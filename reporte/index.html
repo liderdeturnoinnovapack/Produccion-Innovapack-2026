@@ -5,22 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reporte de Producción · Innovapack</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
     --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
     --card:#FFFFFF; --header-bg:rgba(250,250,248,0.92); --th-text:#000;
-    --text:#18181B; --text-dim:#71717A; --accent:#2563EB; --accent-text:#fff;
-    --accent-dim:#EFF6FF; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --text:#18181B; --text-dim:#71717A; --accent:#0091C7; --accent-text:#fff;
+    --accent-dim:#E1F3FA; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --brand-blue:#0091C7; --brand-green:#7CB342;
     --sb-thumb:#a8a293; --sb-thumb-h:#7d7869; --sb-track:rgba(0,0,0,0.04); --row-hover:rgba(0,0,0,0.015);
     --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
     --sans:'Inter','Segoe UI',system-ui,sans-serif;
+    --head:'Roboto','Inter','Segoe UI',system-ui,sans-serif;
     color-scheme:light;
   }
   [data-theme="dark"]{
     --bg:#0F1115; --panel:#171A21; --panel-2:#20242E; --line:#2C313C;
     --card:#171A21; --header-bg:rgba(15,17,21,0.92); --th-text:#E5E7EB;
-    --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#3B82F6; --accent-text:#fff;
-    --accent-dim:#1E293B; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
+    --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#1CA0D6; --accent-text:#fff;
+    --accent-dim:#0C2A33; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
+    --brand-blue:#26B4E0; --brand-green:#8DC63F;
     --sb-thumb:#3A404C; --sb-thumb-h:#4E5563; --sb-track:rgba(255,255,255,0.05); --row-hover:rgba(255,255,255,0.04);
     color-scheme:dark;
   }
@@ -67,7 +70,7 @@ function Logo(){
     <div style={{display:"flex",alignItems:"center",gap:14}}>
       <img src="../shared/logo.png" alt="Innovapack" onError={e=>{e.target.style.display='none';}}
         className="logo-img" style={{height:44,width:"auto",objectFit:"contain"}}/>
-      <div style={{fontFamily:"var(--sans)",fontSize:18,color:"var(--text)",fontWeight:700,letterSpacing:"0.01em"}}>
+      <div style={{fontFamily:"var(--head)",fontSize:18,color:"var(--text)",fontWeight:900,letterSpacing:"0.02em"}}>
         REPORTE DE PRODUCCIÓN
       </div>
     </div>
@@ -390,7 +393,7 @@ function App(){
   useEffect(()=>{ loadConfigRemoto(SHEETS_URL_WRITE).then(()=>{ setCatalog(loadCatalog()); setMachines(loadMachines()); }); },[]);
   return (
     <div id="app-root">
-      <header style={{background:"var(--header-bg)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <header style={{background:"var(--header-bg)",borderBottom:"3px solid var(--brand-blue)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
         <ThemeToggle theme={theme} setTheme={setTheme}/>
       </header>

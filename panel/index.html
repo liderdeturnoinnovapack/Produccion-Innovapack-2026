@@ -5,22 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Producción · Innovapack</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
     --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
     --card:#FFFFFF; --header-bg:rgba(250,250,248,0.92); --th-text:#000; --badge-bg:#e8f4fd; --badge-text:#1a6fa8;
-    --text:#18181B; --text-dim:#71717A; --accent:#2563EB; --accent-text:#fff;
-    --accent-dim:#EFF6FF; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --text:#18181B; --text-dim:#71717A; --accent:#0091C7; --accent-text:#fff;
+    --accent-dim:#E1F3FA; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --brand-blue:#0091C7; --brand-green:#7CB342;
+    --grid:#F0EEE9; --axis:#D1D5DB; --chart-lbl:#6B7280;
     --sb-thumb:#a8a293; --sb-thumb-h:#7d7869; --sb-track:rgba(0,0,0,0.04); --row-hover:rgba(0,0,0,0.015);
     --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
     --sans:'Inter','Segoe UI',system-ui,sans-serif;
+    --head:'Roboto','Inter','Segoe UI',system-ui,sans-serif;
     color-scheme:light;
   }
   [data-theme="dark"]{
     --bg:#0F1115; --panel:#171A21; --panel-2:#20242E; --line:#2C313C;
     --card:#171A21; --header-bg:rgba(15,17,21,0.92); --th-text:#E5E7EB; --badge-bg:#1E3A5F; --badge-text:#93C5FD;
-    --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#3B82F6; --accent-text:#fff;
-    --accent-dim:#1E293B; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
+    --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#1CA0D6; --accent-text:#fff;
+    --accent-dim:#0C2A33; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
+    --brand-blue:#26B4E0; --brand-green:#8DC63F;
+    --grid:#262B35; --axis:#3A404C; --chart-lbl:#9AA1AD;
     --sb-thumb:#3A404C; --sb-thumb-h:#4E5563; --sb-track:rgba(255,255,255,0.05); --row-hover:rgba(255,255,255,0.04);
     color-scheme:dark;
   }
@@ -79,7 +84,7 @@ function Logo(){
     <div style={{display:"flex",alignItems:"center",gap:14}}>
       <img src="../shared/logo.png" alt="Innovapack" onError={e=>{e.target.style.display='none';}}
         className="logo-img" style={{height:44,width:"auto",objectFit:"contain"}}/>
-      <div style={{fontFamily:"var(--sans)",fontSize:18,color:"var(--text)",fontWeight:700,letterSpacing:"0.01em"}}>
+      <div style={{fontFamily:"var(--head)",fontSize:18,color:"var(--text)",fontWeight:900,letterSpacing:"0.02em"}}>
         PANEL DE PRODUCCIÓN
       </div>
     </div>
@@ -249,7 +254,7 @@ function DonutDash({data,title,unidad}){
   const hov=hovered!==null?slices[hovered]:null;
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
       <div style={{display:"flex",gap:16,alignItems:"center"}}>
         <svg width="140" height="140" viewBox="0 0 140 140" style={{flexShrink:0,cursor:"pointer"}}>
           {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="var(--card)" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.45} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)} style={{transition:"opacity 0.15s"}}/>)}
@@ -259,8 +264,8 @@ function DonutDash({data,title,unidad}){
             <text x="70" y="76" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text>
             <text x="70" y="88" textAnchor="middle" fontSize="9" fill="var(--text-dim)">{hov.val.toLocaleString()+u}</text>
           </>:<>
-            <text x="70" y="67" textAnchor="middle" fontSize="9" fill="#9CA3AF">Total</text>
-            <text x="70" y="80" textAnchor="middle" fontSize="11" fontWeight="600" fill="#18181B">{total.toLocaleString()}</text>
+            <text x="70" y="67" textAnchor="middle" fontSize="9" fill="var(--chart-lbl)">Total</text>
+            <text x="70" y="80" textAnchor="middle" fontSize="11" fontWeight="600" fill="var(--text)">{total.toLocaleString()}</text>
           </>}
         </svg>
         <div style={{flex:1}}>
@@ -281,19 +286,19 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
   const [hi,setHi]=useState(null);
   if(!data||data.length===0) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
-  const W=440,H=192,padL=40,padB=36,padT=22,padR=10;
+  const W=440,H=214,padL=40,padB=56,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
   const barW=Math.max(8,Math.floor(chartW/data.length)-4);
   const u=unidad?" "+unidad:"";
   const hov=hi!==null?data[hi]:null;
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
           <g key={t}>
-            <line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="#F0EEE9" strokeWidth="1"/>
-            <text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="#9CA3AF">{Math.round(max*t).toLocaleString()}</text>
+            <line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="var(--grid)" strokeWidth="1"/>
+            <text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="var(--chart-lbl)">{Math.round(max*t).toLocaleString()}</text>
           </g>
         ))}
         {data.map((d,i)=>{
@@ -303,10 +308,10 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
           return(<g key={i} onMouseEnter={()=>setHi(i)} onMouseLeave={()=>setHi(null)}>
             <rect x={x} y={padT} width={barW} height={chartH} fill="transparent"/>
             <rect x={x} y={y} width={barW} height={bH} fill={color} rx="3" opacity={hi===null||hi===i?0.9:0.3} style={{transition:"opacity 0.15s"}}/>
-            <text x={x+barW/2} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(d[labelKey]).length>6?String(d[labelKey]).substring(0,6):d[labelKey]}</text>
+            <g transform={`translate(${x+barW/2} ${padT+chartH+8}) rotate(-90)`}><text textAnchor="end" dominantBaseline="central" fontSize="9" fill="var(--chart-lbl)">{d[labelKey]}</text></g>
           </g>);
         })}
-        <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#D1D5DB" strokeWidth="1"/>
+        <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="var(--axis)" strokeWidth="1"/>
         {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov[labelKey]}: {hov[valueKey].toLocaleString()}{u}</text>}
       </svg>
     </div>
@@ -317,7 +322,7 @@ function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
   const [hi,setHi]=useState(null);
   if(!data||data.length<2) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin suficientes datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
-  const W=440,H=192,padL=40,padB=36,padT=22,padR=10;
+  const W=440,H=214,padL=40,padB=56,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
   const u=unidad?" "+unidad:"";
   const pts=data.map((d,i)=>({x:padL+(i/(data.length-1))*chartW,y:padT+chartH-(d[valueKey]/max)*chartH,label:d[labelKey],val:d[valueKey]}));
@@ -326,19 +331,19 @@ function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
   const hov=hi!==null?pts[hi]:null;
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
-          <g key={t}><line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="#F0EEE9" strokeWidth="1"/><text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="#9CA3AF">{Math.round(max*t)}</text></g>
+          <g key={t}><line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="var(--grid)" strokeWidth="1"/><text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="var(--chart-lbl)">{Math.round(max*t)}</text></g>
         ))}
         <path d={area} fill={color} opacity="0.1"/>
         <polyline points={polyline} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
         {pts.map((p,i)=>(<g key={i} onMouseEnter={()=>setHi(i)} onMouseLeave={()=>setHi(null)}>
           <rect x={p.x-14} y={padT} width="28" height={chartH} fill="transparent"/>
           <circle cx={p.x} cy={p.y} r={hi===i?5:3} fill={color}/>
-          <text x={p.x} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(p.label).length>6?String(p.label).substring(0,6):p.label}</text>
+          <g transform={`translate(${p.x} ${padT+chartH+8}) rotate(-90)`}><text textAnchor="end" dominantBaseline="central" fontSize="9" fill="var(--chart-lbl)">{p.label}</text></g>
         </g>))}
-        <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#D1D5DB" strokeWidth="1"/>
+        <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="var(--axis)" strokeWidth="1"/>
         {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov.label}: {hov.val.toLocaleString()}{u}</text>}
       </svg>
     </div>
@@ -362,12 +367,12 @@ function PieChart({data,title}){
   const hov=hovered!==null?slices[hovered]:null;
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12,fontWeight:600,marginBottom:14}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:14,fontFamily:"var(--head)"}}>{title}</div>
       <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
         <svg width="160" height="160" viewBox="0 0 160 160" style={{cursor:"pointer",flexShrink:0}}>
           {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="var(--card)" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.5} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}/>)}
           <circle cx="80" cy="80" r="35" fill="var(--card)"/>
-          {hov?<><text x="80" y="74" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.label.length>12?hov.label.substring(0,11)+"…":hov.label}</text><text x="80" y="88" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text><text x="80" y="100" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.val.toLocaleString()}</text></>:<><text x="80" y="76" textAnchor="middle" fontSize="10" fill="var(--text-dim)">Total</text><text x="80" y="92" textAnchor="middle" fontSize="13" fontWeight="600">{total.toLocaleString()}</text></>}
+          {hov?<><text x="80" y="74" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.label.length>12?hov.label.substring(0,11)+"…":hov.label}</text><text x="80" y="88" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text><text x="80" y="100" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.val.toLocaleString()}</text></>:<><text x="80" y="76" textAnchor="middle" fontSize="10" fill="var(--text-dim)">Total</text><text x="80" y="92" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--text)">{total.toLocaleString()}</text></>}
         </svg>
         <div style={{flex:1,minWidth:120}}>
           {slices.map((s,i)=>(
@@ -391,7 +396,7 @@ function Top5Card({title,reports,color}){
   const max=top5[0][1];
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
       {top5.map(([ref,val],i)=>(
         <div key={i} style={{marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
@@ -652,7 +657,7 @@ function GeneralTab({reports}){
     <div>
       {/* Barra de filtros GLOBAL */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{fontSize:14,fontWeight:700}}>Resumen general {activeF>0 && <span style={{fontSize:12,fontWeight:500,color:"var(--accent)"}}>· filtrado</span>}</div>
+        <div style={{fontSize:15,fontWeight:700,fontFamily:"var(--head)"}}>Resumen general {activeF>0 && <span style={{fontSize:12,fontWeight:500,color:"var(--accent)"}}>· filtrado</span>}</div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {favs.length>0 && <select onChange={e=>{const fv=favs.find(x=>x.nombre===e.target.value);aplicarFav(fv);e.target.value="";}} defaultValue="" style={{...selStyle,maxWidth:160}}><option value="">⭐ Favoritos…</option>{favs.map(fv=><option key={fv.nombre} value={fv.nombre}>{fv.nombre}</option>)}</select>}
           <button onClick={guardarFav} title="Guardar el filtro actual como favorito" style={{background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⭐ Guardar</button>
@@ -676,13 +681,13 @@ function GeneralTab({reports}){
         <ProdCard reports={fr}/>
         <StatCard label="Merma total" value={rmMerma.pct!==null?rmMerma.pct+"%":totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" highlight="bad" breakdown={bdMerma} trend={rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg merma · ${rmMerma.prodKg.toLocaleString()} kg prod.${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %"}/>
         <StatCard label="Tiempos muertos" value={tmPct!==null?tmPct+"%":totalTM.toLocaleString()} accent="var(--amber)" borderColor="var(--amber)" highlight="amber" breakdown={bdTM} trend={totalProgMin>0?`Perdido ${totalTM.toLocaleString()} min (${tmPct}%) de ${totalProgMin.toLocaleString()} min prog. · ≈ ${totalTMh}h de ${totalProgH}h`:`${totalTM.toLocaleString()} min · ≈ ${totalTMh}h`}/>
-        <StatCard label="% Eficiencia" value={avgEfic} borderColor="#0EA5E9" breakdown={bdEfic} trend={totalProgMin>0?`≈ ${totalProdH}h productivas de ${totalProgH}h programadas`:"Hrs productivas ÷ programadas"}/>
+        <StatCard label="% Eficiencia" value={avgEfic} borderColor="var(--brand-blue)" breakdown={bdEfic} trend={totalProgMin>0?`≈ ${totalProdH}h productivas de ${totalProgH}h programadas`:"Hrs productivas ÷ programadas"}/>
       </div>
 
       {/* GRÁFICAS (ya filtradas) */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <BarChartDash data={prodByDayKg} title="Producción por día · Kg" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
-        <BarChartDash data={prodByDayUnd} title="Producción por día · Unidades" color="#0EA5E9" labelKey="label" valueKey="val" unidad="und"/>
+        <BarChartDash data={prodByDayUnd} title="Producción por día · Unidades" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="und"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
         <BarChartDash data={mermaPorMaq} title="Merma por máquina" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
@@ -706,7 +711,7 @@ function GeneralTab({reports}){
 
       {/* TENDENCIA EFICIENCIA + TOP MOTIVOS TIEMPO MUERTO */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
-        <LineChartDash data={efTrend} title="Tendencia de eficiencia (%)" color="#0EA5E9" labelKey="label" valueKey="val" unidad="%"/>
+        <LineChartDash data={efTrend} title="Tendencia de eficiencia (%)" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="%"/>
         <BarChartDash data={topTM} title="Top motivos de tiempo muerto" color="var(--amber)" labelKey="label" valueKey="val" unidad="min"/>
       </div>
 
@@ -1173,7 +1178,7 @@ function InventarioRollos({reports}){
 
   return (
     <div style={{marginBottom:26}}>
-      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>📦 Inventario de producto en proceso <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(según reportes)</span></div>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📦 Inventario de producto en proceso <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(según reportes)</span></div>
       <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Rollos de extrusión, <b>lámina impresa</b> (impresión) y refilado (<b>lámina</b> / <b>lámina doblada</b>). El <b>stock real</b> se ajustará con el inventario base (que nos pasarás) y los consumos (Fase 3).</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:14}}>
         <InvCard label="Registros" value={rollos.length.toLocaleString()} color="var(--accent)"/>
@@ -1235,7 +1240,7 @@ function InventarioPT({reports}){
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   return (
     <div style={{marginBottom:26}}>
-      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>📦 Inventario de producto terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(producido según reportes)</span></div>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📦 Inventario de producto terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(producido según reportes)</span></div>
       <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Cantidades y su <b>peso en kg</b> según la referencia. El <b>stock real</b> se ajustará con los consumos por pedido/remisión (Fase 3).</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
         <InvCard label="Referencias" value={inv.length.toLocaleString()} color="var(--accent)"/>
@@ -1328,7 +1333,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
         <div style={{marginTop:24}}>
-          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Administración</div>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:12,fontFamily:"var(--head)"}}>Administración</div>
           <CatalogEditor catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} onEditMetas={()=>setShowMetas(true)}/>
         </div>
       </>}
@@ -1373,7 +1378,7 @@ function App(){
 
   return(
     <div id="app-root">
-      <header style={{background:"var(--header-bg)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <header style={{background:"var(--header-bg)",borderBottom:"3px solid var(--brand-blue)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}
