@@ -18,8 +18,11 @@
   #app-root{min-height:100vh;}
   input,select,button{font-family:var(--sans);}
   input:focus,select:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(37,99,235,0.1)!important;}
-  ::-webkit-scrollbar{width:5px;height:5px;}
-  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
+  *{scrollbar-width:auto;scrollbar-color:#9c968a transparent;}
+  ::-webkit-scrollbar{width:15px;height:15px;}
+  ::-webkit-scrollbar-track{background:rgba(0,0,0,0.04);border-radius:12px;}
+  ::-webkit-scrollbar-thumb{background:#a8a293;border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
+  ::-webkit-scrollbar-thumb:hover{background:#7d7869;background-clip:content-box;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>

@@ -396,3 +396,80 @@ function inventarioPT(list){
   });
   return Object.values(mapa).sort((a,b)=> b.kg - a.kg);
 }
+
+
+/* ============================================================================
+   PRODUCTO EN PROCESO  —  tipo/color de cada reporte y su inventario
+   ----------------------------------------------------------------------------
+   Reglas Innovapack:
+   - Impresora .................... siempre "Lámina Impresa" (filtrable por SISA).
+   - Refiladora (alimentos):
+        · referencia con "bolsa" .. "Lámina Doblada"
+        · referencia con "lámina" . "Lámina"
+   - Extrusoras ................... según categoría / referencia:
+        Lámina · Semitubular · Tubular · Lámina Termoencogible.
+   El color se deduce de la referencia (Blanco / Transparente).
+   ========================================================================== */
+function tipoProceso(report){
+  const cls = clasificarReporte(report);
+  const cat = cls.categoria || "";
+  const ref = String(report.referencia || "").toLowerCase();
+  const tieneBolsa  = ref.indexOf("bolsa") !== -1;
+  const tieneLamina = ref.indexOf("lamina") !== -1 || ref.indexOf("lámina") !== -1;
+
+  if(report.maquina === "Impresora") return "Lámina Impresa";
+
+  if(report.maquina === "Refiladora"){
+    if(tieneBolsa)  return "Lámina Doblada";
+    if(tieneLamina) return "Lámina";
+    return cat || "Lámina";
+  }
+
+  // Extrusión (u otra máquina de proceso). OJO: "semitubular" contiene "tubular",
+  // por eso se evalúa semitubular primero.
+  if(cat === "Lámina Termoencogible") return "Lámina Termoencogible";
+  if(cat === "Semitubular" || ref.indexOf("semitub") !== -1) return "Semitubular";
+  if(cat === "Tubular"     || ref.indexOf("tubular") !== -1) return "Tubular";
+  if(cat === "Lámina"      || tieneLamina) return "Lámina";
+  return cat || "Lámina";
+}
+
+function colorProceso(report){
+  const ref = String(report.referencia || "").toLowerCase();
+  if(ref.indexOf("transp") !== -1 || ref.indexOf("cristal") !== -1) return "Transparente";
+  if(ref.indexOf("blanc")  !== -1) return "Blanco";
+  return "";
+}
+
+/* Inventario de Producto en Proceso: aplana rollos (o una fila-resumen por
+   reporte sin detalle de rollos) y les añade tipo/color/código SISA.
+   Recibe una lista YA filtrada a bodega = "Producto en Proceso". */
+function inventarioProceso(list){
+  const out = [];
+  list.forEach(r=>{
+    const tipo   = tipoProceso(r);
+    const color  = colorProceso(r);
+    const codigo = r.siesa || r.sku || "";
+    const rolls  = parseRollos(r);
+    if(rolls.length){
+      rolls.forEach(roll=>{
+        out.push({
+          ...roll, tipo, color, codigo,
+          peso: roll.peso || roll.pesoFinal || roll.pesoInicial || ""
+        });
+      });
+    } else {
+      const unidad = String(r.unidad || "").toLowerCase();
+      const pesoKg = unidad.indexOf("kg") === 0 ? (Number(r.produccion) || 0) : "";
+      out.push({
+        numero:"", rolloMadre:"",
+        medida:  (r.extraMedida  && r.extraMedida  !== "-") ? r.extraMedida  : "",
+        calibre: (r.extraCalibre && r.extraCalibre !== "-") ? r.extraCalibre : "",
+        peso: pesoKg, maquina: r.maquina, fecha: r.fecha, fechaTurno: r.fechaTurno,
+        turno: r.turno, operario: r.nombre, siesa: r.siesa, referencia: r.referencia,
+        tipo, color, codigo
+      });
+    }
+  });
+  return out;
+}

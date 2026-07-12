@@ -19,8 +19,11 @@
   input,select,button{font-family:var(--sans);}
   input:focus,select:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(37,99,235,0.1)!important;}
   tr:hover td{background:rgba(0,0,0,0.015);}
-  ::-webkit-scrollbar{width:5px;height:5px;}
-  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
+  *{scrollbar-width:auto;scrollbar-color:#9c968a transparent;}
+  ::-webkit-scrollbar{width:15px;height:15px;}
+  ::-webkit-scrollbar-track{background:rgba(0,0,0,0.04);border-radius:12px;}
+  ::-webkit-scrollbar-thumb{background:#a8a293;border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
+  ::-webkit-scrollbar-thumb:hover{background:#7d7869;background-clip:content-box;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -612,7 +615,7 @@ function GeneralTab({reports}){
 
 /* ================== VISTA POR BODEGA (PT / PP) ==================
    Producto en Proceso incluye la ficha de MERMA %. */
-const TIPO_COLORS={"Bolsa de agua":"#3B82F6","Bolsa valvulada":"#16A34A","Bolsa abierta":"#D97706","Flow Pack":"#8B5CF6","Lámina":"#06B6D4","Lámina Termoencogible":"#0EA5E9","Lámina Impresa":"#6366F1","Tubular":"#EC4899","Semitubular":"#F97316","Rollo":"#84CC16","Sachet/Doypack":"#DC2626"};
+const TIPO_COLORS={"Bolsa de agua":"#3B82F6","Bolsa valvulada":"#16A34A","Bolsa abierta":"#D97706","Flow Pack":"#8B5CF6","Lámina":"#06B6D4","Lámina Termoencogible":"#0EA5E9","Lámina Impresa":"#6366F1","Lámina Doblada":"#14B8A6","Tubular":"#EC4899","Semitubular":"#F97316","Rollo":"#84CC16","Sachet/Doypack":"#DC2626"};
 
 function Top5PorTipo({reports,tipos,getCategoria}){
   const conDatos=tipos.filter(t=>t!=="Todos"&&reports.some(r=>getCategoria(r)===t));
@@ -974,49 +977,86 @@ function TrazabilidadModal({siesa, reports, onClose}){
 }
 
 function InventarioRollos({reports}){
-  const [fMaq,setFMaq]=useState(""); const [buscar,setBuscar]=useState("");
-  const maquinasRollo=["Extrusora 1","Extrusora 2","Refiladora"];
-  let rollos=rollosDeReportes(reports.filter(r=>maquinasRollo.includes(r.maquina)));
-  if(fMaq) rollos=rollos.filter(r=>r.maquina===fMaq);
-  if(buscar.trim()) rollos=rollos.filter(r=>String(r.numero).includes(buscar.trim()));
-  const totalKg=rollos.reduce((s,r)=>s+(Number(r.peso)||0),0);
+  const [fMaq,setFMaq]=useState(""); const [fTipo,setFTipo]=useState("");
+  const [fMedida,setFMedida]=useState(""); const [fColor,setFColor]=useState("");
+  const [buscar,setBuscar]=useState("");
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+  const tipoColor=t=>TIPO_COLORS[t]||"#64748B";
+
+  // Solo reportes cuya bodega es "Producto en Proceso" (excluye la excepción Termo→PT).
+  const base=reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso");
+  const all=inventarioProceso(base);
+
+  // Opciones de filtro derivadas de los datos.
+  const maquinas=[...new Set(all.map(r=>r.maquina).filter(Boolean))].sort();
+  const tipos=[...new Set(all.map(r=>r.tipo).filter(Boolean))].sort();
+  const medidas=[...new Set(all.map(r=>String(r.medida)).filter(m=>m&&m!=="-"))].sort((a,b)=>(parseFloat(a)||0)-(parseFloat(b)||0));
+  const colores=[...new Set(all.map(r=>r.color).filter(Boolean))].sort();
+
+  let rollos=all;
+  if(fMaq)    rollos=rollos.filter(r=>r.maquina===fMaq);
+  if(fTipo)   rollos=rollos.filter(r=>r.tipo===fTipo);
+  if(fMedida) rollos=rollos.filter(r=>String(r.medida)===fMedida);
+  if(fColor)  rollos=rollos.filter(r=>r.color===fColor);
+  if(buscar.trim()){
+    const q=buscar.trim().toLowerCase();
+    rollos=rollos.filter(r=>String(r.numero).toLowerCase().includes(q)||String(r.codigo).toLowerCase().includes(q)||String(r.referencia||"").toLowerCase().includes(q));
+  }
+  const totalKg=rollos.reduce((s,r)=>s+(Number(r.peso)||0),0);
+  const hayFiltro=fMaq||fTipo||fMedida||fColor||buscar.trim();
+
+  // Conteo por tipo (sobre el resultado filtrado) para las "chips".
+  const porTipo={}; rollos.forEach(r=>{porTipo[r.tipo]=(porTipo[r.tipo]||0)+1;});
+  const chips=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+
   return (
     <div style={{marginBottom:26}}>
-      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>📦 Inventario de rollos <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(producidos según reportes)</span></div>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Rollos producidos que capturan los reportes. El <b>stock real</b> se ajustará con el inventario base (que nos pasarás) y los consumos (Fase 3).</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
-        <InvCard label="Rollos (registros)" value={rollos.length.toLocaleString()} color="var(--accent)"/>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>📦 Inventario de producto en proceso <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(según reportes)</span></div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Rollos de extrusión, <b>lámina impresa</b> (impresión) y refilado (<b>lámina</b> / <b>lámina doblada</b>). El <b>stock real</b> se ajustará con el inventario base (que nos pasarás) y los consumos (Fase 3).</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:14}}>
+        <InvCard label="Registros" value={rollos.length.toLocaleString()} color="var(--accent)"/>
         <InvCard label="Peso total" value={Math.round(totalKg).toLocaleString()+" kg"} color="var(--good)"/>
-        <InvCard label="Máquinas" value={new Set(rollos.map(r=>r.maquina)).size} color="var(--amber)"/>
+        <InvCard label="Tipos distintos" value={new Set(rollos.map(r=>r.tipo)).size} color="var(--amber)"/>
       </div>
+      {chips.length>0 && <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+        {chips.map(([t,n])=>(
+          <span key={t} style={{fontSize:11.5,fontWeight:600,padding:"4px 10px",borderRadius:20,color:"#fff",background:tipoColor(t)}}>{t}: {n.toLocaleString()}</span>
+        ))}
+      </div>}
       <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-        <select style={{...selStyle,maxWidth:200}} value={fMaq} onChange={e=>setFMaq(e.target.value)}><option value="">Todas las máquinas</option>{maquinasRollo.map(m=><option key={m} value={m}>{m}</option>)}</select>
-        <input style={{...selStyle,maxWidth:220}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar # de rollo…"/>
+        <select style={{...selStyle,maxWidth:190}} value={fMaq} onChange={e=>setFMaq(e.target.value)}><option value="">Todas las máquinas</option>{maquinas.map(m=><option key={m} value={m}>{m}</option>)}</select>
+        <select style={{...selStyle,maxWidth:190}} value={fTipo} onChange={e=>setFTipo(e.target.value)}><option value="">Todos los tipos</option>{tipos.map(t=><option key={t} value={t}>{t}</option>)}</select>
+        <select style={{...selStyle,maxWidth:150}} value={fMedida} onChange={e=>setFMedida(e.target.value)}><option value="">Toda medida</option>{medidas.map(m=><option key={m} value={m}>{m} cm</option>)}</select>
+        <select style={{...selStyle,maxWidth:150}} value={fColor} onChange={e=>setFColor(e.target.value)}><option value="">Todo color</option>{colores.map(c=><option key={c} value={c}>{c}</option>)}</select>
+        <input style={{...selStyle,maxWidth:230}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar # rollo o código SISA…"/>
+        {hayFiltro && <button onClick={()=>{setFMaq("");setFTipo("");setFMedida("");setFColor("");setBuscar("");}} style={{...selStyle,cursor:"pointer",background:"var(--panel-2)",maxWidth:110}}>✕ Limpiar</button>}
       </div>
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["# Rollo","Máquina","Medida (cm)","Calibre","Peso (kg)","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["# Rollo","Tipo","Color","Máquina","Medida (cm)","Calibre","Peso (kg)","Código SISA","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rollos.slice(0,500).map((r,i)=>(
               <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{r.numero||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}><span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,color:"#fff",background:tipoColor(r.tipo)}}>{r.tipo}</span></td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.color||"-"}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
                 <td style={{padding:"8px 10px"}}>{r.medida||"-"}</td>
                 <td style={{padding:"8px 10px"}}>{r.calibre||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)"}}>{r.peso||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{r.codigo||"-"}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fechaTurno||r.fecha||"-"}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:12}}>{r.turno||"-"}</td>
                 <td style={{padding:"8px 10px"}}>{r.operario||"-"}</td>
               </tr>
             ))}
-            {rollos.length===0 && <tr><td colSpan="8" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin rollos registrados aún.</td></tr>}
+            {rollos.length===0 && <tr><td colSpan="11" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin registros de producto en proceso.</td></tr>}
           </tbody>
         </table>
       </div>
-      {rollos.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {rollos.length.toLocaleString()}. Usa el filtro para acotar.</div>}
+      {rollos.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {rollos.length.toLocaleString()}. Usa los filtros para acotar.</div>}
     </div>
   );
 }
