@@ -14,6 +14,7 @@
     --sb-thumb:#a8a293; --sb-thumb-h:#7d7869; --sb-track:rgba(0,0,0,0.04); --row-hover:rgba(0,0,0,0.015);
     --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
     --sans:'Inter','Segoe UI',system-ui,sans-serif;
+    color-scheme:light;
   }
   [data-theme="dark"]{
     --bg:#0F1115; --panel:#171A21; --panel-2:#20242E; --line:#2C313C;
@@ -21,6 +22,7 @@
     --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#3B82F6; --accent-text:#fff;
     --accent-dim:#1E293B; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
     --sb-thumb:#3A404C; --sb-thumb-h:#4E5563; --sb-track:rgba(255,255,255,0.05); --row-hover:rgba(255,255,255,0.04);
+    color-scheme:dark;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background 0.2s,color 0.2s;}
@@ -34,8 +36,6 @@
   ::-webkit-scrollbar-track{background:var(--sb-track);border-radius:12px;}
   ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
   ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-h);background-clip:content-box;}
-  .logo-img{mix-blend-mode:multiply;}
-  [data-theme="dark"] .logo-img{mix-blend-mode:screen;filter:brightness(1.8) saturate(1.2);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
