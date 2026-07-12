@@ -170,14 +170,18 @@ function RendBar({rend}){
 /* Producción total separada: Kg Prod.Terminado / Kg Prod.Proceso / Unidades */
 function ProdCard({reports}){
   const [open,setOpen]=useState(false);
-  const repsPT = reports.filter(r=>clasificarReporte(r).bodega==="Producto Terminado" && MAQUINAS_KG.includes(r.maquina));
-  const repsPP = reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso" && MAQUINAS_KG.includes(r.maquina));
+  const ALLM = MAQUINAS_KG.concat(MAQUINAS_UND);
+  // Kg por bodega: TODAS las máquinas (las selladoras convierten unidades→kg por peso de referencia).
+  const repsPT = reports.filter(r=>clasificarReporte(r).bodega==="Producto Terminado");
+  const repsPP = reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso");
   const repsUnd= reports.filter(r=>MAQUINAS_UND.includes(r.maquina));
-  const sum = list => list.reduce((s,r)=>s+(Number(r.produccion)||0),0);
-  const totalKgPT=sum(repsPT), totalKgPP=sum(repsPP), totalUnd=sum(repsUnd);
-  const totalUndKg=repsUnd.reduce((s,r)=>s+produccionKg(r),0); // kg equivalentes de las unidades (según peso por referencia)
-  const bd = (list)=> MAQUINAS_KG.concat(MAQUINAS_UND).map(m=>({maquina:m,val:list.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(x=>x.val>0);
-  const bdKgPT=bd(repsPT), bdKgPP=bd(repsPP), bdUnd=bd(repsUnd);
+  const sumKg = list => Math.round(list.reduce((s,r)=>s+produccionKg(r),0));
+  const totalKgPT=sumKg(repsPT), totalKgPP=sumKg(repsPP);
+  const totalUnd=repsUnd.reduce((s,r)=>s+(Number(r.produccion)||0),0);
+  const totalUndKg=Math.round(repsUnd.reduce((s,r)=>s+produccionKg(r),0)); // kg equiv. de las unidades (ya incluidos en los kg de arriba)
+  const bdKg = (list)=> ALLM.map(m=>({maquina:m,val:Math.round(list.filter(r=>r.maquina===m).reduce((s,r)=>s+produccionKg(r),0))})).filter(x=>x.val>0);
+  const bdKgPT=bdKg(repsPT), bdKgPP=bdKg(repsPP);
+  const bdUnd=MAQUINAS_UND.map(m=>({maquina:m,val:repsUnd.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(x=>x.val>0);
   const row=(label,val,unit)=>(
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
       <span style={{fontSize:12.5,color:"var(--text-dim)",fontWeight:500}}>{label}</span>
@@ -205,7 +209,7 @@ function ProdCard({reports}){
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
           <div style={{display:"flex",flexDirection:"column"}}>
             <span style={{fontSize:12.5,color:"var(--text-dim)",fontWeight:500}}>Unidades</span>
-            {totalUndKg>0 && <span style={{fontSize:11,color:"var(--text-dim)"}}>≈ {Math.round(totalUndKg).toLocaleString()} kg equiv. (según peso)</span>}
+            {totalUndKg>0 && <span style={{fontSize:11,color:"var(--text-dim)"}}>≈ {totalUndKg.toLocaleString()} kg (ya sumados en los Kg de arriba)</span>}
           </div>
           <span style={{fontSize:18,fontWeight:600,fontFamily:"var(--mono)",color:"var(--good)"}}>{totalUnd.toLocaleString()}</span>
         </div>
@@ -586,15 +590,16 @@ function GeneralTab({reports}){
   const totalProdMin=byMaq.reduce((s,x)=>s+x.prodMin,0);
   const avgEfic=totalProgMin>0?Math.round((totalProdMin/totalProgMin)*100)+"%":"-";
   const tmPct=totalProgMin>0?Math.round((totalTM/totalProgMin)*1000)/10:null; // % de tiempo muerto vs tiempo programado
-  const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?x.eficiencia+"%":"-"})).filter(x=>x.val!=="-");
+  const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?`${x.horasProd}/${x.horasProg} · ${x.eficiencia}%`:"-"})).filter(x=>x.val!=="-");
+  const totalTMh=(totalTM/60).toFixed(1), totalProgH=(totalProgMin/60).toFixed(1), totalProdH=(totalProdMin/60).toFixed(1);
 
   /* ---- Datos de gráficas (sobre fr) ---- */
   const byDayKg={}, byDayUnd={};
   fr.forEach(r=>{const d=getFechaISO(r);if(!d)return;
-    if(MAQUINAS_KG.includes(r.maquina)) byDayKg[d]=(byDayKg[d]||0)+(Number(r.produccion)||0);
-    else if(MAQUINAS_UND.includes(r.maquina)) byDayUnd[d]=(byDayUnd[d]||0)+(Number(r.produccion)||0);
+    const pk=produccionKg(r); if(pk>0) byDayKg[d]=(byDayKg[d]||0)+pk;   // TODAS las máquinas (selladoras convertidas a kg)
+    if(MAQUINAS_UND.includes(r.maquina)) byDayUnd[d]=(byDayUnd[d]||0)+(Number(r.produccion)||0);
   });
-  const prodByDayKg=Object.entries(byDayKg).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const prodByDayKg=Object.entries(byDayKg).sort().map(([d,v])=>({label:d.slice(5),val:Math.round(v)}));
   const prodByDayUnd=Object.entries(byDayUnd).sort().map(([d,v])=>({label:d.slice(5),val:v}));
   const mermaByDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)mermaByDay[d]=(mermaByDay[d]||0)+sumNumeros(r.mermasCantidad);});
   const mermaByDayArr=Object.entries(mermaByDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
@@ -660,8 +665,8 @@ function GeneralTab({reports}){
         <StatCard label="Reportes" value={fr.length} borderColor="#3B82F6" breakdown={bdReportes} trend={`${fr.length} de ${reports.length} totales`}/>
         <ProdCard reports={fr}/>
         <StatCard label="Merma total" value={rmMerma.pct!==null?rmMerma.pct+"%":totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" highlight="bad" breakdown={bdMerma} trend={rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg merma · ${rmMerma.prodKg.toLocaleString()} kg prod.${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %"}/>
-        <StatCard label="Tiempos muertos" value={tmPct!==null?tmPct+"%":totalTM.toLocaleString()} accent="var(--amber)" borderColor="var(--amber)" highlight="amber" breakdown={bdTM} trend={`${totalTM.toLocaleString()} min · ≈ ${(totalTM/60).toFixed(1)}h`}/>
-        <StatCard label="% Eficiencia" value={avgEfic} borderColor="#0EA5E9" breakdown={bdEfic} trend="Hrs productivas ÷ programadas"/>
+        <StatCard label="Tiempos muertos" value={tmPct!==null?tmPct+"%":totalTM.toLocaleString()} accent="var(--amber)" borderColor="var(--amber)" highlight="amber" breakdown={bdTM} trend={totalProgMin>0?`Perdido ${totalTM.toLocaleString()} min (${tmPct}%) de ${totalProgMin.toLocaleString()} min prog. · ≈ ${totalTMh}h de ${totalProgH}h`:`${totalTM.toLocaleString()} min · ≈ ${totalTMh}h`}/>
+        <StatCard label="% Eficiencia" value={avgEfic} borderColor="#0EA5E9" breakdown={bdEfic} trend={totalProgMin>0?`≈ ${totalProdH}h productivas de ${totalProgH}h programadas`:"Hrs productivas ÷ programadas"}/>
       </div>
 
       {/* GRÁFICAS (ya filtradas) */}
