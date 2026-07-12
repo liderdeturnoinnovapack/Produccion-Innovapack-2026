@@ -62,9 +62,11 @@
 <script type="text/babel" data-presets="react">
 const { useState, useEffect } = React;
 
-/* URL de LECTURA del panel (endpoint Apps Script administrativo). */
-const SHEETS_URL_READ = "https://script.google.com/macros/s/AKfycby3m0ptMQjUEYkVmMt1Fij1fQWIhBxZ1WuyYF84fKJYLIrj3Cwn0Ifr8bRm0AF7m2ic/exec";
-window.__CONFIG_URL = SHEETS_URL_READ; // el panel lee y ESCRIBE la config compartida
+/* Endpoint Apps Script (deployment con el código NUEVO: reportes + config).
+   Usamos el mismo que ya quedó actualizado y funcionando, para no depender de
+   identificar cuál de las muchas implementaciones "Sin título" corresponde. */
+const SHEETS_URL_READ = "https://script.google.com/macros/s/AKfycbwv0-tKDdA8uOn6UYy3Z0YG0V-wg7ZNyKUkynpuupWXysWfkXXmRuNQmCGivPwBxKyF/exec";
+window.__CONFIG_URL = SHEETS_URL_READ; // el panel lee reportes y lee/ESCRIBE la config compartida
 
 const inputStyle = {
   width:"100%", padding:"10px 13px", background:"var(--card)", border:"1px solid var(--line)",
