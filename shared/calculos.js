@@ -35,19 +35,32 @@ function cleanTime(v){
   return m ? m[1] : String(v);
 }
 
-/* Devuelve la fecha del reporte en formato ISO (yyyy-mm-dd).
-   Prioriza fechaTurno (fecha real de producción); si no, usa la fecha de
-   digitación dd/MM/yyyy. Clave para el rendimiento por día. */
+/* Devuelve la fecha del reporte en formato ISO (yyyy-mm-dd), agrupable por DÍA.
+   Prioriza fechaTurno (fecha real de producción); si no, la fecha de digitación.
+   Soporta varios formatos que puede devolver Google Sheets:
+     - ISO:                 "2026-07-04..."
+     - dd/MM/yyyy [hh:mm]:  "04/07/2026 18:14"
+     - Date.toString():     "Sat Jul 04 2026 00:00:00 GMT-0500 (...)"
+   Si el valor no es una fecha reconocible (p.ej. un consecutivo), lo ignora. */
 function getFechaISO(r){
-  if(r.fechaTurno && r.fechaTurno !== "-"){
-    return String(r.fechaTurno).slice(0,10);
+  var MESES = {Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",Jul:"07",Aug:"08",Sep:"09",Oct:"10",Nov:"11",Dec:"12"};
+  function norm(v){
+    if(v === undefined || v === null || v === "-" || v === "") return "";
+    var s = String(v).trim();
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                 // ISO
+    if(m) return m[1]+"-"+m[2]+"-"+m[3];
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);               // dd/MM/yyyy
+    if(m) return m[3]+"-"+String(m[2]).padStart(2,"0")+"-"+String(m[1]).padStart(2,"0");
+    m = s.match(/\b([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{4})/);      // "Sat Jul 04 2026"
+    if(m && MESES[m[1]]) return m[3]+"-"+MESES[m[1]]+"-"+String(m[2]).padStart(2,"0");
+    var d = new Date(s);                                         // último recurso
+    if(!isNaN(d.getTime())){
+      var p = function(n){ return String(n).padStart(2,"0"); };
+      return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+    }
+    return "";
   }
-  if(r.fecha){
-    const p = String(r.fecha).split(" ")[0]; // dd/MM/yyyy
-    const parts = p.split("/");
-    if(parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return "";
+  return norm(r.fechaTurno) || norm(r.fecha) || "";
 }
 
 /* Normaliza un reporte que llega de Google Sheets. */
