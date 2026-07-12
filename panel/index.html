@@ -86,22 +86,25 @@ function PinGate({onUnlock}){
   );
 }
 
-function StatCard({label,value,accent,borderColor,breakdown,trend}){
+function StatCard({label,value,accent,borderColor,breakdown,trend,highlight}){
   const [open,setOpen]=useState(false);
+  const hlBg=highlight==="bad"?"#FEE2E2":highlight==="amber"?"#FEF3C7":highlight==="good"?"#DCFCE7":null;
   return (
     <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:`3px solid ${borderColor||"var(--line)"}`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:10.5,color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:5}}>{label}</div>
-      <div style={{fontSize:26,fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)",marginBottom:5,letterSpacing:"-0.02em"}}>{value}</div>
+      {hlBg
+        ? <div style={{display:"inline-block",fontSize:30,fontWeight:800,fontFamily:"var(--mono)",color:accent||"var(--text)",background:hlBg,borderRadius:10,padding:"3px 12px",marginBottom:6,letterSpacing:"-0.02em"}}>{value}</div>
+        : <div style={{fontSize:26,fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)",marginBottom:5,letterSpacing:"-0.02em"}}>{value}</div>}
       {trend && <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:breakdown?8:0}}>{trend}</div>}
       {breakdown && (
         <>
           <button onClick={()=>setOpen(!open)} style={{background:"none",border:"1px solid var(--line)",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",color:"var(--text-dim)",marginTop:4}}>{open?"▲ Ocultar":"▼ Por máquina"}</button>
           {open && (
             <div style={{marginTop:10}}>
-              {breakdown.map(({maquina,val})=>(
+              {breakdown.map(({maquina,val,pct})=>(
                 <div key={maquina} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--line)"}}>
                   <span style={{color:"var(--text-dim)",fontWeight:500}}>{maquina}</span>
-                  <span style={{fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)"}}>{typeof val==="number"?val.toLocaleString():val}</span>
+                  <span style={{fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)"}}>{typeof val==="number"?val.toLocaleString():val}{pct!==null&&pct!==undefined?<span style={{color:"var(--text-dim)",fontWeight:500,marginLeft:5}}>({pct}%)</span>:""}</span>
                 </div>
               ))}
             </div>
@@ -238,16 +241,19 @@ function DonutDash({data,title,unidad}){
   );
 }
 
-function BarChartDash({data,title,color,labelKey,valueKey}){
-  if(!data||data.length===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>Sin datos</div>;
+function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
+  const [hi,setHi]=useState(null);
+  if(!data||data.length===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
-  const W=440,H=180,padL=40,padB=36,padT=10,padR=10;
+  const W=440,H=192,padL=40,padB=36,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
   const barW=Math.max(8,Math.floor(chartW/data.length)-4);
+  const u=unidad?" "+unidad:"";
+  const hov=hi!==null?data[hi]:null;
   return(
     <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
           <g key={t}>
             <line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="#F0EEE9" strokeWidth="1"/>
@@ -258,33 +264,46 @@ function BarChartDash({data,title,color,labelKey,valueKey}){
           const bH=Math.max(2,(d[valueKey]/max)*chartH);
           const x=padL+(i/data.length)*chartW+(chartW/data.length-barW)/2;
           const y=padT+chartH-bH;
-          return(<g key={i}><rect x={x} y={y} width={barW} height={bH} fill={color} rx="3" opacity="0.85"/><text x={x+barW/2} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(d[labelKey]).length>6?String(d[labelKey]).substring(0,6):d[labelKey]}</text></g>);
+          return(<g key={i} onMouseEnter={()=>setHi(i)} onMouseLeave={()=>setHi(null)}>
+            <rect x={x} y={padT} width={barW} height={chartH} fill="transparent"/>
+            <rect x={x} y={y} width={barW} height={bH} fill={color} rx="3" opacity={hi===null||hi===i?0.9:0.3} style={{transition:"opacity 0.15s"}}/>
+            <text x={x+barW/2} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(d[labelKey]).length>6?String(d[labelKey]).substring(0,6):d[labelKey]}</text>
+          </g>);
         })}
         <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#D1D5DB" strokeWidth="1"/>
+        {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov[labelKey]}: {hov[valueKey].toLocaleString()}{u}</text>}
       </svg>
     </div>
   );
 }
 
-function LineChartDash({data,title,color,labelKey,valueKey}){
-  if(!data||data.length<2) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>Sin suficientes datos</div>;
+function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
+  const [hi,setHi]=useState(null);
+  if(!data||data.length<2) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin suficientes datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
-  const W=440,H=180,padL=40,padB=36,padT=10,padR=10;
+  const W=440,H=192,padL=40,padB=36,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
+  const u=unidad?" "+unidad:"";
   const pts=data.map((d,i)=>({x:padL+(i/(data.length-1))*chartW,y:padT+chartH-(d[valueKey]/max)*chartH,label:d[labelKey],val:d[valueKey]}));
   const polyline=pts.map(p=>`${p.x},${p.y}`).join(" ");
   const area=`M${pts[0].x},${padT+chartH} `+pts.map(p=>`L${p.x},${p.y}`).join(" ")+` L${pts[pts.length-1].x},${padT+chartH} Z`;
+  const hov=hi!==null?pts[hi]:null;
   return(
     <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
           <g key={t}><line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="#F0EEE9" strokeWidth="1"/><text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="#9CA3AF">{Math.round(max*t)}</text></g>
         ))}
         <path d={area} fill={color} opacity="0.1"/>
         <polyline points={polyline} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
-        {pts.map((p,i)=>(<g key={i}><circle cx={p.x} cy={p.y} r="3" fill={color}/><text x={p.x} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(p.label).length>6?String(p.label).substring(0,6):p.label}</text></g>))}
+        {pts.map((p,i)=>(<g key={i} onMouseEnter={()=>setHi(i)} onMouseLeave={()=>setHi(null)}>
+          <rect x={p.x-14} y={padT} width="28" height={chartH} fill="transparent"/>
+          <circle cx={p.x} cy={p.y} r={hi===i?5:3} fill={color}/>
+          <text x={p.x} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(p.label).length>6?String(p.label).substring(0,6):p.label}</text>
+        </g>))}
         <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#D1D5DB" strokeWidth="1"/>
+        {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov.label}: {hov.val.toLocaleString()}{u}</text>}
       </svg>
     </div>
   );
@@ -401,8 +420,8 @@ function GeneralTab({reports}){
   const rmMerma=resumenMerma(fr); // merma % (merma kg ÷ producción kg)
   const totalTM=fr.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
   const MAQ=MAQUINAS_KG.concat(MAQUINAS_UND);
-  const bdMerma=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0)})).filter(x=>x.val>0);
-  const bdTM=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0)})).filter(x=>x.val>0);
+  const bdMerma=MAQ.map(m=>{const list=fr.filter(r=>r.maquina===m);return{maquina:m,val:list.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0),pct:resumenMerma(list).pct};}).filter(x=>x.val>0);
+  const bdTM=MAQ.map(m=>{const list=fr.filter(r=>r.maquina===m);const prog=eficienciaDe(list).prog;const val=list.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);return{maquina:m,val,pct:prog>0?Math.round((val/prog)*100):null};}).filter(x=>x.val>0);
   const bdReportes=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).length})).filter(x=>x.val>0);
 
   /* ---- Resumen + eficiencia por máquina (sobre fr) ----
@@ -442,13 +461,20 @@ function GeneralTab({reports}){
   const totalProgMin=byMaq.reduce((s,x)=>s+x.progMin,0);
   const totalProdMin=byMaq.reduce((s,x)=>s+x.prodMin,0);
   const avgEfic=totalProgMin>0?Math.round((totalProdMin/totalProgMin)*100)+"%":"-";
+  const tmPct=totalProgMin>0?Math.round((totalTM/totalProgMin)*1000)/10:null; // % de tiempo muerto vs tiempo programado
   const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?x.eficiencia+"%":"-"})).filter(x=>x.val!=="-");
 
   /* ---- Datos de gráficas (sobre fr) ---- */
-  const byDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)byDay[d]=(byDay[d]||0)+(Number(r.produccion)||0);});
-  const prodByDay=Object.entries(byDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const byDayKg={}, byDayUnd={};
+  fr.forEach(r=>{const d=getFechaISO(r);if(!d)return;
+    if(MAQUINAS_KG.includes(r.maquina)) byDayKg[d]=(byDayKg[d]||0)+(Number(r.produccion)||0);
+    else if(MAQUINAS_UND.includes(r.maquina)) byDayUnd[d]=(byDayUnd[d]||0)+(Number(r.produccion)||0);
+  });
+  const prodByDayKg=Object.entries(byDayKg).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const prodByDayUnd=Object.entries(byDayUnd).sort().map(([d,v])=>({label:d.slice(5),val:v}));
   const mermaByDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)mermaByDay[d]=(mermaByDay[d]||0)+sumNumeros(r.mermasCantidad);});
   const mermaByDayArr=Object.entries(mermaByDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const mermaPorMaq=MAQ.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0)})).filter(d=>d.val>0);
   /* Torta separada Kg / Unidades */
   const donutKg=MAQUINAS_KG.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
   const donutUnd=MAQUINAS_UND.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
@@ -480,15 +506,19 @@ function GeneralTab({reports}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:20}}>
         <StatCard label="Reportes" value={fr.length} borderColor="#3B82F6" breakdown={bdReportes} trend={`${fr.length} de ${reports.length} totales`}/>
         <ProdCard reports={fr}/>
-        <StatCard label="Merma total" value={rmMerma.pct!==null?rmMerma.pct+"%":totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" breakdown={bdMerma} trend={rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg merma · ${rmMerma.prodKg.toLocaleString()} kg prod.${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %"}/>
-        <StatCard label="T. muertos (min)" value={totalTM.toLocaleString()} borderColor="var(--amber)" breakdown={bdTM} trend="Minutos de tiempo muerto"/>
+        <StatCard label="Merma total" value={rmMerma.pct!==null?rmMerma.pct+"%":totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" highlight="bad" breakdown={bdMerma} trend={rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg merma · ${rmMerma.prodKg.toLocaleString()} kg prod.${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %"}/>
+        <StatCard label="Tiempos muertos" value={tmPct!==null?tmPct+"%":totalTM.toLocaleString()} accent="var(--amber)" borderColor="var(--amber)" highlight="amber" breakdown={bdTM} trend={`${totalTM.toLocaleString()} min · ≈ ${(totalTM/60).toFixed(1)}h`}/>
         <StatCard label="% Eficiencia" value={avgEfic} borderColor="#0EA5E9" breakdown={bdEfic} trend="Hrs productivas ÷ programadas"/>
       </div>
 
       {/* GRÁFICAS (ya filtradas) */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-        <BarChartDash data={prodByDay} title="Producción por día" color="var(--good)" labelKey="label" valueKey="val"/>
-        <LineChartDash data={mermaByDayArr} title="Evolución de mermas" color="var(--bad)" labelKey="label" valueKey="val"/>
+        <BarChartDash data={prodByDayKg} title="Producción por día · Kg" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
+        <BarChartDash data={prodByDayUnd} title="Producción por día · Unidades" color="#0EA5E9" labelKey="label" valueKey="val" unidad="und"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+        <BarChartDash data={mermaPorMaq} title="Merma por máquina" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
+        <LineChartDash data={mermaByDayArr} title="Evolución de mermas" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
         <DonutDash data={donutKg} title="Producción por máquina · Kg" unidad="Kg"/>
