@@ -34,6 +34,15 @@
   ::-webkit-scrollbar-track{background:var(--sb-track);border-radius:12px;}
   ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
   ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-h);background-clip:content-box;}
+  /* --- animaciones suaves --- */
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .fade-in{animation:fadeInUp 0.35s cubic-bezier(0.16,1,0.3,1) both;}
+  .fade-in-soft{animation:fadeIn 0.3s ease both;}
+  button{transition:background 0.15s ease,color 0.15s ease,box-shadow 0.15s ease,transform 0.1s ease,border-color 0.15s ease;}
+  button:active{transform:scale(0.97);}
+  select,input{transition:border-color 0.15s ease,box-shadow 0.15s ease,background 0.2s ease;}
+  path,rect,circle,line{transition:opacity 0.15s ease;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -383,6 +392,97 @@ function Top5Card({title,reports,color}){
 }
 
 
+/* Eficiencia (topada por turno físico) para CUALQUIER lista de reportes. */
+function eficienciaLista(list){
+  const porTurno={};
+  list.forEach(r=>{
+    const key=getFechaISO(r)+"|"+(r.turno||"")+"|"+(r.maquina||"");
+    const u=calcUtilizacion(r);
+    if(!porTurno[key]) porTurno[key]={dur:0,prod:0};
+    if(u){ porTurno[key].dur=u.duracionTurno; porTurno[key].prod+=u.tiempoProductivo; }
+  });
+  const prog=Object.values(porTurno).reduce((s,d)=>s+d.dur,0);
+  const prod=Object.values(porTurno).reduce((s,d)=>s+Math.min(d.prod,d.dur),0);
+  return {prog,prod,pct:prog>0?Math.min(100,Math.round((prod/prog)*100)):null};
+}
+
+/* Punto de color (semáforo) según % vs meta. */
+function Semaforo({pct,size}){
+  const c=pct==null?"#9CA3AF":pct>=100?"var(--good)":pct>=70?"var(--amber)":"var(--bad)";
+  const s=size||9;
+  return <span title={pct==null?"Sin datos":pct+"% vs meta"} style={{display:"inline-block",width:s,height:s,borderRadius:"50%",background:c,flexShrink:0}}/>;
+}
+
+/* Tarjeta comparativa entre dos periodos con flecha ▲/▼.
+   invert=true → subir es MALO (merma, tiempos muertos). */
+function CompareCard({label,cur,prev,unidad,invert}){
+  const fmt=v=>v==null?"—":Number(v).toLocaleString()+(unidad||"");
+  let delta=null, up=null;
+  if(cur!=null&&prev!=null&&prev!==0){ delta=Math.round(((cur-prev)/Math.abs(prev))*1000)/10; up=cur>=prev; }
+  const bueno = up==null?null:(invert?!up:up);
+  const col = bueno==null?"var(--text-dim)":bueno?"var(--good)":"var(--bad)";
+  return (
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"14px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:10.5,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em",marginBottom:5}}>{label}</div>
+      <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+        <div style={{fontSize:22,fontWeight:700,fontFamily:"var(--mono)"}}>{fmt(cur)}</div>
+        {delta!=null && <span style={{fontSize:12.5,fontWeight:700,color:col}}>{up?"▲":"▼"} {Math.abs(delta)}%</span>}
+      </div>
+      <div style={{fontSize:10.5,color:"var(--text-dim)",marginTop:3}}>últ. 7 días · antes: {fmt(prev)}</div>
+    </div>
+  );
+}
+
+function OperariosTab({reports}){
+  const [orden,setOrden]=useState("efic");
+  const nombres=[...new Set(reports.map(r=>r.nombre).filter(Boolean))];
+  const filas=nombres.map(nombre=>{
+    const rs=reports.filter(r=>r.nombre===nombre);
+    const ef=eficienciaLista(rs); const rm=resumenMerma(rs);
+    return {nombre,reportes:rs.length,
+      prod:rs.reduce((s,r)=>s+(Number(r.produccion)||0),0),
+      merma:rs.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0),
+      mermaPct:rm.pct, tm:rs.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0),
+      efic:ef.pct, maqs:[...new Set(rs.map(r=>r.maquina).filter(Boolean))].join(", ")};
+  });
+  const dir={efic:-1,prod:-1,reportes:-1,merma:1,tm:1,mermaPct:1};
+  filas.sort((a,b)=>{const va=a[orden]==null?-1:a[orden],vb=b[orden]==null?-1:b[orden];return (va-vb)*(dir[orden]||-1);});
+  const mejor=[...filas].filter(x=>x.efic!=null).sort((a,b)=>b.efic-a.efic)[0];
+  const th=(k,label)=>(<th onClick={()=>setOrden(k)} style={{padding:"9px 12px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"}}>{label}{orden===k?" ↓":""}</th>);
+  return (
+    <div>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>👤 Desempeño por operario</div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:16}}>Ranking de {filas.length} operarios. Haz clic en un encabezado para reordenar.</div>
+      {mejor && <div style={{marginBottom:16,padding:"12px 16px",background:"var(--accent-dim)",border:"1px solid var(--line)",borderRadius:12,fontSize:13}}>🏆 Mayor eficiencia: <b>{mejor.nombre}</b> con <b>{mejor.efic}%</b></div>}
+      <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <table style={{transform:"rotateX(180deg)",width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+            <th style={{padding:"9px 12px",color:"var(--th-text)",fontWeight:700}}>#</th>
+            {th("nombre","Operario")}{th("reportes","Reportes")}{th("prod","Producción")}{th("merma","Merma")}{th("mermaPct","Merma %")}{th("tm","T.M. (min)")}{th("efic","% Eficiencia")}
+            <th style={{padding:"9px 12px",color:"var(--th-text)",fontWeight:700}}>Máquinas</th>
+          </tr></thead>
+          <tbody>
+            {filas.map((x,i)=>(
+              <tr key={x.nombre} style={{borderTop:"1px solid var(--line)"}}>
+                <td style={{padding:"9px 12px",fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{i+1}</td>
+                <td style={{padding:"9px 12px",fontWeight:700}}>{x.nombre}</td>
+                <td style={{padding:"9px 12px",fontFamily:"var(--mono)"}}>{x.reportes}</td>
+                <td style={{padding:"9px 12px",fontFamily:"var(--mono)",color:"var(--good)",fontWeight:700}}>{x.prod.toLocaleString()}</td>
+                <td style={{padding:"9px 12px",fontFamily:"var(--mono)",color:"var(--bad)"}}>{x.merma.toLocaleString()}</td>
+                <td style={{padding:"9px 12px",fontFamily:"var(--mono)"}}>{x.mermaPct!=null?x.mermaPct+"%":"—"}</td>
+                <td style={{padding:"9px 12px",fontFamily:"var(--mono)",color:"var(--amber)"}}>{x.tm}</td>
+                <td style={{padding:"9px 12px"}}><span style={{display:"flex",alignItems:"center",gap:8}}><Semaforo pct={x.efic}/><UtilBar val={x.efic!=null?x.efic+"%":"-"} hi={85} lo={60}/></span></td>
+                <td style={{padding:"9px 12px",fontSize:11.5,color:"var(--text-dim)"}}>{x.maqs||"-"}</td>
+              </tr>
+            ))}
+            {filas.length===0 && <tr><td colSpan="9" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ================== PESTAÑA GENERAL ==================
    Los filtros de aquí afectan TODO: fichas de encabezado, gráficas y tabla. */
 function GeneralTab({reports}){
@@ -414,6 +514,17 @@ function GeneralTab({reports}){
   });
   const activeF=[fMaquina,fOperario,fTurno,fDesde,fHasta].filter(Boolean).length;
   function clearF(){setFMaquina("");setFOperario("");setFTurno("");setFDesde("");setFHasta("");}
+
+  // Filtros favoritos (guardados en localStorage)
+  const [favs,setFavs]=useState(()=>{try{return JSON.parse(localStorage.getItem('filtros-fav-panel')||'[]');}catch(e){return [];}});
+  function guardarFav(){
+    const nombre=(prompt("Nombre para este filtro favorito:")||"").trim();
+    if(!nombre) return;
+    const nuevo={nombre,f:{fMaquina,fOperario,fTurno,fDesde,fHasta}};
+    const next=[...favs.filter(x=>x.nombre!==nombre),nuevo];
+    setFavs(next); try{localStorage.setItem('filtros-fav-panel',JSON.stringify(next));}catch(e){}
+  }
+  function aplicarFav(fv){ if(!fv)return; const f=fv.f||{}; setFMaquina(f.fMaquina||"");setFOperario(f.fOperario||"");setFTurno(f.fTurno||"");setFDesde(f.fDesde||"");setFHasta(f.fHasta||""); }
 
   // Filtro PROPIO del historial (se aplica encima del filtro global)
   const frHist=fr.filter(r=>{
@@ -492,6 +603,31 @@ function GeneralTab({reports}){
   const donutKg=MAQUINAS_KG.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
   const donutUnd=MAQUINAS_UND.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
 
+  /* ---- Comparativo de periodos (últ. 7 días vs. 7 previos) ---- */
+  const frNoDate=reports.filter(r=>{
+    if(fMaquina&&r.maquina!==fMaquina)return false;
+    if(fOperario&&r.nombre!==fOperario)return false;
+    if(fTurno&&r.turno!==fTurno)return false;
+    return true;
+  });
+  const isoAgo=n=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+  const hoyISO=isoAgo(0), d7=isoAgo(7), d14=isoAgo(14);
+  const cur7=frNoDate.filter(r=>{const i=getFechaISO(r);return i&&i>d7&&i<=hoyISO;});
+  const prev7=frNoDate.filter(r=>{const i=getFechaISO(r);return i&&i>d14&&i<=d7;});
+  const sumKg=list=>Math.round(list.reduce((s,r)=>s+produccionKg(r),0));
+  const cmpProdCur=sumKg(cur7), cmpProdPrev=sumKg(prev7);
+  const cmpEfCur=eficienciaLista(cur7).pct, cmpEfPrev=eficienciaLista(prev7).pct;
+  const cmpMeCur=resumenMerma(cur7).pct, cmpMePrev=resumenMerma(prev7).pct;
+  const cmpTmCur=cur7.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0), cmpTmPrev=prev7.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
+  const hayComp=cur7.length>0||prev7.length>0;
+
+  /* ---- Tendencia de eficiencia por día (respeta filtros) ---- */
+  const diasEf=[...new Set(fr.map(getFechaISO).filter(Boolean))].sort();
+  const efTrend=diasEf.map(d=>({label:d.slice(5),val:eficienciaLista(fr.filter(r=>getFechaISO(r)===d)).pct||0}));
+
+  /* ---- Top motivos de tiempo muerto ---- */
+  const topTM=tmPorMotivo(fr).slice(0,8).map(x=>({label:x.motivo,val:x.min}));
+
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   const fmtMC=r=>r.mermasCantidad||"-", fmtMM=r=>r.mermasMotivo||"-", fmtTMin=r=>r.tiemposMuertosMinutos||"-", fmtTM=r=>r.tiemposMuertosMotivo||"-";
 
@@ -500,7 +636,9 @@ function GeneralTab({reports}){
       {/* Barra de filtros GLOBAL */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
         <div style={{fontSize:14,fontWeight:700}}>Resumen general {activeF>0 && <span style={{fontSize:12,fontWeight:500,color:"var(--accent)"}}>· filtrado</span>}</div>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          {favs.length>0 && <select onChange={e=>{const fv=favs.find(x=>x.nombre===e.target.value);aplicarFav(fv);e.target.value="";}} defaultValue="" style={{...selStyle,maxWidth:160}}><option value="">⭐ Favoritos…</option>{favs.map(fv=><option key={fv.nombre} value={fv.nombre}>{fv.nombre}</option>)}</select>}
+          <button onClick={guardarFav} title="Guardar el filtro actual como favorito" style={{background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⭐ Guardar</button>
           {activeF>0 && <button onClick={clearF} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
           <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
         </div>
@@ -538,6 +676,23 @@ function GeneralTab({reports}){
         <DonutDash data={donutUnd} title="Producción por máquina · Unidades" unidad="und"/>
       </div>
 
+      {/* COMPARATIVO DE PERIODOS */}
+      {hayComp && <>
+        <div style={{fontSize:13,fontWeight:700,margin:"4px 0 12px"}}>Comparativo · últimos 7 días vs. 7 previos {activeF>0 && <span style={{fontSize:11,fontWeight:500,color:"var(--text-dim)"}}>(respeta máquina/operario/turno)</span>}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+          <CompareCard label="Producción (kg)" cur={cmpProdCur} prev={cmpProdPrev} unidad=" kg"/>
+          <CompareCard label="Eficiencia" cur={cmpEfCur} prev={cmpEfPrev} unidad="%"/>
+          <CompareCard label="Merma %" cur={cmpMeCur} prev={cmpMePrev} unidad="%" invert={true}/>
+          <CompareCard label="T. muertos (min)" cur={cmpTmCur} prev={cmpTmPrev} unidad=" min" invert={true}/>
+        </div>
+      </>}
+
+      {/* TENDENCIA EFICIENCIA + TOP MOTIVOS TIEMPO MUERTO */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
+        <LineChartDash data={efTrend} title="Tendencia de eficiencia (%)" color="#0EA5E9" labelKey="label" valueKey="val" unidad="%"/>
+        <BarChartDash data={topTM} title="Top motivos de tiempo muerto" color="var(--amber)" labelKey="label" valueKey="val" unidad="min"/>
+      </div>
+
       {/* RESUMEN POR MÁQUINA (ya filtrado) */}
       <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,marginBottom:24,overflowX:"auto",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <div style={{padding:"14px 18px",borderBottom:"1px solid var(--line)",fontWeight:600,fontSize:13}}>Resumen por máquina</div>
@@ -548,7 +703,7 @@ function GeneralTab({reports}){
           <tbody>
             {byMaq.filter(x=>x.reportes>0).map(x=>(
               <tr key={x.maquina} style={{borderTop:"1px solid var(--line)"}}>
-                <td style={{padding:"9px 14px",fontWeight:700}}>{x.maquina}</td>
+                <td style={{padding:"9px 14px",fontWeight:700}}><span style={{display:"flex",alignItems:"center",gap:8}}><Semaforo pct={x.rend}/>{x.maquina}</span></td>
                 <td style={{padding:"9px 14px",fontFamily:"var(--mono)"}}>{x.reportes}</td>
                 <td style={{padding:"9px 14px",fontFamily:"var(--mono)",color:"var(--good)",fontWeight:700}}>{x.prod.toLocaleString()}</td>
                 <td style={{padding:"9px 14px",fontFamily:"var(--mono)",color:"var(--bad)",fontWeight:700}}>{x.merma.toLocaleString()}</td>
@@ -572,6 +727,7 @@ function GeneralTab({reports}){
         </div>
         {showHist && (
           <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>exportReportesXLSX(frHist,"reportes_filtrados.xlsx")} title="Exportar a Excel lo que ves en el historial" style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇ Exportar ({frHist.length})</button>
             {activeFH>0 && <button onClick={clearFH} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeFH})</button>}
             <button onClick={()=>setShowHistFilter(!showHistFilter)} style={{background:showHistFilter||activeFH>0?"var(--accent)":"var(--panel-2)",color:showHistFilter||activeFH>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showHistFilter?"▲ Ocultar":"▼ Filtrar historial"}{activeFH>0?` (${activeFH})`:""}</button>
           </div>
@@ -995,8 +1151,8 @@ function InventarioRollos({reports}){
   const hayFiltro=fMaq||fTipo||fMedida||fColor||buscar.trim();
 
   // Conteo por tipo (sobre el resultado filtrado) para las "chips".
-  const porTipo={}; rollos.forEach(r=>{porTipo[r.tipo]=(porTipo[r.tipo]||0)+1;});
-  const chips=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+  const porTipo={}; rollos.forEach(r=>{const t=r.tipo;if(!porTipo[t])porTipo[t]={n:0,kg:0};porTipo[t].n++;porTipo[t].kg+=Number(r.peso)||0;});
+  const chips=Object.entries(porTipo).sort((a,b)=>b[1].kg-a[1].kg);
 
   return (
     <div style={{marginBottom:26}}>
@@ -1008,8 +1164,8 @@ function InventarioRollos({reports}){
         <InvCard label="Tipos distintos" value={new Set(rollos.map(r=>r.tipo)).size} color="var(--amber)"/>
       </div>
       {chips.length>0 && <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
-        {chips.map(([t,n])=>(
-          <span key={t} style={{fontSize:11.5,fontWeight:600,padding:"4px 10px",borderRadius:20,color:"#fff",background:tipoColor(t)}}>{t}: {n.toLocaleString()}</span>
+        {chips.map(([t,d])=>(
+          <span key={t} style={{fontSize:11.5,fontWeight:600,padding:"4px 10px",borderRadius:20,color:"#fff",background:tipoColor(t)}}>{t}: {d.n.toLocaleString()} reg{d.kg>0?` · ${Math.round(d.kg).toLocaleString()} kg`:""}</span>
         ))}
       </div>}
       <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
@@ -1058,6 +1214,7 @@ function InventarioPT({reports}){
   if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
   const totalUnd=inv.reduce((s,x)=>s+x.unidades,0);
   const totalKg=inv.reduce((s,x)=>s+x.kg,0);
+  const sinPesoN=inv.filter(x=>x.sinPeso).length;
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   return (
     <div style={{marginBottom:26}}>
@@ -1069,25 +1226,31 @@ function InventarioPT({reports}){
         <InvCard label="Peso total" value={Math.round(totalKg).toLocaleString()+" kg"} color="var(--good)"/>
       </div>
       <input style={{...selStyle,maxWidth:320,marginBottom:6}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
-      <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:12}}>💡 Haz clic en una fila para ver la <b>trazabilidad</b> completa de esa referencia.</div>
+      <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:12}}>💡 Haz clic en una fila para ver la <b>trazabilidad</b>. El <b>#</b> es el ranking de rotación (más producido primero).{sinPesoN>0 && <span> · <span style={{color:"var(--amber)"}}>⚠️ {sinPesoN} referencia(s) por unidades sin peso definido</span> (no suman a kg).</span>}</div>
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:480,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Código","Referencia","Categoría","Sector","Cantidad (und)","Peso (kg)",""].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["#","Código","Referencia","Categoría","Sector","Cantidad (und)","Peso (kg)","Últ. producción",""].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
-            {inv.slice(0,500).map((x,i)=>(
+            {inv.slice(0,500).map((x,i)=>{
+              const dd=diasDesde(x.ultima);
+              const ddCol=dd==null?"var(--text-dim)":dd>60?"var(--bad)":dd>30?"var(--amber)":"var(--text-dim)";
+              const ddTxt=x.ultima?(dd===0?"hoy":dd===1?"ayer":"hace "+dd+"d"):"-";
+              return (
               <tr key={i} onClick={()=>setTraza(x.siesa)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}}>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,color:"var(--text-dim)"}}>{i+1}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
                 <td style={{padding:"8px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
                 <td style={{padding:"8px 10px"}}><span style={{background:"var(--badge-bg)",color:"var(--badge-text)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{x.categoria}</span></td>
                 <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-dim)"}}>{x.sector||"-"}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.unidades).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.unidades).toLocaleString()} {x.sinPeso && <span title="Sin peso definido: no suma a kg" style={{color:"var(--amber)"}}>⚠️</span>}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{Math.round(x.kg).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontSize:12,fontFamily:"var(--mono)",color:ddCol,whiteSpace:"nowrap"}}>{ddTxt}</td>
                 <td style={{padding:"8px 10px",color:"var(--accent)",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>🔎 ver</td>
               </tr>
-            ))}
-            {inv.length===0 && <tr><td colSpan="7" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin producto terminado registrado aún.</td></tr>}
+            );})}
+            {inv.length===0 && <tr><td colSpan="9" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin producto terminado registrado aún.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1098,41 +1261,53 @@ function InventarioPT({reports}){
 }
 
 /* ================== PANEL (ensamblaje) ================== */
-function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports}){
+/* Exportación reutilizable: exporta la lista que se le pase (todo o filtrado). */
+function exportReportesXLSX(list, filename){
+  const headers=["Fecha","F.Turno","Nombre","Cargo","Maquina","H.Inicio","H.Final","Turno","Siesa","SKU","Referencia","Unidad","Produccion","Merma Cant.","Merma Motivo","T.M. Min","T.M. Motivo","Bodega","Categoria","Sector","% Util.","Rend. Real","% Rend.","Consecutivo","Observaciones"];
+  const metas=loadMetas();
+  const rows=list.map(r=>{
+    const c=clasificarReporte(r), u=calcUtilizacion(r), rd=calcRendimiento(r,metas);
+    return [r.fecha,r.fechaTurno,r.nombre,r.cargo,r.maquina,r.horaInicio,r.horaFinal,r.turno,r.siesa,r.sku,r.referencia,r.unidad,r.produccion,r.mermasCantidad,r.mermasMotivo,r.tiemposMuertosMinutos,r.tiemposMuertosMotivo,c.bodega,c.categoria,c.sector,u?u.utilizacion+"%":"-",rd?rd.rendReal+" "+rd.unidad:"-",rd?rd.pct+"%":"-",r.consecutivo,r.observaciones];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws['!cols']=headers.map(()=>({wch:16}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Reportes");
+  XLSX.writeFile(wb,filename||"reportes_produccion.xlsx");
+}
+
+function LastUpdated({ts}){
+  const [,tick]=useState(0);
+  useEffect(()=>{const id=setInterval(()=>tick(n=>n+1),30000);return ()=>clearInterval(id);},[]);
+  if(!ts) return null;
+  const s=Math.floor((Date.now()-ts)/1000);
+  const txt=s<45?"hace instantes":s<90?"hace 1 min":s<3600?`hace ${Math.floor(s/60)} min`:s<7200?"hace 1 h":`hace ${Math.floor(s/3600)} h`;
+  return <span style={{fontSize:11.5,color:"var(--text-dim)",whiteSpace:"nowrap"}}>🕒 Actualizado {txt}</span>;
+}
+
+function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
   const [tab,setTab]=useState('general');
   const [showMetas,setShowMetas]=useState(false);
   const [metasVer,setMetasVer]=useState(0); // fuerza re-render al guardar metas
-
-  function exportXLSX(){
-    const headers=["Fecha","F.Turno","Nombre","Cargo","Maquina","H.Inicio","H.Final","Turno","Siesa","SKU","Referencia","Unidad","Produccion","Merma Cant.","Merma Motivo","T.M. Min","T.M. Motivo","Bodega","Categoria","Sector","% Util.","Rend. Real","% Rend.","Consecutivo","Observaciones"];
-    const metas=loadMetas();
-    const rows=reports.map(r=>{
-      const c=clasificarReporte(r), u=calcUtilizacion(r), rd=calcRendimiento(r,metas);
-      return [r.fecha,r.fechaTurno,r.nombre,r.cargo,r.maquina,r.horaInicio,r.horaFinal,r.turno,r.siesa,r.sku,r.referencia,r.unidad,r.produccion,r.mermasCantidad,r.mermasMotivo,r.tiemposMuertosMinutos,r.tiemposMuertosMotivo,c.bodega,c.categoria,c.sector,u?u.utilizacion+"%":"-",rd?rd.rendReal+" "+rd.unidad:"-",rd?rd.pct+"%":"-",r.consecutivo,r.observaciones];
-    });
-    const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
-    ws['!cols']=headers.map(()=>({wch:16}));
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,"Reportes");
-    XLSX.writeFile(wb,"reportes_produccion.xlsx");
-  }
 
   return(
     <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)"}}>
-          {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso']].map(([k,label])=>(
-            <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 18px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+          {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso'],['ops','👤 Operarios']].map(([k,label])=>(
+            <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={refreshReports} style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13}}>Actualizar</button>
-          <button onClick={exportXLSX} style={{background:"var(--accent)",border:"none",color:"#fff",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700}}>Exportar Excel</button>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          <LastUpdated ts={lastUpdated}/>
+          <button onClick={refreshReports} style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13,color:"var(--text)"}}>↻ Actualizar</button>
+          <button onClick={()=>exportReportesXLSX(reports,"reportes_produccion.xlsx")} style={{background:"var(--accent)",border:"none",color:"#fff",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700}}>Exportar Excel</button>
         </div>
       </div>
 
       {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
 
+      <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
         <div style={{marginTop:24}}>
@@ -1142,6 +1317,8 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       </>}
       {tab==='pt' && <><InventarioPT reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/></>}
       {tab==='pp' && <><InventarioRollos reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/></>}
+      {tab==='ops' && <OperariosTab reports={reports}/>}
+      </div>
     </div>
   );
 }
@@ -1163,12 +1340,14 @@ function App(){
   const [unlocked,setUnlocked]=useState(false);
   const [loading,setLoading]=useState(false);
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-panel')||'light';}catch(e){return 'light';}});
+  const [lastUpdated,setLastUpdated]=useState(null);
   useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-panel',theme);}catch(e){}},[theme]);
 
   async function refreshReports(){
     setLoading(true);
     const data=await loadReports(SHEETS_URL_READ);
     setReports(data);
+    setLastUpdated(Date.now());
     setLoading(false);
   }
   useEffect(()=>{ if(unlocked) refreshReports(); },[unlocked]);
@@ -1183,7 +1362,7 @@ function App(){
         </div>
       </header>
       {unlocked
-        ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports}/>
+        ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
         : <PinGate onUnlock={()=>setUnlocked(true)}/>}
     </div>
   );

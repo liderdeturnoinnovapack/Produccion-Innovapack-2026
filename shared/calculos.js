@@ -395,15 +395,48 @@ function inventarioPT(list){
     if(!mapa[key]){
       const c = clasificarReporte(r);
       mapa[key] = { siesa:key, referencia:r.referencia, categoria:c.categoria, sector:c.sector,
-                    unidades:0, kg:0, unidad:r.unidad };
+                    unidades:0, kg:0, reportes:0, unidad:r.unidad, ultima:"", pu:pesoUnidad(r,p) };
     }
     const prod = Number(r.produccion)||0;
     const unidad = String(r.unidad||"").toLowerCase();
     if(unidad.indexOf("kg")===0) mapa[key].kg += prod;
     else mapa[key].unidades += prod;
     mapa[key].kg += (unidad.indexOf("kg")===0 ? 0 : produccionKg(r,p));
+    mapa[key].reportes += 1;
+    const iso = getFechaISO(r);
+    if(iso && iso > mapa[key].ultima) mapa[key].ultima = iso;
   });
+  // sinPeso: producto por unidades sin peso definido (su producción no suma a kg)
+  Object.values(mapa).forEach(x=>{ x.sinPeso = (x.unidades > 0 && (!x.pu || x.pu <= 0)); });
   return Object.values(mapa).sort((a,b)=> b.kg - a.kg);
+}
+
+/* Días transcurridos desde una fecha ISO (yyyy-mm-dd) hasta hoy. */
+function diasDesde(iso){
+  if(!iso) return null;
+  const d = new Date(iso + "T00:00:00");
+  if(isNaN(d)) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  return Math.round((hoy - d) / 86400000);
+}
+
+/* Agrega minutos de tiempo muerto por MOTIVO. Los reportes guardan minutos y
+   motivos como texto paralelo unido por " + " (ej. "30min + 15min" y
+   "Cambio de referencia + Falla mecánica"). Se emparejan por posición. */
+function tmPorMotivo(list){
+  const mapa = {};
+  list.forEach(r=>{
+    const partesMin = String(r.tiemposMuertosMinutos || "").split("+");
+    const partesMot = String(r.tiemposMuertosMotivo || "").split("+");
+    partesMin.forEach((pm, i)=>{
+      const min = Number((pm.match(/[\d.]+/) || [0])[0]) || 0;
+      if(min <= 0) return;
+      let mot = (partesMot[i] || "").trim();
+      if(!mot || mot === "-") mot = "Sin motivo";
+      mapa[mot] = (mapa[mot] || 0) + min;
+    });
+  });
+  return Object.entries(mapa).map(([motivo, min])=>({motivo, min})).sort((a,b)=> b.min - a.min);
 }
 
 
