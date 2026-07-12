@@ -282,7 +282,7 @@ function DonutDash({data,title,unidad}){
   );
 }
 
-function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
+function BarChartDash({data,title,color,labelKey,valueKey,unidad,sub}){
   const [hi,setHi]=useState(null);
   if(!data||data.length===0) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
@@ -293,7 +293,8 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
   const hov=hi!==null?data[hi]:null;
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:sub?3:12,fontFamily:"var(--head)"}}>{title}</div>
+      {sub && <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>{sub}</div>}
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
           <g key={t}>
@@ -312,26 +313,27 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
           </g>);
         })}
         <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="var(--axis)" strokeWidth="1"/>
-        {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov[labelKey]}: {hov[valueKey].toLocaleString()}{u}</text>}
+        {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov.full||hov[labelKey]}: {hov[valueKey].toLocaleString()}{u}</text>}
       </svg>
     </div>
   );
 }
 
-function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
+function LineChartDash({data,title,color,labelKey,valueKey,unidad,sub}){
   const [hi,setHi]=useState(null);
   if(!data||data.length<2) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin suficientes datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
   const W=440,H=214,padL=40,padB=56,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
   const u=unidad?" "+unidad:"";
-  const pts=data.map((d,i)=>({x:padL+(i/(data.length-1))*chartW,y:padT+chartH-(d[valueKey]/max)*chartH,label:d[labelKey],val:d[valueKey]}));
+  const pts=data.map((d,i)=>({x:padL+(i/(data.length-1))*chartW,y:padT+chartH-(d[valueKey]/max)*chartH,label:d[labelKey],full:d.full,val:d[valueKey]}));
   const polyline=pts.map(p=>`${p.x},${p.y}`).join(" ");
   const area=`M${pts[0].x},${padT+chartH} `+pts.map(p=>`L${p.x},${p.y}`).join(" ")+` L${pts[pts.length-1].x},${padT+chartH} Z`;
   const hov=hi!==null?pts[hi]:null;
   return(
     <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
+      <div style={{fontSize:12.5,fontWeight:700,marginBottom:sub?3:12,fontFamily:"var(--head)"}}>{title}</div>
+      {sub && <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>{sub}</div>}
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
           <g key={t}><line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="var(--grid)" strokeWidth="1"/><text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="var(--chart-lbl)">{Math.round(max*t)}</text></g>
@@ -344,7 +346,7 @@ function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
           <g transform={`translate(${p.x} ${padT+chartH+8}) rotate(-90)`}><text textAnchor="end" dominantBaseline="central" fontSize="9" fill="var(--chart-lbl)">{p.label}</text></g>
         </g>))}
         <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="var(--axis)" strokeWidth="1"/>
-        {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov.label}: {hov.val.toLocaleString()}{u}</text>}
+        {hov && <text x={W/2} y={13} textAnchor="middle" fontSize="11" fontWeight="600" fill={color}>{hov.full||hov.label}: {hov.val.toLocaleString()}{u}</text>}
       </svg>
     </div>
   );
@@ -410,6 +412,10 @@ function Top5Card({title,reports,color}){
   );
 }
 
+
+/* Fecha ISO (yyyy-mm-dd) → dd/mm (eje) y dd/mm/yyyy (tooltip). */
+function fechaCorta(iso){ return (iso && iso.length>=10) ? iso.slice(8,10)+"/"+iso.slice(5,7) : iso; }
+function fechaLarga(iso){ return (iso && iso.length>=10) ? iso.slice(8,10)+"/"+iso.slice(5,7)+"/"+iso.slice(0,4) : iso; }
 
 /* Eficiencia (topada por turno físico) para CUALQUIER lista de reportes. */
 function eficienciaLista(list){
@@ -614,10 +620,10 @@ function GeneralTab({reports}){
     const pk=produccionKg(r); if(pk>0) byDayKg[d]=(byDayKg[d]||0)+pk;   // TODAS las máquinas (selladoras convertidas a kg)
     if(MAQUINAS_UND.includes(r.maquina)) byDayUnd[d]=(byDayUnd[d]||0)+(Number(r.produccion)||0);
   });
-  const prodByDayKg=Object.entries(byDayKg).sort().map(([d,v])=>({label:d.slice(5),val:Math.round(v)}));
-  const prodByDayUnd=Object.entries(byDayUnd).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const prodByDayKg=Object.entries(byDayKg).sort().map(([d,v])=>({label:fechaCorta(d),full:fechaLarga(d),val:Math.round(v)}));
+  const prodByDayUnd=Object.entries(byDayUnd).sort().map(([d,v])=>({label:fechaCorta(d),full:fechaLarga(d),val:v}));
   const mermaByDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)mermaByDay[d]=(mermaByDay[d]||0)+sumNumeros(r.mermasCantidad);});
-  const mermaByDayArr=Object.entries(mermaByDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const mermaByDayArr=Object.entries(mermaByDay).sort().map(([d,v])=>({label:fechaCorta(d),full:fechaLarga(d),val:v}));
   const mermaPorMaq=MAQ.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0)})).filter(d=>d.val>0);
   /* Torta separada Kg / Unidades.
      Kg: TODAS las máquinas (las selladoras convierten sus unidades a kg con el
@@ -645,7 +651,7 @@ function GeneralTab({reports}){
 
   /* ---- Tendencia de eficiencia por día (respeta filtros) ---- */
   const diasEf=[...new Set(fr.map(getFechaISO).filter(Boolean))].sort();
-  const efTrend=diasEf.map(d=>({label:d.slice(5),val:eficienciaLista(fr.filter(r=>getFechaISO(r)===d)).pct||0}));
+  const efTrend=diasEf.map(d=>({label:fechaCorta(d),full:fechaLarga(d),val:eficienciaLista(fr.filter(r=>getFechaISO(r)===d)).pct||0}));
 
   /* ---- Top motivos de tiempo muerto ---- */
   const topTM=tmPorMotivo(fr).slice(0,8).map(x=>({label:x.motivo,val:x.min}));
@@ -686,12 +692,12 @@ function GeneralTab({reports}){
 
       {/* GRÁFICAS (ya filtradas) */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-        <BarChartDash data={prodByDayKg} title="Producción por día · Kg" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
-        <BarChartDash data={prodByDayUnd} title="Producción por día · Unidades" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="und"/>
+        <BarChartDash data={prodByDayKg} title="Producción por día · Kg" sub="Eje X: día (DD/MM)" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
+        <BarChartDash data={prodByDayUnd} title="Producción por día · Unidades" sub="Eje X: día (DD/MM)" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="und"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-        <BarChartDash data={mermaPorMaq} title="Merma por máquina" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
-        <LineChartDash data={mermaByDayArr} title="Evolución de mermas" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
+        <BarChartDash data={mermaPorMaq} title="Merma por máquina" sub="Eje X: máquina" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
+        <LineChartDash data={mermaByDayArr} title="Evolución de mermas" sub="Eje X: día (DD/MM)" color="var(--bad)" labelKey="label" valueKey="val" unidad="kg/und"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
         <DonutDash data={donutKg} title="Producción por máquina · Kg" unidad="Kg"/>
@@ -711,8 +717,8 @@ function GeneralTab({reports}){
 
       {/* TENDENCIA EFICIENCIA + TOP MOTIVOS TIEMPO MUERTO */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
-        <LineChartDash data={efTrend} title="Tendencia de eficiencia (%)" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="%"/>
-        <BarChartDash data={topTM} title="Top motivos de tiempo muerto" color="var(--amber)" labelKey="label" valueKey="val" unidad="min"/>
+        <LineChartDash data={efTrend} title="Tendencia de eficiencia (%)" sub="Eje X: día (DD/MM)" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="%"/>
+        <BarChartDash data={topTM} title="Top motivos de tiempo muerto" sub="Eje X: motivo" color="var(--amber)" labelKey="label" valueKey="val" unidad="min"/>
       </div>
 
       {/* RESUMEN POR MÁQUINA (ya filtrado) */}
