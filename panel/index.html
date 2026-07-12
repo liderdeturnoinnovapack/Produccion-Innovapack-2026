@@ -599,8 +599,10 @@ function GeneralTab({reports}){
   const mermaByDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)mermaByDay[d]=(mermaByDay[d]||0)+sumNumeros(r.mermasCantidad);});
   const mermaByDayArr=Object.entries(mermaByDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
   const mermaPorMaq=MAQ.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0)})).filter(d=>d.val>0);
-  /* Torta separada Kg / Unidades */
-  const donutKg=MAQUINAS_KG.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
+  /* Torta separada Kg / Unidades.
+     Kg: TODAS las máquinas (las selladoras convierten sus unidades a kg con el
+     peso por referencia vía produccionKg). */
+  const donutKg=MAQ.map(m=>({label:m,val:Math.round(fr.filter(r=>r.maquina===m).reduce((s,r)=>s+produccionKg(r),0))})).filter(d=>d.val>0);
   const donutUnd=MAQUINAS_UND.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
 
   /* ---- Comparativo de periodos (últ. 7 días vs. 7 previos) ---- */
