@@ -1384,7 +1384,7 @@ function App(){
 
   return(
     <div id="app-root">
-      <header style={{background:"var(--header-bg)",borderBottom:"3px solid var(--brand-blue)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <header style={{background:"var(--header-bg)",borderBottom:"3px solid transparent",borderImage:"linear-gradient(90deg, var(--brand-blue), var(--brand-green)) 1",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}

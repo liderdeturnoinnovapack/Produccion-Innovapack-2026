@@ -393,7 +393,7 @@ function App(){
   useEffect(()=>{ loadConfigRemoto(SHEETS_URL_WRITE).then(()=>{ setCatalog(loadCatalog()); setMachines(loadMachines()); }); },[]);
   return (
     <div id="app-root">
-      <header style={{background:"var(--header-bg)",borderBottom:"3px solid var(--brand-blue)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <header style={{background:"var(--header-bg)",borderBottom:"3px solid transparent",borderImage:"linear-gradient(90deg, var(--brand-blue), var(--brand-green)) 1",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
         <ThemeToggle theme={theme} setTheme={setTheme}/>
       </header>
