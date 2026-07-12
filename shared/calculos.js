@@ -255,15 +255,31 @@ function savePesos(obj){ try{ localStorage.setItem('pesos-siesa', JSON.stringify
    - Bolsa abierta con "estuco" 25 kg .... 0.07 kg
    - Bolsa abierta (pegante/porcel/cer) .. 0.05 kg
    - Cualquier otro tipo ................. 0 (sin peso) */
+function pesoPorTipoDe(categoria, sector, referencia){
+  const cat = categoria || "";
+  const sec = sector || "";
+  const ref = String(referencia || "").toLowerCase();
+  if(cat === "Bolsa de agua") return 0.026;
+  if(cat === "Bolsa valvulada") return /40\s*k/.test(ref) ? 0.08 : 0.05;
+  if(cat === "Bolsa abierta"){
+    if(sec === "Alimentos"){                       // bolsas de alimentos
+      if(/2[.,]5\s*k/.test(ref)) return 0.012;      // 2.5 kg
+      if(/1\s*k/.test(ref)) return 0.008;           // 1 kg
+      return 0;                                      // otra medida: sin regla
+    }
+    return ref.indexOf("estuco") !== -1 ? 0.07 : 0.05; // estuco 0.07 / resto 0.05
+  }
+  if(cat === "Flow Pack"){
+    if(/2\s*k/.test(ref)) return 0.017;             // 2 kg
+    if(/1\s*k/.test(ref)) return 0.012;             // 1 kg
+    return 0;                                        // otra medida: sin regla
+  }
+  return 0;
+}
 function pesoPorTipo(report){
   const cls = loadClasificacion();
   const c = cls[report.siesa] || cls[report.sku] || {};
-  const cat = c.categoria || "";
-  const ref = String(report.referencia || "").toLowerCase();
-  if(cat === "Bolsa de agua") return 0.026;
-  if(cat === "Bolsa valvulada") return /40\s*k/.test(ref) ? 0.08 : 0.05;
-  if(cat === "Bolsa abierta") return ref.indexOf("estuco") !== -1 ? 0.07 : 0.05;
-  return 0;
+  return pesoPorTipoDe(c.categoria, c.sector, report.referencia);
 }
 
 /* Peso por unidad (kg) de un reporte. Prioridad:

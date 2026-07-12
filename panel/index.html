@@ -784,6 +784,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   function removeMachine(m){ const u=machines.filter(x=>x!==m); setMachines(u); saveMachines(u); }
 
   const esProceso=f.bodega==="Producto en Proceso";
+  const autoPeso=pesoPorTipoDe(f.categoria,f.sector,f.referencia); // peso sugerido por tipo
   const cardBtn={background:"#fff",border:"1px solid rgba(0,0,0,0.08)",borderRadius:12,padding:"14px 22px",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
 
   return(
@@ -824,7 +825,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Bodega *</div><select style={inputStyle} value={f.bodega} onChange={e=>setF({...f,bodega:e.target.value})}>{BODEGAS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Categoría *</div><select style={inputStyle} value={f.categoria} onChange={e=>setF({...f,categoria:e.target.value})}>{CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Sector {esProceso?"(N/A)":"*"}</div><select style={{...inputStyle,opacity:esProceso?0.5:1}} disabled={esProceso} value={f.sector} onChange={e=>setF({...f,sector:e.target.value})}>{SECTORES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Peso por unidad (kg)</div><input style={inputStyle} type="number" step="any" value={f.peso} onChange={e=>setF({...f,peso:e.target.value})} placeholder="Solo si se produce por unidades. Ej: 0.025"/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Peso por unidad (kg)</div><input style={inputStyle} type="number" step="any" value={f.peso} onChange={e=>setF({...f,peso:e.target.value})} placeholder={autoPeso>0?`Automático: ${autoPeso} kg (déjalo vacío para usarlo)`:"Ej: 0.025 (opcional)"}/></div>
             <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
               <span style={{fontSize:12,color:msg.startsWith("✓")?"var(--good)":"var(--bad)"}}>{msg}</span>
               <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>+ Agregar producto</button>
