@@ -185,10 +185,12 @@ function ProdCard({reports}){
 }
 
 /* ---------- Gráficas ---------- */
-function DonutDash({data,title}){
+function DonutDash({data,title,unidad}){
   const total=data.reduce((s,d)=>s+d.val,0);
+  const [hovered,setHovered]=useState(null);
   if(total===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:180,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
   const COLORS=["#3B82F6","#16A34A","#D97706","#8B5CF6","#DC2626","#06B6D4","#EC4899","#84CC16"];
+  const u = unidad ? " "+unidad : "";
   let cum=-Math.PI/2;
   const slices=data.map((d,i)=>{
     const angle=(d.val/total)*2*Math.PI;
@@ -198,22 +200,29 @@ function DonutDash({data,title}){
     const path=data.length===1?`M70,15 A55,55 0 1,1 69.999,15 Z`:`M70,70 L${x1},${y1} A55,55 0 ${large},1 ${x2},${y2} Z`;
     return {path,color:COLORS[i%COLORS.length],label:d.label,val:d.val,pct:Math.round((d.val/total)*100)};
   });
+  const hov=hovered!==null?slices[hovered]:null;
   return(
     <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
       <div style={{display:"flex",gap:16,alignItems:"center"}}>
-        <svg width="140" height="140" viewBox="0 0 140 140" style={{flexShrink:0}}>
-          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2"/>)}
-          <circle cx="70" cy="70" r="28" fill="#fff"/>
-          <text x="70" y="67" textAnchor="middle" fontSize="9" fill="#9CA3AF">Total</text>
-          <text x="70" y="80" textAnchor="middle" fontSize="11" fontWeight="600" fill="#18181B">{total.toLocaleString()}</text>
+        <svg width="140" height="140" viewBox="0 0 140 140" style={{flexShrink:0,cursor:"pointer"}}>
+          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.45} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)} style={{transition:"opacity 0.15s"}}/>)}
+          <circle cx="70" cy="70" r="30" fill="#fff"/>
+          {hov?<>
+            <text x="70" y="62" textAnchor="middle" fontSize="8.5" fill="var(--text-dim)">{hov.label.length>13?hov.label.substring(0,12)+"…":hov.label}</text>
+            <text x="70" y="76" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text>
+            <text x="70" y="88" textAnchor="middle" fontSize="9" fill="var(--text-dim)">{hov.val.toLocaleString()+u}</text>
+          </>:<>
+            <text x="70" y="67" textAnchor="middle" fontSize="9" fill="#9CA3AF">Total</text>
+            <text x="70" y="80" textAnchor="middle" fontSize="11" fontWeight="600" fill="#18181B">{total.toLocaleString()}</text>
+          </>}
         </svg>
         <div style={{flex:1}}>
           {slices.map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,cursor:"pointer",opacity:hovered===null||hovered===i?1:0.45,transition:"opacity 0.15s"}} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
               <div style={{width:8,height:8,borderRadius:2,background:s.color,flexShrink:0}}></div>
               <span style={{fontSize:11,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.label}</span>
-              <span style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{s.pct}%</span>
+              <span style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{s.val.toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -345,6 +354,9 @@ function GeneralTab({reports}){
   const [fHasta,setFHasta]=useState("");
   const [showFilter,setShowFilter]=useState(false);
   const [showHist,setShowHist]=useState(false);
+  const [showHistFilter,setShowHistFilter]=useState(false);
+  const [hMaquina,setHMaquina]=useState(""); const [hOperario,setHOperario]=useState(""); const [hTurno,setHTurno]=useState("");
+  const [hDesde,setHDesde]=useState(""); const [hHasta,setHHasta]=useState("");
   const metas=loadMetas();
 
   const maquinas=["",...new Set(reports.map(r=>r.maquina).filter(Boolean))].sort();
@@ -364,8 +376,22 @@ function GeneralTab({reports}){
   const activeF=[fMaquina,fOperario,fTurno,fDesde,fHasta].filter(Boolean).length;
   function clearF(){setFMaquina("");setFOperario("");setFTurno("");setFDesde("");setFHasta("");}
 
+  // Filtro PROPIO del historial (se aplica encima del filtro global)
+  const frHist=fr.filter(r=>{
+    if(hMaquina&&r.maquina!==hMaquina)return false;
+    if(hOperario&&r.nombre!==hOperario)return false;
+    if(hTurno&&r.turno!==hTurno)return false;
+    const iso=getFechaISO(r);
+    if(hDesde&&iso&&iso<hDesde)return false;
+    if(hHasta&&iso&&iso>hHasta)return false;
+    return true;
+  });
+  const activeFH=[hMaquina,hOperario,hTurno,hDesde,hHasta].filter(Boolean).length;
+  function clearFH(){setHMaquina("");setHOperario("");setHTurno("");setHDesde("");setHHasta("");}
+
   /* ---- KPIs (calculados sobre fr) ---- */
   const totalMerma=fr.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  const rmMerma=resumenMerma(fr); // merma % (merma kg ÷ producción kg)
   const totalTM=fr.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
   const MAQ=MAQUINAS_KG.concat(MAQUINAS_UND);
   const bdMerma=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0)})).filter(x=>x.val>0);
@@ -447,7 +473,7 @@ function GeneralTab({reports}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:20}}>
         <StatCard label="Reportes" value={fr.length} borderColor="#3B82F6" breakdown={bdReportes} trend={`${fr.length} de ${reports.length} totales`}/>
         <ProdCard reports={fr}/>
-        <StatCard label="Merma total" value={totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" breakdown={bdMerma} trend="Suma de mermas (Kg/und)"/>
+        <StatCard label="Merma total" value={rmMerma.pct!==null?rmMerma.pct+"%":totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" breakdown={bdMerma} trend={rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg merma · ${rmMerma.prodKg.toLocaleString()} kg prod.${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %"}/>
         <StatCard label="T. muertos (min)" value={totalTM.toLocaleString()} borderColor="var(--amber)" breakdown={bdTM} trend="Minutos de tiempo muerto"/>
         <StatCard label="% Eficiencia" value={avgEfic} borderColor="#0EA5E9" breakdown={bdEfic} trend="Hrs productivas ÷ programadas"/>
       </div>
@@ -458,8 +484,8 @@ function GeneralTab({reports}){
         <LineChartDash data={mermaByDayArr} title="Evolución de mermas" color="var(--bad)" labelKey="label" valueKey="val"/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
-        <DonutDash data={donutKg} title="Producción por máquina · Kg"/>
-        <DonutDash data={donutUnd} title="Producción por máquina · Unidades"/>
+        <DonutDash data={donutKg} title="Producción por máquina · Kg" unidad="Kg"/>
+        <DonutDash data={donutUnd} title="Producción por máquina · Unidades" unidad="und"/>
       </div>
 
       {/* RESUMEN POR MÁQUINA (ya filtrado) */}
@@ -489,18 +515,35 @@ function GeneralTab({reports}){
         </table>
       </div>
 
-      {/* HISTORIAL (ya filtrado) */}
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:"pointer"}} onClick={()=>setShowHist(!showHist)}>
-        <span style={{fontWeight:700,fontSize:14}}>Historial de reportes</span><span style={{fontSize:12,color:"var(--text-dim)"}}>{showHist?"▲":"▼"}</span>
+      {/* HISTORIAL (filtro global + filtro propio) */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setShowHist(!showHist)}>
+          <span style={{fontWeight:700,fontSize:14}}>Historial de reportes</span><span style={{fontSize:12,color:"var(--text-dim)"}}>{showHist?"▲":"▼"}</span>
+        </div>
+        {showHist && (
+          <div style={{display:"flex",gap:8}}>
+            {activeFH>0 && <button onClick={clearFH} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeFH})</button>}
+            <button onClick={()=>setShowHistFilter(!showHistFilter)} style={{background:showHistFilter||activeFH>0?"var(--accent)":"var(--panel-2)",color:showHistFilter||activeFH>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showHistFilter?"▲ Ocultar":"▼ Filtrar historial"}{activeFH>0?` (${activeFH})`:""}</button>
+          </div>
+        )}
       </div>
+      {showHist && showHistFilter && (
+        <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:12}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Máquina</div><select style={selStyle} value={hMaquina} onChange={e=>setHMaquina(e.target.value)}><option value="">Todas</option>{maquinas.filter(Boolean).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Operario</div><select style={selStyle} value={hOperario} onChange={e=>setHOperario(e.target.value)}><option value="">Todos</option>{operarios.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Turno</div><select style={selStyle} value={hTurno} onChange={e=>setHTurno(e.target.value)}><option value="">Todos</option>{turnos.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Desde</div><input type="date" style={selStyle} value={hDesde} onChange={e=>setHDesde(e.target.value)}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Hasta</div><input type="date" style={selStyle} value={hHasta} onChange={e=>setHHasta(e.target.value)}/></div>
+        </div>
+      )}
       {showHist && (
-        <div style={{overflowX:"auto",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+        <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <table style={{transform:"rotateX(180deg)",width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
             <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
               {["Fecha","F.Turno","Nombre","Máquina","Turno","Siesa","Referencia","Prod.","Merma","T.M.","% Util.","Rend. Real","% Rend."].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {fr.map(r=>{
+              {frHist.map(r=>{
                 const u=calcUtilizacion(r), rd=calcRendimiento(r,metas);
                 return(
                   <tr key={r.id||r.ts+r.consecutivo} style={{borderTop:"1px solid var(--line)"}}>
@@ -520,7 +563,7 @@ function GeneralTab({reports}){
                   </tr>
                 );
               })}
-              {fr.length===0 && <tr><td colSpan="13" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para estos filtros.</td></tr>}
+              {frHist.length===0 && <tr><td colSpan="13" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para estos filtros.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -580,7 +623,7 @@ function BodegaView({reports,titulo,showFiltros}){
   const tProd=f.reduce((s,r)=>s+(Number(r.produccion)||0),0);
   const tMerma=f.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
   const tTM=f.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
-  const mermaPct = (tProd+tMerma)>0 ? Math.round((tMerma/(tProd+tMerma))*1000)/10 : 0;
+  const rmMerma = resumenMerma(f); // merma % = merma kg ÷ producción kg (usando pesos)
 
   const pieTipo=tipos.filter(t=>t!=="Todos").map(t=>({label:t,val:rb.filter(r=>getCategoria(r)===t).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
   const pieSector=showFiltros?sectores.filter(s=>s!=="Todos").map(s=>({label:s,val:rb.filter(r=>getSector(r)===s).reduce((s2,r)=>s2+(Number(r.produccion)||0),0)})).filter(d=>d.val>0):[];
@@ -598,11 +641,11 @@ function BodegaView({reports,titulo,showFiltros}){
 
   return(
     <div>
-      <div style={{display:"grid",gridTemplateColumns:showFiltros?"repeat(4,1fr)":"repeat(5,1fr)",gap:14,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:20}}>
         {card("Reportes",`${f.length}`,"var(--accent)",`de ${rb.length}`)}
         {card("Producción",tProd.toLocaleString(),"var(--good)")}
         {card("Merma total",tMerma.toLocaleString(),"var(--bad)")}
-        {!showFiltros && card("Merma %",mermaPct+"%","var(--bad)","merma ÷ (producción + merma)")}
+        {card("Merma %",rmMerma.pct!==null?rmMerma.pct+"%":"—","var(--bad)",rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg ÷ ${rmMerma.prodKg.toLocaleString()} kg${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %")}
         {card("T. Muertos",tTM.toLocaleString(),"var(--amber)",`≈ ${(tTM/60).toFixed(1)} h`)}
       </div>
 
@@ -704,9 +747,22 @@ const BODEGAS=["Producto Terminado","Producto en Proceso"];
 function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   const [showSKU,setShowSKU]=useState(false);
   const [showMachines,setShowMachines]=useState(false);
-  const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción"});
+  const [showPesos,setShowPesos]=useState(false);
+  const [pesos,setPesos]=useState(loadPesos());
+  const [buscar,setBuscar]=useState("");
+  const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:""});
   const [newMachine,setNewMachine]=useState("");
   const [msg,setMsg]=useState("");
+
+  function setPeso(siesa,val){
+    const pz={...loadPesos()};
+    if(val===""||isNaN(Number(val))) delete pz[siesa]; else pz[siesa]=Number(val);
+    savePesos(pz); setPesos(pz);
+  }
+  const nPesos=Object.keys(pesos).length;
+  const resultados = buscar.trim().length>=2
+    ? catalog.filter(c=>(c.referencia+" "+c.siesa).toLowerCase().includes(buscar.trim().toLowerCase())).slice(0,60)
+    : [];
 
   function addCode(e){
     e.preventDefault();
@@ -719,7 +775,8 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
     const extra=(()=>{try{return JSON.parse(localStorage.getItem('clasificacion-siesa')||"{}");}catch(e){return {};}})();
     extra[nuevo.siesa]={bodega:f.bodega,categoria:f.categoria,sector:esProceso?null:f.sector};
     saveClasificacionExtra(extra);
-    setF({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción"});
+    if(f.peso!==""&&!isNaN(Number(f.peso))){ const pz={...loadPesos()}; pz[nuevo.siesa]=Number(f.peso); savePesos(pz); setPesos(pz); }
+    setF({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:""});
     setMsg("✓ Producto agregado con su clasificación.");
   }
   function removeCode(s){ const list=catalog.filter(c=>c.siesa!==s); setCatalog(list); saveCatalog(list); }
@@ -734,6 +791,25 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
       <button onClick={()=>setShowSKU(true)} style={cardBtn}><span style={{fontSize:20}}>🏷️</span><div style={{textAlign:"left"}}><div>Códigos SKU / Siesa</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{catalog.length} referencias</div></div></button>
       <button onClick={()=>setShowMachines(true)} style={cardBtn}><span style={{fontSize:20}}>⚙️</span><div style={{textAlign:"left"}}><div>Máquinas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{machines.length} registradas</div></div></button>
       {onEditMetas && <button onClick={onEditMetas} style={cardBtn}><span style={{fontSize:20}}>🎯</span><div style={{textAlign:"left"}}><div>Metas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>Editar metas por máquina</div></div></button>}
+      <button onClick={()=>setShowPesos(true)} style={cardBtn}><span style={{fontSize:20}}>⚖️</span><div style={{textAlign:"left"}}><div>Pesos de productos</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{nPesos} con peso definido</div></div></button>
+
+      {showPesos && (
+        <Modal title="⚖️ Pesos por unidad (para calcular Merma %)" onClose={()=>setShowPesos(false)}>
+          <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Define el peso en kg de cada unidad producida (bolsas). Sirve para convertir la producción por unidades a kg y así calcular la <b>Merma %</b>. Busca por nombre o código Siesa.</div>
+          <input style={{...inputStyle,marginBottom:12}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar producto (mín. 2 letras)…" autoFocus/>
+          {buscar.trim().length<2 && <div style={{fontSize:13,color:"var(--text-dim)",padding:"10px 0"}}>Escribe al menos 2 letras para buscar. Actualmente hay <b>{nPesos}</b> productos con peso definido.</div>}
+          {resultados.map(c=>(
+            <div key={c.siesa} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--line)"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.referencia}</div>
+                <div style={{fontSize:11,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{c.siesa}</div>
+              </div>
+              <input style={{...inputStyle,width:130,padding:"7px 10px"}} type="number" step="any" defaultValue={pesos[c.siesa]!==undefined?pesos[c.siesa]:""} onBlur={e=>setPeso(c.siesa,e.target.value)} placeholder="kg/unidad"/>
+            </div>
+          ))}
+          {buscar.trim().length>=2 && resultados.length===0 && <div style={{fontSize:13,color:"var(--text-dim)",padding:"10px 0"}}>Sin resultados para "{buscar}".</div>}
+        </Modal>
+      )}
 
       {showSKU && (
         <Modal title="Agregar producto (todos los campos)" onClose={()=>{setShowSKU(false);setMsg("");}}>
@@ -743,7 +819,8 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
             <div style={{gridColumn:"1/-1"}}><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Referencia *</div><input style={inputStyle} value={f.referencia} onChange={e=>setF({...f,referencia:e.target.value})} placeholder="Nombre / descripción del producto"/></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Bodega *</div><select style={inputStyle} value={f.bodega} onChange={e=>setF({...f,bodega:e.target.value})}>{BODEGAS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Categoría *</div><select style={inputStyle} value={f.categoria} onChange={e=>setF({...f,categoria:e.target.value})}>{CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-            <div style={{gridColumn:"1/-1"}}><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Sector {esProceso?"(no aplica en Producto en Proceso)":"*"}</div><select style={{...inputStyle,opacity:esProceso?0.5:1}} disabled={esProceso} value={f.sector} onChange={e=>setF({...f,sector:e.target.value})}>{SECTORES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Sector {esProceso?"(N/A)":"*"}</div><select style={{...inputStyle,opacity:esProceso?0.5:1}} disabled={esProceso} value={f.sector} onChange={e=>setF({...f,sector:e.target.value})}>{SECTORES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Peso por unidad (kg)</div><input style={inputStyle} type="number" step="any" value={f.peso} onChange={e=>setF({...f,peso:e.target.value})} placeholder="Solo si se produce por unidades. Ej: 0.025"/></div>
             <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
               <span style={{fontSize:12,color:msg.startsWith("✓")?"var(--good)":"var(--bad)"}}>{msg}</span>
               <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>+ Agregar producto</button>

@@ -229,3 +229,69 @@ async function saveReport(report, url){
   const result = await resp.json();
   if(result.status !== "ok") throw new Error("Sheets error: " + (result.message||""));
 }
+
+
+/* ============================================================================
+   PESOS DE PRODUCTO  —  para calcular Merma % (merma kg ÷ producción kg)
+   ----------------------------------------------------------------------------
+   Los productos que se producen por UNIDADES (bolsas) necesitan un peso por
+   unidad (kg) para poder convertir su producción a kg y cruzarla con la merma.
+   Los pesos se editan desde el panel y se guardan en localStorage.
+   ========================================================================== */
+function loadPesos(){
+  try{
+    const r = localStorage.getItem('pesos-siesa');
+    const extra = r ? JSON.parse(r) : {};
+    return {...(window.PESOS_SKU || {}), ...extra};
+  }catch(e){ return {...(window.PESOS_SKU || {})}; }
+}
+function savePesos(obj){ try{ localStorage.setItem('pesos-siesa', JSON.stringify(obj)); }catch(e){} }
+
+/* Peso por unidad (kg) de un reporte, según su SKU. 0 si no está definido. */
+function pesoUnidad(report, pesos){
+  const p = pesos || loadPesos();
+  return Number(p[report.siesa] || p[report.sku] || 0) || 0;
+}
+
+/* Producción del reporte convertida a KG.
+   - Si la unidad ya es Kg → la producción tal cual.
+   - Si es Unidades → producción × peso por unidad (0 si no hay peso definido). */
+function produccionKg(report, pesos){
+  const prod = Number(report.produccion) || 0;
+  const unidad = String(report.unidad || "").toLowerCase();
+  if(unidad.indexOf("kg") === 0) return prod;
+  const pu = pesoUnidad(report, pesos);
+  return pu > 0 ? prod * pu : 0;
+}
+
+/* Merma del reporte convertida a KG. Parsea el texto "5 Kg + 3 Unidades":
+   los Kg suman directo; las Unidades se convierten con el peso por unidad. */
+function mermaKg(report, pesos){
+  const src = String(report.mermasCantidad || "");
+  if(!src || src === "-") return 0;
+  const pu = pesoUnidad(report, pesos);
+  let total = 0, m;
+  const re = /([\d.]+)\s*([a-zA-ZáéíóúÁÉÍÓÚ]+)?/g;
+  while((m = re.exec(src))){
+    const n = Number(m[1]) || 0;
+    const unit = (m[2] || "").toLowerCase();
+    if(unit.indexOf("unid") === 0 || unit === "und" || unit === "u") total += pu > 0 ? n * pu : 0;
+    else total += n; // Kg o sin unidad → se asume kg
+  }
+  return total;
+}
+
+/* Resumen de merma % para una lista de reportes.
+   Solo cuenta reportes cuya producción se puede expresar en kg (kg directos, o
+   unidades CON peso definido). Así el % no se distorsiona por faltantes. */
+function resumenMerma(list, pesos){
+  const p = pesos || loadPesos();
+  let mermaTot = 0, prodTot = 0, sinPeso = 0;
+  list.forEach(r=>{
+    const pk = produccionKg(r, p);
+    if(pk > 0){ prodTot += pk; mermaTot += mermaKg(r, p); }
+    else if((Number(r.produccion)||0) > 0){ sinPeso++; }
+  });
+  const pct = prodTot > 0 ? Math.round((mermaTot / prodTot) * 1000) / 10 : null;
+  return { mermaKg: Math.round(mermaTot), prodKg: Math.round(prodTot), pct, sinPeso };
+}
