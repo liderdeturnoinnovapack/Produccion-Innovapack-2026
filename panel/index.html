@@ -879,6 +879,70 @@ function InvCard({label,value,color,sub}){
   );
 }
 
+function TrazabilidadModal({siesa, reports, onClose}){
+  const rows=reports.filter(r=>(r.siesa===siesa||r.sku===siesa)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const ref=rows.length?rows[0].referencia:siesa;
+  const cls=rows.length?clasificarReporte(rows[0]):{};
+  const p=loadPesos();
+  const totalUnd=rows.reduce((s,r)=>{const u=String(r.unidad||"").toLowerCase();return s+(u.indexOf("kg")===0?0:(Number(r.produccion)||0));},0);
+  const totalKg=rows.reduce((s,r)=>s+produccionKg(r,p),0);
+  const totalMerma=rows.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  const fechas=rows.map(r=>r.fechaTurno).filter(x=>x&&x!=="-").sort();
+  const rango=fechas.length?`${fechas[0]} → ${fechas[fechas.length-1]}`:"-";
+  const mini=(label,val,color)=>(
+    <div style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 14px",flex:"1 1 120px"}}>
+      <div style={{fontSize:10,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em"}}>{label}</div>
+      <div style={{fontSize:16,fontWeight:700,fontFamily:"var(--mono)",color:color||"var(--text)"}}>{val}</div>
+    </div>
+  );
+  return (
+    <Modal title={`🔎 Trazabilidad · ${ref}`} onClose={onClose}>
+      <div style={{display:"flex",gap:10,marginBottom:8,fontSize:12,color:"var(--text-dim)",flexWrap:"wrap"}}>
+        <span><b style={{color:"var(--text)"}}>Código:</b> {siesa}</span>
+        <span><b style={{color:"var(--text)"}}>Tipo:</b> {cls.categoria||"-"}</span>
+        <span><b style={{color:"var(--text)"}}>Sector:</b> {cls.sector||"-"}</span>
+        <span><b style={{color:"var(--text)"}}>Peso/und:</b> {pesoUnidad(rows[0]||{siesa})||"-"} kg</span>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        {mini("Reportes",rows.length,"var(--accent)")}
+        {mini("Unidades",Math.round(totalUnd).toLocaleString(),"var(--good)")}
+        {mini("Peso total",Math.round(totalKg).toLocaleString()+" kg","var(--good)")}
+        {mini("Merma",totalMerma.toLocaleString(),"var(--bad)")}
+        {mini("Periodo",rango)}
+      </div>
+      <div style={{overflowX:"auto",border:"1px solid var(--line)",borderRadius:10}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left"}}>
+            {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"8px 9px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map((r,i)=>{
+              const rolls=parseRollos(r);
+              const madres=rolls.map(x=>x.rolloMadre).filter(Boolean).join(", ");
+              const prods=rolls.map(x=>x.numero).filter(Boolean).join(", ");
+              const traza=[madres?("Madre: "+madres):"",prods?("Prod: #"+prods):""].filter(Boolean).join(" · ")||"-";
+              return (
+                <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.fechaTurno||"-"}</td>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.turno||"-"}</td>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.maquina}</td>
+                  <td style={{padding:"7px 9px"}}>{r.nombre}</td>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.produccion} {r.unidad}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",color:"var(--good)"}}>{Math.round(produccionKg(r,p)).toLocaleString()}</td>
+                  <td style={{padding:"7px 9px",color:"var(--bad)"}}>{r.mermasCantidad||"-"}</td>
+                  <td style={{padding:"7px 9px",fontSize:11}}>{traza}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
+                </tr>
+              );
+            })}
+            {rows.length===0 && <tr><td colSpan="9" style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para esta referencia.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </Modal>
+  );
+}
+
 function InventarioRollos({reports}){
   const [fMaq,setFMaq]=useState(""); const [buscar,setBuscar]=useState("");
   const maquinasRollo=["Extrusora 1","Extrusora 2","Refiladora"];
@@ -929,6 +993,7 @@ function InventarioRollos({reports}){
 
 function InventarioPT({reports}){
   const [buscar,setBuscar]=useState("");
+  const [traza,setTraza]=useState(null);
   const list=reports.filter(r=>clasificarReporte(r).bodega==="Producto Terminado");
   let inv=inventarioPT(list);
   if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
@@ -944,28 +1009,31 @@ function InventarioPT({reports}){
         <InvCard label="Unidades" value={Math.round(totalUnd).toLocaleString()} color="var(--good)"/>
         <InvCard label="Peso total" value={Math.round(totalKg).toLocaleString()+" kg"} color="var(--good)"/>
       </div>
-      <input style={{...selStyle,maxWidth:320,marginBottom:12}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+      <input style={{...selStyle,maxWidth:320,marginBottom:6}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+      <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:12}}>💡 Haz clic en una fila para ver la <b>trazabilidad</b> completa de esa referencia.</div>
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:480,border:"1px solid var(--line)",borderRadius:12,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Código","Referencia","Categoría","Sector","Cantidad (und)","Peso (kg)"].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["Código","Referencia","Categoría","Sector","Cantidad (und)","Peso (kg)",""].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {inv.slice(0,500).map((x,i)=>(
-              <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+              <tr key={i} onClick={()=>setTraza(x.siesa)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}}>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
                 <td style={{padding:"8px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
                 <td style={{padding:"8px 10px"}}><span style={{background:"#e8f4fd",color:"#1a6fa8",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{x.categoria}</span></td>
                 <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-dim)"}}>{x.sector||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.unidades).toLocaleString()}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{Math.round(x.kg).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",color:"var(--accent)",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>🔎 ver</td>
               </tr>
             ))}
-            {inv.length===0 && <tr><td colSpan="6" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin producto terminado registrado aún.</td></tr>}
+            {inv.length===0 && <tr><td colSpan="7" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin producto terminado registrado aún.</td></tr>}
           </tbody>
         </table>
       </div>
       {inv.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {inv.length.toLocaleString()}. Usa el buscador para acotar.</div>}
+      {traza && <TrazabilidadModal siesa={traza} reports={reports} onClose={()=>setTraza(null)}/>}
     </div>
   );
 }
