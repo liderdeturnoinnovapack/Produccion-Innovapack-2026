@@ -372,32 +372,43 @@ function GeneralTab({reports}){
   const bdTM=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0)})).filter(x=>x.val>0);
   const bdReportes=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).length})).filter(x=>x.val>0);
 
-  /* ---- Resumen + eficiencia por máquina (sobre fr) ---- */
+  /* ---- Resumen + eficiencia por máquina (sobre fr) ----
+     Se agrupa por TURNO FÍSICO (fecha + turno) y se TOPAN las horas
+     productivas al límite de cada turno. Así, por más reportes que un
+     operario ingrese en un mismo turno de (p.ej.) 8h, ese turno jamás
+     aporta más de 8h. Esto corrige el sobreconteo (24h en un turno de 8h). */
   function eficienciaDe(list){
     const porTurno={};
     list.forEach(r=>{
       const key=getFechaISO(r)+"|"+(r.turno||"");
       const u=calcUtilizacion(r);
       if(!porTurno[key]) porTurno[key]={dur:0,prod:0};
-      if(u){ porTurno[key].dur=u.duracionTurno; porTurno[key].prod+=Math.min(u.tiempoProductivo,u.duracionTurno); }
+      if(u){ porTurno[key].dur=u.duracionTurno; porTurno[key].prod+=u.tiempoProductivo; }
     });
     const prog=Object.values(porTurno).reduce((s,d)=>s+d.dur,0);
-    const prod=Object.values(porTurno).reduce((s,d)=>s+d.prod,0);
-    return {prog,prod,pct:prog>0?Math.round((prod/prog)*100):null};
+    // TOPE por turno: las horas productivas nunca exceden la duración del turno
+    const prod=Object.values(porTurno).reduce((s,d)=>s+Math.min(d.prod,d.dur),0);
+    return {prog,prod,pct:prog>0?Math.min(100,Math.round((prod/prog)*100)):null};
   }
   const byMaq=MAQ.map(m=>{
     const rs=fr.filter(r=>r.maquina===m);
-    const rends=rs.map(r=>{const rd=calcRendimiento(r,metas);return rd?rd.pct:null;}).filter(x=>x!==null);
-    const rend=rends.length?Math.round(rends.reduce((a,x)=>a+x,0)/rends.length):null;
     const ef=eficienciaDe(rs);
+    const prodTotal=rs.reduce((s,r)=>s+(Number(r.produccion)||0),0);
     const meta=metas[m];
-    return {maquina:m,reportes:rs.length,prod:rs.reduce((s,r)=>s+(Number(r.produccion)||0),0),
+    const horasProd=ef.prod/60; // horas productivas reales (ya topadas por turno)
+    // Rendimiento a nivel de máquina: producción total ÷ horas productivas reales
+    let rend=null, rendReal=null;
+    if(horasProd>0 && meta){ rendReal=Math.round(prodTotal/horasProd); rend=Math.round((rendReal/meta.meta)*100); }
+    return {maquina:m,reportes:rs.length,prod:prodTotal,
       merma:rs.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0),tm:rs.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0),
-      rend,metaStr:meta?`${meta.meta.toLocaleString()} ${meta.unidad}`:"-",
+      rend,rendReal,metaStr:meta?`${meta.meta.toLocaleString()} ${meta.unidad}`:"-",
+      progMin:ef.prog,prodMin:ef.prod,
       horasProg:(ef.prog/60).toFixed(1)+"h",horasProd:(ef.prod/60).toFixed(1)+"h",eficiencia:ef.pct};
   });
-  const efVals=byMaq.filter(x=>x.eficiencia!==null);
-  const avgEfic=efVals.length?Math.round(efVals.reduce((a,x)=>a+x.eficiencia,0)/efVals.length)+"%":"-";
+  // Eficiencia global PONDERADA (total horas productivas ÷ total horas programadas)
+  const totalProgMin=byMaq.reduce((s,x)=>s+x.progMin,0);
+  const totalProdMin=byMaq.reduce((s,x)=>s+x.prodMin,0);
+  const avgEfic=totalProgMin>0?Math.round((totalProdMin/totalProgMin)*100)+"%":"-";
   const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?x.eficiencia+"%":"-"})).filter(x=>x.val!=="-");
 
   /* ---- Datos de gráficas (sobre fr) ---- */
