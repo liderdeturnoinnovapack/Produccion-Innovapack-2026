@@ -798,15 +798,19 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
           <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Define el peso en kg de cada unidad producida (bolsas). Sirve para convertir la producción por unidades a kg y así calcular la <b>Merma %</b>. Busca por nombre o código Siesa.</div>
           <input style={{...inputStyle,marginBottom:12}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar producto (mín. 2 letras)…" autoFocus/>
           {buscar.trim().length<2 && <div style={{fontSize:13,color:"var(--text-dim)",padding:"10px 0"}}>Escribe al menos 2 letras para buscar. Actualmente hay <b>{nPesos}</b> productos con peso definido.</div>}
-          {resultados.map(c=>(
+          {resultados.map(c=>{
+            const auto=pesoPorTipo({siesa:c.siesa,sku:c.sku,referencia:c.referencia});
+            const manual=pesos[c.siesa]!==undefined;
+            return (
             <div key={c.siesa} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--line)"}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.referencia}</div>
-                <div style={{fontSize:11,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{c.siesa}</div>
+                <div style={{fontSize:11,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{c.siesa} · {manual?<span style={{color:"var(--accent)"}}>manual</span>:(auto>0?`auto ${auto} kg`:"sin peso")}</div>
               </div>
-              <input style={{...inputStyle,width:130,padding:"7px 10px"}} type="number" step="any" defaultValue={pesos[c.siesa]!==undefined?pesos[c.siesa]:""} onBlur={e=>setPeso(c.siesa,e.target.value)} placeholder="kg/unidad"/>
+              <input style={{...inputStyle,width:130,padding:"7px 10px"}} type="number" step="any" defaultValue={manual?pesos[c.siesa]:""} onBlur={e=>setPeso(c.siesa,e.target.value)} placeholder={auto>0?`auto ${auto}`:"kg/unidad"}/>
             </div>
-          ))}
+            );
+          })}
           {buscar.trim().length>=2 && resultados.length===0 && <div style={{fontSize:13,color:"var(--text-dim)",padding:"10px 0"}}>Sin resultados para "{buscar}".</div>}
         </Modal>
       )}

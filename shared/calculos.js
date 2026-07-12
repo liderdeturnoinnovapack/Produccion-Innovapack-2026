@@ -247,10 +247,33 @@ function loadPesos(){
 }
 function savePesos(obj){ try{ localStorage.setItem('pesos-siesa', JSON.stringify(obj)); }catch(e){} }
 
-/* Peso por unidad (kg) de un reporte, según su SKU. 0 si no está definido. */
+/* Peso por DEFECTO según el TIPO de bolsa (reglas Innovapack).
+   Se usa cuando el SKU no tiene un peso manual definido.
+   - Bolsa de agua ....................... 0.026 kg
+   - Bolsa valvulada 40 kg ............... 0.08 kg
+   - Bolsa valvulada (25 kg / resto) ..... 0.05 kg
+   - Bolsa abierta con "estuco" 25 kg .... 0.07 kg
+   - Bolsa abierta (pegante/porcel/cer) .. 0.05 kg
+   - Cualquier otro tipo ................. 0 (sin peso) */
+function pesoPorTipo(report){
+  const cls = loadClasificacion();
+  const c = cls[report.siesa] || cls[report.sku] || {};
+  const cat = c.categoria || "";
+  const ref = String(report.referencia || "").toLowerCase();
+  if(cat === "Bolsa de agua") return 0.026;
+  if(cat === "Bolsa valvulada") return /40\s*k/.test(ref) ? 0.08 : 0.05;
+  if(cat === "Bolsa abierta") return ref.indexOf("estuco") !== -1 ? 0.07 : 0.05;
+  return 0;
+}
+
+/* Peso por unidad (kg) de un reporte. Prioridad:
+   1) peso MANUAL definido para el SKU (editor de Pesos) — manda siempre.
+   2) peso por TIPO de bolsa (regla automática). */
 function pesoUnidad(report, pesos){
   const p = pesos || loadPesos();
-  return Number(p[report.siesa] || p[report.sku] || 0) || 0;
+  const explicito = Number(p[report.siesa] || p[report.sku] || 0) || 0;
+  if(explicito > 0) return explicito;
+  return pesoPorTipo(report);
 }
 
 /* Producción del reporte convertida a KG.
