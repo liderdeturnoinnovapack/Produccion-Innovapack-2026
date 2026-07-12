@@ -101,20 +101,29 @@ function getNextConsecutivo(maquina){
 
 /* ---------------------- clasificación (única) --------------------- */
 /* Determina bodega/categoría/sector de un reporte. La MÁQUINA manda sobre
-   el SKU. Excepción: Extrusora 2 + Lámina Termoencogible = Producto Terminado.
-   La Impresora siempre produce "Lámina Impresa". */
+   el SKU. La Impresora siempre produce "Lámina Impresa".
+   Excepciones que van directo a PRODUCTO TERMINADO (aunque sean de máquina
+   de proceso):
+     · Extrusora 2 + Lámina Termoencogible
+     · Refiladora + referencia de "lámina" (las que dicen "bolsa" siguen en
+       proceso como Lámina Doblada). */
 function clasificarReporte(r){
   const cls = loadClasificacion();
   const c = cls[r.siesa] || cls[r.sku] || {};
   const esProceso = window.MAQUINAS_PROCESO.includes(r.maquina);
   const esTermo = c.categoria === "Lámina Termoencogible";
+  const ref = String(r.referencia || "").toLowerCase();
+  const refLamina = ref.indexOf("lamina") !== -1 || ref.indexOf("lámina") !== -1;
 
   let categoria = c.categoria || "-";
   if(r.maquina === "Impresora") categoria = "Lámina Impresa";
 
   let bodega, sector;
   if(esProceso){
-    if(r.maquina === "Extrusora 2" && esTermo){
+    const vaATerminado =
+      (r.maquina === "Extrusora 2" && esTermo) ||   // termoencogible de Extrusora 2
+      (r.maquina === "Refiladora" && refLamina);    // lámina refilada
+    if(vaATerminado){
       bodega = "Producto Terminado";
       sector = c.sector || "-";
     } else {
