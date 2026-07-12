@@ -334,3 +334,65 @@ function resumenMerma(list, pesos){
   const pct = prodTot > 0 ? Math.round((mermaTot / prodTot) * 1000) / 10 : null;
   return { mermaKg: Math.round(mermaTot), prodKg: Math.round(prodTot), pct, sinPeso };
 }
+
+
+/* ============================================================================
+   INVENTARIO (Fase 1)  —  lectura estructurada de rollos y stock derivado
+   ----------------------------------------------------------------------------
+   Los rollos se guardan en la hoja como texto legible (ej:
+     "#123 | 45cm | Cal:3.0 | 45kg // #124 | 46cm | Cal:3.0 | 44kg").
+   parseRollos() los convierte a objetos estructurados para poder inventariar.
+   NOTA: los # de rollo se reinician (1..400), por eso cada rollo producido se
+   cuenta como un REGISTRO independiente (no se deduplica por número).
+   ========================================================================== */
+function parseRollos(report){
+  const src = String(report.extraRollos || "");
+  if(!src || src === "-") return [];
+  return src.split("//").map(chunk=>{
+    const t = chunk.trim();
+    if(!t) return null;
+    const g = (re)=>{ const m = t.match(re); return m ? m[1] : ""; };
+    const numero   = g(/#(\S+)/);
+    const madre    = g(/Madre:(\S+)/i);
+    const medida   = g(/(?:^|\|)\s*([\d.,]+)\s*cm/i);
+    const calibre  = g(/Cal:([\d.,]+)/i);
+    const pesoIni  = g(/PesoIni:([\d.,]+)\s*kg/i);
+    const pesoFin  = g(/PesoFin:([\d.,]+)\s*kg/i);
+    const peso     = g(/(?:^|\|)\s*([\d.,]+)\s*kg/i); // "45kg" simple (no PesoIni/Fin)
+    return {
+      numero, rolloMadre: madre, medida, calibre,
+      peso: peso, pesoInicial: pesoIni, pesoFinal: pesoFin,
+      maquina: report.maquina, fecha: report.fecha, fechaTurno: report.fechaTurno,
+      turno: report.turno, operario: report.nombre,
+      siesa: report.siesa, referencia: report.referencia
+    };
+  }).filter(Boolean);
+}
+
+/* Devuelve todos los rollos (registros) de una lista de reportes, aplanados. */
+function rollosDeReportes(list){
+  const out = [];
+  list.forEach(r => parseRollos(r).forEach(roll => out.push(roll)));
+  return out;
+}
+
+/* Inventario de Producto Terminado agrupado por referencia (SKU).
+   Devuelve por referencia: cantidad (unidades), peso (kg) y datos de tipo. */
+function inventarioPT(list){
+  const p = loadPesos();
+  const mapa = {};
+  list.forEach(r=>{
+    const key = r.siesa || r.sku || r.referencia;
+    if(!mapa[key]){
+      const c = clasificarReporte(r);
+      mapa[key] = { siesa:key, referencia:r.referencia, categoria:c.categoria, sector:c.sector,
+                    unidades:0, kg:0, unidad:r.unidad };
+    }
+    const prod = Number(r.produccion)||0;
+    const unidad = String(r.unidad||"").toLowerCase();
+    if(unidad.indexOf("kg")===0) mapa[key].kg += prod;
+    else mapa[key].unidades += prod;
+    mapa[key].kg += (unidad.indexOf("kg")===0 ? 0 : produccionKg(r,p));
+  });
+  return Object.values(mapa).sort((a,b)=> b.kg - a.kg);
+}
