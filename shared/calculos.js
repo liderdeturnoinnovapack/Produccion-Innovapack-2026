@@ -65,7 +65,7 @@ function loadCatalog(){
   try{ const r = localStorage.getItem('catalogo-siesa'); return r ? JSON.parse(r) : window.DEFAULT_CATALOG; }
   catch(e){ return window.DEFAULT_CATALOG; }
 }
-function saveCatalog(list){ try{ localStorage.setItem('catalogo-siesa', JSON.stringify(list)); }catch(e){} }
+function saveCatalog(list){ try{ localStorage.setItem('catalogo-siesa', JSON.stringify(list)); }catch(e){} postConfig_('catalogo', list); }
 
 /* Clasificación editable (para SKUs nuevos agregados desde el panel). */
 function loadClasificacion(){
@@ -75,19 +75,66 @@ function loadClasificacion(){
     return {...window.CLASIFICACION_SKU, ...extra}; // los agregados sobrescriben/añaden
   }catch(e){ return {...window.CLASIFICACION_SKU}; }
 }
-function saveClasificacionExtra(obj){ try{ localStorage.setItem('clasificacion-siesa', JSON.stringify(obj)); }catch(e){} }
+function saveClasificacionExtra(obj){ try{ localStorage.setItem('clasificacion-siesa', JSON.stringify(obj)); }catch(e){} postConfig_('clasificacion', obj); }
 
 function loadMachines(){
   try{ const r = localStorage.getItem('catalogo-maquinas'); return r ? JSON.parse(r) : window.DEFAULT_MACHINES.slice(); }
   catch(e){ return window.DEFAULT_MACHINES.slice(); }
 }
-function saveMachines(list){ try{ localStorage.setItem('catalogo-maquinas', JSON.stringify(list)); }catch(e){} }
+function saveMachines(list){ try{ localStorage.setItem('catalogo-maquinas', JSON.stringify(list)); }catch(e){} postConfig_('maquinas', list); }
 
 function loadMetas(){
   try{ const r = localStorage.getItem('metas-produccion'); return r ? JSON.parse(r) : window.DEFAULT_METAS; }
   catch(e){ return window.DEFAULT_METAS; }
 }
-function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.stringify(m)); }catch(e){} }
+function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.stringify(m)); }catch(e){} postConfig_('metas', m); }
+
+/* ---------------------- config compartida (Google Sheets) ----------------------
+   metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
+   "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
+   offline). Cada app define window.__CONFIG_URL con su endpoint. */
+var _CFG_KEYS = { catalogo:'catalogo-siesa', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa' };
+
+async function postConfig_(clave, valor){
+  if(!window.__CONFIG_URL) return;
+  try{
+    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor }) });
+  }catch(e){}
+}
+
+/* Descarga la config remota y la refleja en localStorage (misma clave que usan
+   los loaders). Devuelve el objeto remoto (o null si falla). */
+async function loadConfigRemoto(url){
+  if(!url) return null;
+  try{
+    const sep = url.indexOf("?")>=0 ? "&" : "?";
+    const resp = await fetch(url + sep + "tipo=config");
+    const cfg = await resp.json();
+    if(cfg && typeof cfg==="object" && !Array.isArray(cfg)){
+      for(const k in _CFG_KEYS){
+        if(cfg[k]!==undefined && cfg[k]!==null){
+          try{ localStorage.setItem(_CFG_KEYS[k], JSON.stringify(cfg[k])); }catch(e){}
+        }
+      }
+      return cfg;
+    }
+  }catch(e){}
+  return null;
+}
+
+/* Migración: si la config remota no tiene alguna clave pero el navegador sí,
+   la sube (una sola vez). Así no se pierde lo ya configurado localmente. */
+async function migrarConfigInicial(cfg){
+  cfg = cfg || {};
+  for(const k in _CFG_KEYS){
+    if(cfg[k]!==undefined && cfg[k]!==null) continue;
+    let local=null;
+    try{ const r=localStorage.getItem(_CFG_KEYS[k]); local=r?JSON.parse(r):null; }catch(e){}
+    if(local && (Array.isArray(local)?local.length:Object.keys(local).length)){
+      await postConfig_(k, local);
+    }
+  }
+}
 
 /* Consecutivo automático por máquina (lo usa el formulario). */
 function getNextConsecutivo(maquina){
@@ -254,7 +301,7 @@ function loadPesos(){
     return {...(window.PESOS_SKU || {}), ...extra};
   }catch(e){ return {...(window.PESOS_SKU || {})}; }
 }
-function savePesos(obj){ try{ localStorage.setItem('pesos-siesa', JSON.stringify(obj)); }catch(e){} }
+function savePesos(obj){ try{ localStorage.setItem('pesos-siesa', JSON.stringify(obj)); }catch(e){} postConfig_('pesos', obj); }
 
 /* Peso por DEFECTO según el TIPO de bolsa (reglas Innovapack).
    Se usa cuando el SKU no tiene un peso manual definido.

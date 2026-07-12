@@ -64,6 +64,7 @@ const { useState, useEffect } = React;
 
 /* URL de LECTURA del panel (endpoint Apps Script administrativo). */
 const SHEETS_URL_READ = "https://script.google.com/macros/s/AKfycby3m0ptMQjUEYkVmMt1Fij1fQWIhBxZ1WuyYF84fKJYLIrj3Cwn0Ifr8bRm0AF7m2ic/exec";
+window.__CONFIG_URL = SHEETS_URL_READ; // el panel lee y ESCRIBE la config compartida
 
 const inputStyle = {
   width:"100%", padding:"10px 13px", background:"var(--card)", border:"1px solid var(--line)",
@@ -1353,6 +1354,9 @@ function App(){
 
   async function refreshReports(){
     setLoading(true);
+    const cfg=await loadConfigRemoto(SHEETS_URL_READ); // config compartida desde el Sheet
+    await migrarConfigInicial(cfg);                    // sube lo local si el Sheet aún no lo tiene
+    setCatalog(loadCatalog()); setMachines(loadMachines());
     const data=await loadReports(SHEETS_URL_READ);
     setReports(data);
     setLastUpdated(Date.now());

@@ -54,6 +54,7 @@ const { useState, useEffect } = React;
 
 /* URL de ESCRITURA del formulario (endpoint Apps Script del operario). */
 const SHEETS_URL_WRITE = "https://script.google.com/macros/s/AKfycbwv0-tKDdA8uOn6UYy3Z0YG0V-wg7ZNyKUkynpuupWXysWfkXXmRuNQmCGivPwBxKyF/exec";
+window.__CONFIG_URL = SHEETS_URL_WRITE; // el reporte solo LEE la config (para el formulario)
 
 const inputStyle = {
   width:"100%", padding:"10px 13px", background:"var(--card)", border:"1px solid var(--line)",
@@ -381,10 +382,12 @@ function ThemeToggle({theme,setTheme}){
 }
 
 function App(){
-  const [catalog] = useState(loadCatalog());
-  const [machines] = useState(loadMachines());
+  const [catalog,setCatalog] = useState(loadCatalog());
+  const [machines,setMachines] = useState(loadMachines());
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-reporte')||'light';}catch(e){return 'light';}});
   useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-reporte',theme);}catch(e){}},[theme]);
+  // Trae la config compartida (catálogo/máquinas/clasificación) desde el Sheet.
+  useEffect(()=>{ loadConfigRemoto(SHEETS_URL_WRITE).then(()=>{ setCatalog(loadCatalog()); setMachines(loadMachines()); }); },[]);
   return (
     <div id="app-root">
       <header style={{background:"var(--header-bg)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
