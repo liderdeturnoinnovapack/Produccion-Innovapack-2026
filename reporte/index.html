@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte de Producción · Innovapack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  :root{
+    --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
+    --text:#18181B; --text-dim:#71717A; --accent:#2563EB; --accent-text:#fff;
+    --accent-dim:#EFF6FF; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:'Inter','Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  #app-root{min-height:100vh;}
+  input,select,button{font-family:var(--sans);}
+  input:focus,select:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(37,99,235,0.1)!important;}
+  ::-webkit-scrollbar{width:5px;height:5px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<!-- Módulos compartidos (deben cargar ANTES del script de la app) -->
+<script src="../shared/data.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/calculos.js"></script>
+</head>
+<body>
+<div id="app-root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState } = React;
+
+/* URL de ESCRITURA del formulario (endpoint Apps Script del operario). */
+const SHEETS_URL_WRITE = "https://script.google.com/macros/s/AKfycbwv0-tKDdA8uOn6UYy3Z0YG0V-wg7ZNyKUkynpuupWXysWfkXXmRuNQmCGivPwBxKyF/exec";
+
+const inputStyle = {
+  width:"100%", padding:"10px 13px", background:"#fff", border:"1px solid var(--line)",
+  borderRadius:9, color:"var(--text)", fontSize:14, fontFamily:"var(--sans)", outline:"none",
+  boxShadow:"0 1px 2px rgba(0,0,0,0.04)", transition:"border-color 0.15s, box-shadow 0.15s"
+};
+
+function Logo(){
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:14}}>
+      <img src="../shared/logo.png" alt="Innovapack" onError={e=>{e.target.style.display='none';}}
+        style={{height:44,width:"auto",objectFit:"contain"}}/>
+      <div style={{fontFamily:"var(--sans)",fontSize:18,color:"var(--text)",fontWeight:700,letterSpacing:"0.01em"}}>
+        REPORTE DE PRODUCCIÓN
+      </div>
+    </div>
+  );
+}
+
+function Field({label, children, hint}){
+  return (
+    <div style={{marginBottom:18}}>
+      <label style={{display:"block",fontSize:11,fontWeight:600,letterSpacing:"0.05em",color:"var(--text-dim)",textTransform:"uppercase",marginBottom:6}}>{label}</label>
+      {children}
+      {hint && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:5}}>{hint}</div>}
+    </div>
+  );
+}
+
+function MachineFields({maquina, datosExtra, setDatosExtra}){
+  function upd(field, value){ setDatosExtra(prev=>({...prev, [field]:value})); }
+  function updRow(key, id, field, value){ setDatosExtra(prev=>({...prev, [key]: (prev[key]||[]).map(r=>r.id===id?{...r,[field]:value}:r)})); }
+  function addRow(key, template){ setDatosExtra(prev=>({...prev, [key]: [...(prev[key]||[]), {id:uid("r"), ...template}]})); }
+  function removeRow(key, id){ setDatosExtra(prev=>({...prev, [key]: (prev[key]||[]).filter(r=>r.id!==id)})); }
+
+  const sectionStyle = {background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:22,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
+  const addBtn = {background:"var(--panel-2)",border:"1px dashed var(--line)",borderRadius:8,color:"var(--text-dim)",padding:"8px 12px",cursor:"pointer",fontSize:13,marginTop:6};
+  const remBtn = {background:"none",border:"1px solid var(--line)",borderRadius:8,color:"var(--bad)",cursor:"pointer",padding:"0 10px",flexShrink:0};
+
+  if(maquina==="Extrusora 1"){
+    const rollos = datosExtra.rollos||[];
+    return (
+      <div style={sectionStyle}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Datos de Extrusora 1</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+          <Field label="# Rollo inicial"><input style={inputStyle} value={datosExtra.rolloInicial||""} onChange={e=>upd("rolloInicial",e.target.value)} placeholder="Ej: 1001"/></Field>
+          <Field label="# Rollo final"><input style={inputStyle} value={datosExtra.rolloFinal||""} onChange={e=>upd("rolloFinal",e.target.value)} placeholder="Ej: 1010"/></Field>
+        </div>
+        <div style={{fontWeight:600,fontSize:12,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:8}}>Rollos producidos</div>
+        {rollos.map((r,i)=>(
+          <div key={r.id} style={{background:"#f8f9fa",border:"1px solid var(--line)",borderRadius:8,padding:10,marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontWeight:600,fontSize:13}}>Rollo {i+1}</span>
+              {rollos.length>1 && <button type="button" onClick={()=>removeRow("rollos",r.id)} style={remBtn}>✕</button>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <Field label="# Rollo"><input style={inputStyle} value={r.numero||""} onChange={e=>updRow("rollos",r.id,"numero",e.target.value)} placeholder="Número"/></Field>
+              <Field label="Medida (cm)"><input style={inputStyle} type="number" step="any" value={r.medida||""} onChange={e=>updRow("rollos",r.id,"medida",e.target.value)} placeholder="cm"/></Field>
+              <Field label="Calibre (milspulg)"><input style={inputStyle} type="number" step="any" value={r.calibre||""} onChange={e=>updRow("rollos",r.id,"calibre",e.target.value)} placeholder="milspulg"/></Field>
+              <Field label="Peso (kg)"><input style={inputStyle} type="number" step="any" value={r.peso||""} onChange={e=>updRow("rollos",r.id,"peso",e.target.value)} placeholder="kg"/></Field>
+            </div>
+          </div>
+        ))}
+        <button type="button" onClick={()=>addRow("rollos",{numero:"",medida:"",calibre:"",peso:""})} style={addBtn}>+ Agregar rollo</button>
+      </div>
+    );
+  }
+  if(maquina==="Extrusora 2"){
+    return (
+      <div style={sectionStyle}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Datos de Extrusora 2</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          <Field label="Medida (cm)"><input style={inputStyle} type="number" step="any" value={datosExtra.medida||""} onChange={e=>upd("medida",e.target.value)} placeholder="cm"/></Field>
+          <Field label="Calibre (milspulg)"><input style={inputStyle} type="number" step="any" value={datosExtra.calibre||""} onChange={e=>upd("calibre",e.target.value)} placeholder="milspulg"/></Field>
+          <Field label="# Rollos totales"><input style={inputStyle} type="number" value={datosExtra.rollosTotales||""} onChange={e=>upd("rollosTotales",e.target.value)} placeholder="0"/></Field>
+        </div>
+      </div>
+    );
+  }
+  if(maquina==="Impresora"){
+    const rollos = datosExtra.rollos||[];
+    return (
+      <div style={sectionStyle}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Datos de Impresora</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+          <Field label="Medida (cm)"><input style={inputStyle} type="number" step="any" value={datosExtra.medida||""} onChange={e=>upd("medida",e.target.value)} placeholder="cm"/></Field>
+          <Field label="Calibre (milspulg)"><input style={inputStyle} type="number" step="any" value={datosExtra.calibre||""} onChange={e=>upd("calibre",e.target.value)} placeholder="milspulg"/></Field>
+        </div>
+        <div style={{fontWeight:600,fontSize:12,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:8}}>Rollos procesados</div>
+        {rollos.map((r,i)=>(
+          <div key={r.id} style={{display:"flex",gap:8,alignItems:"flex-end",marginBottom:8,flexWrap:"wrap"}}>
+            <div style={{flex:"1 1 100px"}}><Field label="# Rollo madre"><input style={inputStyle} value={r.rolloMadre||""} onChange={e=>updRow("rollos",r.id,"rolloMadre",e.target.value)} placeholder="Número"/></Field></div>
+            <div style={{flex:"1 1 100px"}}><Field label="Peso inicial (kg)"><input style={inputStyle} type="number" step="any" value={r.pesoInicial||""} onChange={e=>updRow("rollos",r.id,"pesoInicial",e.target.value)} placeholder="kg"/></Field></div>
+            <div style={{flex:"1 1 100px"}}><Field label="Peso final (kg)"><input style={inputStyle} type="number" step="any" value={r.pesoFinal||""} onChange={e=>updRow("rollos",r.id,"pesoFinal",e.target.value)} placeholder="kg"/></Field></div>
+            {rollos.length>1 && <button type="button" onClick={()=>removeRow("rollos",r.id)} style={{...remBtn,marginBottom:18}}>✕</button>}
+          </div>
+        ))}
+        <button type="button" onClick={()=>addRow("rollos",{rolloMadre:"",pesoInicial:"",pesoFinal:""})} style={addBtn}>+ Agregar rollo</button>
+      </div>
+    );
+  }
+  if(maquina==="Selladora 1"||maquina==="Selladora 2"||maquina==="Selladora Manual"){
+    const rollos = datosExtra.rollos||[];
+    return (
+      <div style={sectionStyle}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Datos de {maquina}</div>
+        <div style={{fontWeight:600,fontSize:12,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:8}}>Rollos madre</div>
+        {rollos.map((r,i)=>(
+          <div key={r.id} style={{display:"flex",gap:8,alignItems:"flex-end",marginBottom:8}}>
+            <div style={{flex:"1 1 120px"}}><Field label={`Rollo madre ${i+1}`}><input style={inputStyle} value={r.rolloMadre||""} onChange={e=>updRow("rollos",r.id,"rolloMadre",e.target.value)} placeholder="# Rollo"/></Field></div>
+            <div style={{flex:"1 1 120px"}}><Field label="Peso (kg)"><input style={inputStyle} type="number" step="any" value={r.peso||""} onChange={e=>updRow("rollos",r.id,"peso",e.target.value)} placeholder="kg"/></Field></div>
+            {rollos.length>1 && <button type="button" onClick={()=>removeRow("rollos",r.id)} style={{...remBtn,marginBottom:18}}>✕</button>}
+          </div>
+        ))}
+        <button type="button" onClick={()=>addRow("rollos",{rolloMadre:"",peso:""})} style={{...addBtn,marginBottom:14}}>+ Agregar rollo madre</button>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginTop:8}}>
+          <Field label="Paquete inicial"><input style={inputStyle} type="number" value={datosExtra.paqueteInicial||""} onChange={e=>upd("paqueteInicial",e.target.value)} placeholder="0"/></Field>
+          <Field label="Paquete final"><input style={inputStyle} type="number" value={datosExtra.paqueteFinal||""} onChange={e=>upd("paqueteFinal",e.target.value)} placeholder="0"/></Field>
+          <Field label="Unidades por paquete"><input style={inputStyle} type="number" value={datosExtra.unidadesPorPaquete||""} onChange={e=>upd("unidadesPorPaquete",e.target.value)} placeholder="0"/></Field>
+          <Field label="Saldo (unidades)"><input style={inputStyle} type="number" value={datosExtra.saldo||""} onChange={e=>upd("saldo",e.target.value)} placeholder="0"/></Field>
+        </div>
+      </div>
+    );
+  }
+  if(maquina==="Refiladora"){
+    const rollos = datosExtra.rollos||[];
+    return (
+      <div style={sectionStyle}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Datos de Refiladora</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+          <Field label="Medida (cm)"><input style={inputStyle} type="number" step="any" value={datosExtra.medida||""} onChange={e=>upd("medida",e.target.value)} placeholder="cm"/></Field>
+          <Field label="Calibre (milspulg)"><input style={inputStyle} type="number" step="any" value={datosExtra.calibre||""} onChange={e=>upd("calibre",e.target.value)} placeholder="milspulg"/></Field>
+          <Field label="Sentido embobinado">
+            <select style={inputStyle} value={datosExtra.sentido||""} onChange={e=>upd("sentido",e.target.value)}>
+              <option value="">Selecciona</option><option value="A">A</option><option value="B">B</option>
+            </select>
+          </Field>
+        </div>
+        <div style={{fontWeight:600,fontSize:12,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:8}}>Rollos madre</div>
+        {rollos.map((r,i)=>(
+          <div key={r.id} style={{display:"flex",gap:8,alignItems:"flex-end",marginBottom:8}}>
+            <div style={{flex:"1 1 120px"}}><Field label={`# Rollo madre ${i+1}`}><input style={inputStyle} value={r.rolloMadre||""} onChange={e=>updRow("rollos",r.id,"rolloMadre",e.target.value)} placeholder="Número"/></Field></div>
+            <div style={{flex:"1 1 120px"}}><Field label="Peso (kg)"><input style={inputStyle} type="number" step="any" value={r.peso||""} onChange={e=>updRow("rollos",r.id,"peso",e.target.value)} placeholder="kg"/></Field></div>
+            {rollos.length>1 && <button type="button" onClick={()=>removeRow("rollos",r.id)} style={{...remBtn,marginBottom:18}}>✕</button>}
+          </div>
+        ))}
+        <button type="button" onClick={()=>addRow("rollos",{rolloMadre:"",peso:""})} style={{...addBtn,marginBottom:14}}>+ Agregar rollo madre</button>
+        <Field label="# Rollos totales producidos"><input style={inputStyle} type="number" value={datosExtra.rollosProducidos||""} onChange={e=>upd("rollosProducidos",e.target.value)} placeholder="0"/></Field>
+      </div>
+    );
+  }
+  return null;
+}
+
+function FormView({catalog, machines}){
+  const [nombre,setNombre]=useState(""); const [cargo,setCargo]=useState("");
+  const [maquina,setMaquina]=useState(""); const [horaInicio,setHoraInicio]=useState("");
+  const [horaFinal,setHoraFinal]=useState(""); const [turno,setTurno]=useState("");
+  const [siesa,setSiesa]=useState(""); const [produccion,setProduccion]=useState("");
+  const [unidadProd,setUnidadProd]=useState("Kg");
+  const [mermas,setMermas]=useState([{id:uid("m"),cantidad:"",unidad:"Kg",motivo:""}]);
+  const [tms,setTms]=useState([{id:uid("t"),minutos:"",motivo:""}]);
+  const [datosExtra,setDatosExtra]=useState({});
+  const [consecutivo,setConsecutivo]=useState("");
+  const [observaciones,setObservaciones]=useState("");
+  const [fechaTurno,setFechaTurno]=useState(new Date().toISOString().split('T')[0]);
+  const [saving,setSaving]=useState(false); const [done,setDone]=useState(false); const [error,setError]=useState("");
+
+  const siesaTrim = siesa.trim();
+  const match = catalog.find(c => c.siesa.toLowerCase() === siesaTrim.toLowerCase());
+
+  function handleMaquinaChange(e){
+    const m = e.target.value; setMaquina(m);
+    setDatosExtra({rollos:[{id:uid("r")}]});
+    if(m) setConsecutivo(getNextConsecutivo(m));
+  }
+  function reset(){
+    setNombre("");setCargo("");setMaquina("");setHoraInicio("");setHoraFinal("");setTurno("");setSiesa("");
+    setConsecutivo("");setObservaciones("");setFechaTurno(new Date().toISOString().split('T')[0]);
+    setProduccion("");setUnidadProd("Kg");
+    setMermas([{id:uid("m"),cantidad:"",unidad:"Kg",motivo:""}]);
+    setTms([{id:uid("t"),minutos:"",motivo:""}]); setDatosExtra({});
+  }
+  const updateMerma=(id,f,v)=>setMermas(mermas.map(m=>m.id===id?{...m,[f]:v}:m));
+  const addMerma=()=>setMermas([...mermas,{id:uid("m"),cantidad:"",unidad:"Kg",motivo:""}]);
+  const removeMerma=(id)=>setMermas(mermas.length>1?mermas.filter(m=>m.id!==id):mermas);
+  const updateTM=(id,f,v)=>setTms(tms.map(t=>t.id===id?{...t,[f]:v}:t));
+  const addTM=()=>setTms([...tms,{id:uid("t"),minutos:"",motivo:""}]);
+  const removeTM=(id)=>setTms(tms.length>1?tms.filter(t=>t.id!==id):tms);
+
+  async function handleSubmit(e){
+    e.preventDefault(); setError("");
+    if(!nombre||!cargo||!maquina||!turno||!siesaTrim||produccion===""){
+      setError("Completa los campos obligatorios: Nombre, Cargo, Máquina, Turno, Código Siesa y Producción."); return;
+    }
+    if(!match){ setError("Ese código Siesa no está en el catálogo. Pide que lo agreguen desde el Panel."); return; }
+    setSaving(true);
+    const now = new Date();
+    const report = {
+      id:uid("rep"), ts:now.getTime(), fecha:fmtDateTime(now), fechaTurno,
+      nombre, cargo, maquina, horaInicio, horaFinal, turno,
+      siesa:siesaTrim, sku:match.sku, referencia:match.referencia,
+      unidad:unidadProd, produccion:Number(produccion),
+      mermas:mermas.filter(m=>m.cantidad!=="").map(m=>({cantidad:Number(m.cantidad),unidad:m.unidad,motivo:m.motivo})),
+      tiemposMuertos:tms.filter(t=>t.minutos!=="").map(t=>({minutos:Number(t.minutos),motivo:t.motivo})),
+      datosExtra, consecutivo, observaciones
+    };
+    try{ await saveReport(report, SHEETS_URL_WRITE); setDone(true); reset(); }
+    catch(err){ setError("No se pudo guardar el reporte. Intenta de nuevo."); }
+    setSaving(false);
+  }
+
+  if(done){
+    return (
+      <div style={{textAlign:"center",padding:"60px 20px"}}>
+        <div style={{fontSize:40,marginBottom:14,color:"var(--good)"}}>✓</div>
+        <div style={{fontSize:20,fontWeight:700,marginBottom:8}}>Reporte guardado</div>
+        <div style={{color:"var(--text-dim)",marginBottom:26,fontSize:14}}>Tu registro quedó guardado con fecha y hora automática.</div>
+        <button onClick={()=>setDone(false)} style={{background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"12px 26px",fontWeight:700,fontSize:14,cursor:"pointer"}}>Cargar otro reporte</button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{maxWidth:560,margin:"0 auto",padding:"28px 20px 60px"}}>
+      <Field label="Nombre"><input style={inputStyle} value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre completo"/></Field>
+      <Field label="Cargo">
+        <select style={inputStyle} value={cargo} onChange={e=>setCargo(e.target.value)}>
+          <option value="">Selecciona tu cargo</option>
+          {CARGOS.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+      </Field>
+      <Field label="Máquina">
+        <select style={inputStyle} value={maquina} onChange={handleMaquinaChange}>
+          <option value="">Selecciona una máquina</option>
+          {machines.map(m=><option key={m} value={m}>{m}</option>)}
+        </select>
+      </Field>
+      {consecutivo && (
+        <div style={{marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Consecutivo</span>
+          <span style={{fontFamily:"var(--mono)",fontSize:15,fontWeight:700,color:"var(--accent)",background:"var(--accent-dim)",padding:"4px 12px",borderRadius:8,letterSpacing:"0.05em"}}>{consecutivo}</span>
+        </div>
+      )}
+      <Field label="Turno">
+        <select style={inputStyle} value={turno} onChange={e=>setTurno(e.target.value)}>
+          <option value="">Selecciona un turno</option>
+          {TURNOS.map(t=><option key={t} value={t}>{t}</option>)}
+        </select>
+      </Field>
+      <Field label="Fecha del turno" hint="Fecha en que se realizó la producción (para turnos nocturnos: el día en que INICIÓ el turno)">
+        <input style={inputStyle} type="date" value={fechaTurno} onChange={e=>setFechaTurno(e.target.value)}/>
+      </Field>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <Field label="Hora de inicio"><input style={inputStyle} type="time" value={horaInicio} onChange={e=>setHoraInicio(e.target.value)}/></Field>
+        <Field label="Hora final"><input style={inputStyle} type="time" value={horaFinal} onChange={e=>setHoraFinal(e.target.value)}/></Field>
+      </div>
+      <Field label="Código Siesa" hint={
+        siesaTrim==="" ? "Escribe el código Siesa de la producción" :
+        match ? `Referencia: ${match.referencia} (SKU: ${match.sku})` : "Código no encontrado en el catálogo"
+      }>
+        <input style={inputStyle} value={siesa} onChange={e=>setSiesa(e.target.value)} placeholder="Ej: 5991217"/>
+      </Field>
+      {match && <Field label="Referencia (automática)"><input style={{...inputStyle,background:"var(--panel)",color:"#000",fontWeight:"700"}} value={match.referencia} disabled readOnly/></Field>}
+
+      {maquina && <MachineFields maquina={maquina} datosExtra={datosExtra} setDatosExtra={setDatosExtra}/>}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <Field label="Producción"><input style={inputStyle} type="number" step="any" min="0" value={produccion} onChange={e=>setProduccion(e.target.value)} placeholder="0"/></Field>
+        <Field label="Unidad">
+          <select style={inputStyle} value={unidadProd} onChange={e=>setUnidadProd(e.target.value)}>
+            <option value="Kg">Kg</option><option value="Unidades">Unidades</option>
+          </select>
+        </Field>
+      </div>
+
+      <Field label="Merma (desperdicio)">
+        {mermas.map(m=>(
+          <div key={m.id} style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <input style={{...inputStyle,flex:"1 1 100px"}} type="number" step="any" min="0" value={m.cantidad} onChange={e=>updateMerma(m.id,"cantidad",e.target.value)} placeholder="Cantidad"/>
+            <select style={{...inputStyle,maxWidth:130}} value={m.unidad} onChange={e=>updateMerma(m.id,"unidad",e.target.value)}>
+              <option value="Kg">Kg</option><option value="Unidades">Unidades</option>
+            </select>
+            <input style={{...inputStyle,flex:"1 1 160px"}} value={m.motivo} onChange={e=>updateMerma(m.id,"motivo",e.target.value)} placeholder="Motivo del desperdicio"/>
+            {mermas.length>1 && <button type="button" onClick={()=>removeMerma(m.id)} style={{background:"none",border:"1px solid var(--line)",borderRadius:8,color:"var(--bad)",cursor:"pointer",padding:"0 12px"}}>✕</button>}
+          </div>
+        ))}
+        <button type="button" onClick={addMerma} style={{background:"var(--panel-2)",border:"1px dashed var(--line)",borderRadius:8,color:"var(--text-dim)",padding:"8px 12px",cursor:"pointer",fontSize:13}}>+ Agregar otra merma</button>
+      </Field>
+
+      <Field label="Tiempos muertos">
+        {tms.map(t=>(
+          <div key={t.id} style={{display:"flex",gap:8,marginBottom:8}}>
+            <input style={{...inputStyle,maxWidth:130}} type="number" step="any" min="0" value={t.minutos} onChange={e=>updateTM(t.id,"minutos",e.target.value)} placeholder="Minutos"/>
+            <select style={inputStyle} value={t.motivo} onChange={e=>updateTM(t.id,"motivo",e.target.value)}>
+              <option value="">-- Seleccionar motivo --</option>
+              {MOTIVOS_TM.map(m=><option key={m.cod} value={`${m.cod} - ${m.desc}`}>{m.cod} - {m.desc}</option>)}
+            </select>
+            {tms.length>1 && <button type="button" onClick={()=>removeTM(t.id)} style={{background:"none",border:"1px solid var(--line)",borderRadius:8,color:"var(--bad)",cursor:"pointer",padding:"0 12px"}}>✕</button>}
+          </div>
+        ))}
+        <button type="button" onClick={addTM} style={{background:"var(--panel-2)",border:"1px dashed var(--line)",borderRadius:8,color:"var(--text-dim)",padding:"8px 12px",cursor:"pointer",fontSize:13}}>+ Agregar otro tiempo muerto</button>
+      </Field>
+
+      <Field label="Observaciones (opcional)">
+        <textarea style={{...inputStyle,minHeight:70,resize:"vertical"}} value={observaciones} onChange={e=>setObservaciones(e.target.value)} placeholder="Notas del turno..."/>
+      </Field>
+
+      {error && <div style={{color:"var(--bad)",fontSize:13,marginBottom:14}}>{error}</div>}
+      <button type="submit" disabled={saving} style={{width:"100%",background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"14px",fontWeight:700,fontSize:15,cursor:saving?"default":"pointer",opacity:saving?0.7:1,marginTop:6}}>
+        {saving?"Guardando...":"Guardar reporte"}
+      </button>
+    </form>
+  );
+}
+
+function App(){
+  const [catalog] = useState(loadCatalog());
+  const [machines] = useState(loadMachines());
+  return (
+    <div id="app-root">
+      <header style={{background:"rgba(250,250,248,0.92)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+        <Logo/>
+      </header>
+      <FormView catalog={catalog} machines={machines}/>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('app-root')).render(<App/>);
+</script>
+</body>
+</html>

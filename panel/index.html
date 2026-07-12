@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Producción · Innovapack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  :root{
+    --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
+    --text:#18181B; --text-dim:#71717A; --accent:#2563EB; --accent-text:#fff;
+    --accent-dim:#EFF6FF; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
+    --sans:'Inter','Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  #app-root{min-height:100vh;}
+  input,select,button{font-family:var(--sans);}
+  input:focus,select:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(37,99,235,0.1)!important;}
+  tr:hover td{background:rgba(0,0,0,0.015);}
+  ::-webkit-scrollbar{width:5px;height:5px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:10px;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Módulos compartidos (cargan ANTES del script de la app) -->
+<script src="../shared/data.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/calculos.js"></script>
+</head>
+<body>
+<div id="app-root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+
+/* URL de LECTURA del panel (endpoint Apps Script administrativo). */
+const SHEETS_URL_READ = "https://script.google.com/macros/s/AKfycby3m0ptMQjUEYkVmMt1Fij1fQWIhBxZ1WuyYF84fKJYLIrj3Cwn0Ifr8bRm0AF7m2ic/exec";
+
+const inputStyle = {
+  width:"100%", padding:"10px 13px", background:"#fff", border:"1px solid var(--line)",
+  borderRadius:9, color:"var(--text)", fontSize:14, fontFamily:"var(--sans)", outline:"none",
+  boxShadow:"0 1px 2px rgba(0,0,0,0.04)", transition:"border-color 0.15s, box-shadow 0.15s"
+};
+
+function Logo(){
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:14}}>
+      <img src="../shared/logo.png" alt="Innovapack" onError={e=>{e.target.style.display='none';}}
+        style={{height:44,width:"auto",objectFit:"contain"}}/>
+      <div style={{fontFamily:"var(--sans)",fontSize:18,color:"var(--text)",fontWeight:700,letterSpacing:"0.01em"}}>
+        PANEL DE PRODUCCIÓN
+      </div>
+    </div>
+  );
+}
+
+function Modal({title,onClose,children}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)"}}>
+      <div style={{background:"#fff",borderRadius:16,padding:26,width:"100%",maxWidth:700,maxHeight:"82vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,paddingBottom:16,borderBottom:"1px solid var(--line)"}}>
+          <div style={{fontWeight:700,fontSize:15}}>{title}</div>
+          <button onClick={onClose} style={{background:"var(--panel-2)",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14,color:"var(--text-dim)"}}>✕</button>
+        </div>
+        <div style={{overflowY:"auto",flex:1}}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function PinGate({onUnlock}){
+  const [pin,setPin]=useState(""); const [err,setErr]=useState("");
+  function check(e){ e.preventDefault(); if(pin===ADMIN_PIN) onUnlock(); else setErr("PIN incorrecto."); }
+  return (
+    <form onSubmit={check} style={{maxWidth:320,margin:"80px auto",textAlign:"center"}}>
+      <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:14,textTransform:"uppercase",letterSpacing:"0.05em",fontFamily:"var(--mono)"}}>Panel privado</div>
+      <input style={{...inputStyle,textAlign:"center",letterSpacing:"0.3em",fontSize:18}} value={pin} onChange={e=>setPin(e.target.value)} placeholder="PIN" type="password" autoFocus/>
+      {err && <div style={{color:"var(--bad)",fontSize:13,marginTop:10}}>{err}</div>}
+      <button type="submit" style={{marginTop:16,background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"11px 24px",fontWeight:700,cursor:"pointer"}}>Entrar</button>
+    </form>
+  );
+}
+
+function StatCard({label,value,accent,borderColor,breakdown,trend}){
+  const [open,setOpen]=useState(false);
+  return (
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:`3px solid ${borderColor||"var(--line)"}`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:10.5,color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:5}}>{label}</div>
+      <div style={{fontSize:26,fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)",marginBottom:5,letterSpacing:"-0.02em"}}>{value}</div>
+      {trend && <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:breakdown?8:0}}>{trend}</div>}
+      {breakdown && (
+        <>
+          <button onClick={()=>setOpen(!open)} style={{background:"none",border:"1px solid var(--line)",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",color:"var(--text-dim)",marginTop:4}}>{open?"▲ Ocultar":"▼ Por máquina"}</button>
+          {open && (
+            <div style={{marginTop:10}}>
+              {breakdown.map(({maquina,val})=>(
+                <div key={maquina} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--line)"}}>
+                  <span style={{color:"var(--text-dim)",fontWeight:500}}>{maquina}</span>
+                  <span style={{fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)"}}>{typeof val==="number"?val.toLocaleString():val}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function UtilBar({val,hi,lo}){
+  if(!val||val==="-") return <span style={{color:"var(--text-dim)"}}>-</span>;
+  const p=parseInt(val);
+  const color=p>=hi?"var(--good)":p>=lo?"var(--amber)":"var(--bad)";
+  const bg=p>=hi?"#DCFCE7":p>=lo?"#FEF3C7":"#FEE2E2";
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <span style={{background:bg,color,borderRadius:20,padding:"2px 8px",fontSize:11,fontWeight:600,minWidth:42,textAlign:"center"}}>{val}</span>
+      <div style={{flex:1,height:5,background:"var(--panel-2)",borderRadius:4,overflow:"hidden",minWidth:40}}>
+        <div style={{width:val,height:"100%",background:color,borderRadius:4}}></div>
+      </div>
+    </div>
+  );
+}
+
+function RendBar({rend}){
+  if(rend===null||rend===undefined) return <span style={{color:"var(--text-dim)"}}>-</span>;
+  const color=rend>=90?"var(--good)":rend>=70?"var(--amber)":"var(--bad)";
+  const bg=rend>=90?"#DCFCE7":rend>=70?"#FEF3C7":"#FEE2E2";
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <span style={{background:bg,color,borderRadius:20,padding:"2px 8px",fontSize:11,fontWeight:600,minWidth:42,textAlign:"center"}}>{rend}%</span>
+      <div style={{flex:1,height:5,background:"var(--panel-2)",borderRadius:4,overflow:"hidden",minWidth:40}}>
+        <div style={{width:rend+"%",height:"100%",background:color,borderRadius:4}}></div>
+      </div>
+    </div>
+  );
+}
+
+
+/* Producción total separada: Kg Prod.Terminado / Kg Prod.Proceso / Unidades */
+function ProdCard({reports}){
+  const [open,setOpen]=useState(false);
+  const repsPT = reports.filter(r=>clasificarReporte(r).bodega==="Producto Terminado" && MAQUINAS_KG.includes(r.maquina));
+  const repsPP = reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso" && MAQUINAS_KG.includes(r.maquina));
+  const repsUnd= reports.filter(r=>MAQUINAS_UND.includes(r.maquina));
+  const sum = list => list.reduce((s,r)=>s+(Number(r.produccion)||0),0);
+  const totalKgPT=sum(repsPT), totalKgPP=sum(repsPP), totalUnd=sum(repsUnd);
+  const bd = (list)=> MAQUINAS_KG.concat(MAQUINAS_UND).map(m=>({maquina:m,val:list.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(x=>x.val>0);
+  const bdKgPT=bd(repsPT), bdKgPP=bd(repsPP), bdUnd=bd(repsUnd);
+  const row=(label,val,unit)=>(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+      <span style={{fontSize:12.5,color:"var(--text-dim)",fontWeight:500}}>{label}</span>
+      <span style={{fontSize:18,fontWeight:600,fontFamily:"var(--mono)",color:"var(--good)"}}>{val.toLocaleString()}</span>
+    </div>
+  );
+  const section=(title,arr,unit)=> arr.length>0 && (
+    <>
+      <div style={{fontSize:10,fontWeight:700,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.06em",padding:"8px 0 4px",borderBottom:"2px solid var(--line)"}}>{title}</div>
+      {arr.map(({maquina,val})=>(
+        <div key={maquina} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--line)"}}>
+          <span style={{color:"var(--text-dim)",fontWeight:500}}>{maquina}</span>
+          <span style={{fontWeight:600,fontFamily:"var(--mono)",color:"var(--good)"}}>{val.toLocaleString()} {unit}</span>
+        </div>
+      ))}
+    </>
+  );
+  return(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:"3px solid var(--good)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:10.5,color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:10}}>Producción total</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
+        {row("Kg · Prod. Terminado",totalKgPT)}
+        {row("Kg · Prod. en Proceso",totalKgPP)}
+        <div style={{height:1,background:"var(--line)"}}></div>
+        {row("Unidades",totalUnd)}
+      </div>
+      <button onClick={()=>setOpen(!open)} style={{background:"none",border:"1px solid var(--line)",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",color:"var(--text-dim)",marginTop:4}}>{open?"▲ Ocultar":"▼ Por máquina"}</button>
+      {open && <div style={{marginTop:10}}>{section("Kg · Producto Terminado",bdKgPT,"kg")}{section("Kg · Producto en Proceso",bdKgPP,"kg")}{section("Unidades",bdUnd,"und")}</div>}
+    </div>
+  );
+}
+
+/* ---------- Gráficas ---------- */
+function DonutDash({data,title}){
+  const total=data.reduce((s,d)=>s+d.val,0);
+  if(total===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:180,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
+  const COLORS=["#3B82F6","#16A34A","#D97706","#8B5CF6","#DC2626","#06B6D4","#EC4899","#84CC16"];
+  let cum=-Math.PI/2;
+  const slices=data.map((d,i)=>{
+    const angle=(d.val/total)*2*Math.PI;
+    const x1=70+55*Math.cos(cum),y1=70+55*Math.sin(cum); cum+=angle;
+    const x2=70+55*Math.cos(cum),y2=70+55*Math.sin(cum);
+    const large=angle>Math.PI?1:0;
+    const path=data.length===1?`M70,15 A55,55 0 1,1 69.999,15 Z`:`M70,70 L${x1},${y1} A55,55 0 ${large},1 ${x2},${y2} Z`;
+    return {path,color:COLORS[i%COLORS.length],label:d.label,val:d.val,pct:Math.round((d.val/total)*100)};
+  });
+  return(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <div style={{display:"flex",gap:16,alignItems:"center"}}>
+        <svg width="140" height="140" viewBox="0 0 140 140" style={{flexShrink:0}}>
+          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2"/>)}
+          <circle cx="70" cy="70" r="28" fill="#fff"/>
+          <text x="70" y="67" textAnchor="middle" fontSize="9" fill="#9CA3AF">Total</text>
+          <text x="70" y="80" textAnchor="middle" fontSize="11" fontWeight="600" fill="#18181B">{total.toLocaleString()}</text>
+        </svg>
+        <div style={{flex:1}}>
+          {slices.map((s,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+              <div style={{width:8,height:8,borderRadius:2,background:s.color,flexShrink:0}}></div>
+              <span style={{fontSize:11,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.label}</span>
+              <span style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{s.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BarChartDash({data,title,color,labelKey,valueKey}){
+  if(!data||data.length===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>Sin datos</div>;
+  const max=Math.max(...data.map(d=>d[valueKey]),1);
+  const W=440,H=180,padL=40,padB=36,padT=10,padR=10;
+  const chartW=W-padL-padR,chartH=H-padB-padT;
+  const barW=Math.max(8,Math.floor(chartW/data.length)-4);
+  return(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+        {[0,0.25,0.5,0.75,1].map(t=>(
+          <g key={t}>
+            <line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="#F0EEE9" strokeWidth="1"/>
+            <text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="#9CA3AF">{Math.round(max*t).toLocaleString()}</text>
+          </g>
+        ))}
+        {data.map((d,i)=>{
+          const bH=Math.max(2,(d[valueKey]/max)*chartH);
+          const x=padL+(i/data.length)*chartW+(chartW/data.length-barW)/2;
+          const y=padT+chartH-bH;
+          return(<g key={i}><rect x={x} y={y} width={barW} height={bH} fill={color} rx="3" opacity="0.85"/><text x={x+barW/2} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(d[labelKey]).length>6?String(d[labelKey]).substring(0,6):d[labelKey]}</text></g>);
+        })}
+        <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#D1D5DB" strokeWidth="1"/>
+      </svg>
+    </div>
+  );
+}
+
+function LineChartDash({data,title,color,labelKey,valueKey}){
+  if(!data||data.length<2) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>Sin suficientes datos</div>;
+  const max=Math.max(...data.map(d=>d[valueKey]),1);
+  const W=440,H=180,padL=40,padB=36,padT=10,padR=10;
+  const chartW=W-padL-padR,chartH=H-padB-padT;
+  const pts=data.map((d,i)=>({x:padL+(i/(data.length-1))*chartW,y:padT+chartH-(d[valueKey]/max)*chartH,label:d[labelKey],val:d[valueKey]}));
+  const polyline=pts.map(p=>`${p.x},${p.y}`).join(" ");
+  const area=`M${pts[0].x},${padT+chartH} `+pts.map(p=>`L${p.x},${p.y}`).join(" ")+` L${pts[pts.length-1].x},${padT+chartH} Z`;
+  return(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+        {[0,0.25,0.5,0.75,1].map(t=>(
+          <g key={t}><line x1={padL} y1={padT+chartH*(1-t)} x2={padL+chartW} y2={padT+chartH*(1-t)} stroke="#F0EEE9" strokeWidth="1"/><text x={padL-4} y={padT+chartH*(1-t)+4} textAnchor="end" fontSize="9" fill="#9CA3AF">{Math.round(max*t)}</text></g>
+        ))}
+        <path d={area} fill={color} opacity="0.1"/>
+        <polyline points={polyline} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+        {pts.map((p,i)=>(<g key={i}><circle cx={p.x} cy={p.y} r="3" fill={color}/><text x={p.x} y={H-padB+14} textAnchor="middle" fontSize="9" fill="#6B7280">{String(p.label).length>6?String(p.label).substring(0,6):p.label}</text></g>))}
+        <line x1={padL} y1={padT+chartH} x2={padL+chartW} y2={padT+chartH} stroke="#D1D5DB" strokeWidth="1"/>
+      </svg>
+    </div>
+  );
+}
+
+function PieChart({data,title}){
+  const total=data.reduce((s,d)=>s+d.val,0);
+  const [hovered,setHovered]=useState(null);
+  if(total===0) return null;
+  const COLORS=["#3B82F6","#16A34A","#DC2626","#D97706","#8B5CF6","#06B6D4","#EC4899","#84CC16","#F97316","#6366F1"];
+  let cum=-Math.PI/2;
+  const slices=data.map((d,i)=>{
+    const angle=(d.val/total)*2*Math.PI;
+    const x1=80+70*Math.cos(cum),y1=80+70*Math.sin(cum); cum+=angle;
+    const x2=80+70*Math.cos(cum),y2=80+70*Math.sin(cum);
+    const large=angle>Math.PI?1:0;
+    const path=data.length===1?`M80,10 A70,70 0 1,1 79.999,10 Z`:`M80,80 L${x1},${y1} A70,70 0 ${large},1 ${x2},${y2} Z`;
+    return {path,color:COLORS[i%COLORS.length],label:d.label,val:d.val,pct:Math.round((d.val/total)*100)};
+  });
+  const hov=hovered!==null?slices[hovered]:null;
+  return(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:12,fontWeight:600,marginBottom:14}}>{title}</div>
+      <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+        <svg width="160" height="160" viewBox="0 0 160 160" style={{cursor:"pointer",flexShrink:0}}>
+          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.5} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}/>)}
+          <circle cx="80" cy="80" r="35" fill="#fff"/>
+          {hov?<><text x="80" y="74" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.label.length>12?hov.label.substring(0,11)+"…":hov.label}</text><text x="80" y="88" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text><text x="80" y="100" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.val.toLocaleString()}</text></>:<><text x="80" y="76" textAnchor="middle" fontSize="10" fill="var(--text-dim)">Total</text><text x="80" y="92" textAnchor="middle" fontSize="13" fontWeight="600">{total.toLocaleString()}</text></>}
+        </svg>
+        <div style={{flex:1,minWidth:120}}>
+          {slices.map((s,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,cursor:"pointer",opacity:hovered===null||hovered===i?1:0.5}} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
+              <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}></div>
+              <div style={{fontSize:12,flex:1}}>{s.label}</div>
+              <div style={{fontSize:12,fontWeight:600,fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{s.val.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Top5Card({title,reports,color}){
+  const refs={};
+  reports.forEach(r=>{ refs[r.referencia]=(refs[r.referencia]||0)+(Number(r.produccion)||0); });
+  const top5=Object.entries(refs).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(top5.length===0) return null;
+  const max=top5[0][1];
+  return(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
+      {top5.map(([ref,val],i)=>(
+        <div key={i} style={{marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+            <span style={{fontSize:11,maxWidth:"75%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ref}</span>
+            <span style={{fontSize:11,fontWeight:600,fontFamily:"var(--mono)",color}}>{val.toLocaleString()}</span>
+          </div>
+          <div style={{height:5,background:"var(--panel-2)",borderRadius:3,overflow:"hidden"}}><div style={{width:Math.round((val/max)*100)+"%",height:"100%",background:color,borderRadius:3,opacity:1-(i*0.15)}}></div></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+/* ================== PESTAÑA GENERAL ==================
+   Los filtros de aquí afectan TODO: fichas de encabezado, gráficas y tabla. */
+function GeneralTab({reports}){
+  const [fMaquina,setFMaquina]=useState("");
+  const [fOperario,setFOperario]=useState("");
+  const [fTurno,setFTurno]=useState("");
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
+  const [showFilter,setShowFilter]=useState(false);
+  const [showHist,setShowHist]=useState(false);
+  const metas=loadMetas();
+
+  const maquinas=["",...new Set(reports.map(r=>r.maquina).filter(Boolean))].sort();
+  const opSet=new Set();
+  const operarios=["",...reports.map(r=>r.nombre).filter(Boolean).filter(n=>{const k=n.trim().toLowerCase();return opSet.has(k)?false:(opSet.add(k),true);}).sort()];
+  const turnos=["",...new Set(reports.map(r=>r.turno).filter(Boolean))].sort();
+
+  const fr=reports.filter(r=>{
+    if(fMaquina&&r.maquina!==fMaquina)return false;
+    if(fOperario&&r.nombre!==fOperario)return false;
+    if(fTurno&&r.turno!==fTurno)return false;
+    const iso=getFechaISO(r);
+    if(fDesde&&iso&&iso<fDesde)return false;
+    if(fHasta&&iso&&iso>fHasta)return false;
+    return true;
+  });
+  const activeF=[fMaquina,fOperario,fTurno,fDesde,fHasta].filter(Boolean).length;
+  function clearF(){setFMaquina("");setFOperario("");setFTurno("");setFDesde("");setFHasta("");}
+
+  /* ---- KPIs (calculados sobre fr) ---- */
+  const totalMerma=fr.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  const totalTM=fr.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
+  const MAQ=MAQUINAS_KG.concat(MAQUINAS_UND);
+  const bdMerma=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0)})).filter(x=>x.val>0);
+  const bdTM=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0)})).filter(x=>x.val>0);
+  const bdReportes=MAQ.map(m=>({maquina:m,val:fr.filter(r=>r.maquina===m).length})).filter(x=>x.val>0);
+
+  /* ---- Resumen + eficiencia por máquina (sobre fr) ---- */
+  function eficienciaDe(list){
+    const porTurno={};
+    list.forEach(r=>{
+      const key=getFechaISO(r)+"|"+(r.turno||"");
+      const u=calcUtilizacion(r);
+      if(!porTurno[key]) porTurno[key]={dur:0,prod:0};
+      if(u){ porTurno[key].dur=u.duracionTurno; porTurno[key].prod+=Math.min(u.tiempoProductivo,u.duracionTurno); }
+    });
+    const prog=Object.values(porTurno).reduce((s,d)=>s+d.dur,0);
+    const prod=Object.values(porTurno).reduce((s,d)=>s+d.prod,0);
+    return {prog,prod,pct:prog>0?Math.round((prod/prog)*100):null};
+  }
+  const byMaq=MAQ.map(m=>{
+    const rs=fr.filter(r=>r.maquina===m);
+    const rends=rs.map(r=>{const rd=calcRendimiento(r,metas);return rd?rd.pct:null;}).filter(x=>x!==null);
+    const rend=rends.length?Math.round(rends.reduce((a,x)=>a+x,0)/rends.length):null;
+    const ef=eficienciaDe(rs);
+    const meta=metas[m];
+    return {maquina:m,reportes:rs.length,prod:rs.reduce((s,r)=>s+(Number(r.produccion)||0),0),
+      merma:rs.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0),tm:rs.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0),
+      rend,metaStr:meta?`${meta.meta.toLocaleString()} ${meta.unidad}`:"-",
+      horasProg:(ef.prog/60).toFixed(1)+"h",horasProd:(ef.prod/60).toFixed(1)+"h",eficiencia:ef.pct};
+  });
+  const efVals=byMaq.filter(x=>x.eficiencia!==null);
+  const avgEfic=efVals.length?Math.round(efVals.reduce((a,x)=>a+x.eficiencia,0)/efVals.length)+"%":"-";
+  const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?x.eficiencia+"%":"-"})).filter(x=>x.val!=="-");
+
+  /* ---- Datos de gráficas (sobre fr) ---- */
+  const byDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)byDay[d]=(byDay[d]||0)+(Number(r.produccion)||0);});
+  const prodByDay=Object.entries(byDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  const mermaByDay={}; fr.forEach(r=>{const d=getFechaISO(r);if(d)mermaByDay[d]=(mermaByDay[d]||0)+sumNumeros(r.mermasCantidad);});
+  const mermaByDayArr=Object.entries(mermaByDay).sort().map(([d,v])=>({label:d.slice(5),val:v}));
+  /* Torta separada Kg / Unidades */
+  const donutKg=MAQUINAS_KG.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
+  const donutUnd=MAQUINAS_UND.map(m=>({label:m,val:fr.filter(r=>r.maquina===m).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
+
+  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+  const fmtMC=r=>r.mermasCantidad||"-", fmtMM=r=>r.mermasMotivo||"-", fmtTMin=r=>r.tiemposMuertosMinutos||"-", fmtTM=r=>r.tiemposMuertosMotivo||"-";
+
+  return(
+    <div>
+      {/* Barra de filtros GLOBAL */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:700}}>Resumen general {activeF>0 && <span style={{fontSize:12,fontWeight:500,color:"var(--accent)"}}>· filtrado</span>}</div>
+        <div style={{display:"flex",gap:8}}>
+          {activeF>0 && <button onClick={clearF} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+          <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
+        </div>
+      </div>
+      {showFilter && (
+        <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:16}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Máquina</div><select style={selStyle} value={fMaquina} onChange={e=>setFMaquina(e.target.value)}><option value="">Todas</option>{maquinas.filter(Boolean).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Operario</div><select style={selStyle} value={fOperario} onChange={e=>setFOperario(e.target.value)}><option value="">Todos</option>{operarios.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Turno</div><select style={selStyle} value={fTurno} onChange={e=>setFTurno(e.target.value)}><option value="">Todos</option>{turnos.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Desde</div><input type="date" style={selStyle} value={fDesde} onChange={e=>setFDesde(e.target.value)}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Hasta</div><input type="date" style={selStyle} value={fHasta} onChange={e=>setFHasta(e.target.value)}/></div>
+        </div>
+      )}
+
+      {/* FICHAS (ya filtradas) */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:20}}>
+        <StatCard label="Reportes" value={fr.length} borderColor="#3B82F6" breakdown={bdReportes} trend={`${fr.length} de ${reports.length} totales`}/>
+        <ProdCard reports={fr}/>
+        <StatCard label="Merma total" value={totalMerma.toLocaleString()} accent="var(--bad)" borderColor="var(--bad)" breakdown={bdMerma} trend="Suma de mermas (Kg/und)"/>
+        <StatCard label="T. muertos (min)" value={totalTM.toLocaleString()} borderColor="var(--amber)" breakdown={bdTM} trend="Minutos de tiempo muerto"/>
+        <StatCard label="% Eficiencia" value={avgEfic} borderColor="#0EA5E9" breakdown={bdEfic} trend="Hrs productivas ÷ programadas"/>
+      </div>
+
+      {/* GRÁFICAS (ya filtradas) */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+        <BarChartDash data={prodByDay} title="Producción por día" color="var(--good)" labelKey="label" valueKey="val"/>
+        <LineChartDash data={mermaByDayArr} title="Evolución de mermas" color="var(--bad)" labelKey="label" valueKey="val"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:22}}>
+        <DonutDash data={donutKg} title="Producción por máquina · Kg"/>
+        <DonutDash data={donutUnd} title="Producción por máquina · Unidades"/>
+      </div>
+
+      {/* RESUMEN POR MÁQUINA (ya filtrado) */}
+      <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,marginBottom:24,overflowX:"auto",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <div style={{padding:"14px 18px",borderBottom:"1px solid var(--line)",fontWeight:600,fontSize:13}}>Resumen por máquina</div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+            {["Máquina","Reportes","Producción","Merma","T. Muertos (min)","Hrs Prog.","Hrs Prod.","% Eficiencia","Meta","vs Meta"].map(h=><th key={h} style={{padding:"9px 14px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {byMaq.filter(x=>x.reportes>0).map(x=>(
+              <tr key={x.maquina} style={{borderTop:"1px solid var(--line)"}}>
+                <td style={{padding:"9px 14px",fontWeight:700}}>{x.maquina}</td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)"}}>{x.reportes}</td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)",color:"var(--good)",fontWeight:700}}>{x.prod.toLocaleString()}</td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)",color:"var(--bad)",fontWeight:700}}>{x.merma.toLocaleString()}</td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)"}}>{x.tm}</td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)"}}>{x.horasProg}</td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)",color:"var(--good)",fontWeight:600}}>{x.horasProd}</td>
+                <td style={{padding:"9px 14px"}}><UtilBar val={x.eficiencia!==null?x.eficiencia+"%":"-"} hi={85} lo={60}/></td>
+                <td style={{padding:"9px 14px",fontFamily:"var(--mono)",fontSize:12,color:"var(--text-dim)"}}>{x.metaStr}</td>
+                <td style={{padding:"9px 14px"}}><RendBar rend={x.rend}/></td>
+              </tr>
+            ))}
+            {byMaq.every(x=>x.reportes===0) && <tr><td colSpan="10" style={{padding:14,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para estos filtros.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {/* HISTORIAL (ya filtrado) */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:"pointer"}} onClick={()=>setShowHist(!showHist)}>
+        <span style={{fontWeight:700,fontSize:14}}>Historial de reportes</span><span style={{fontSize:12,color:"var(--text-dim)"}}>{showHist?"▲":"▼"}</span>
+      </div>
+      {showHist && (
+        <div style={{overflowX:"auto",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+              {["Fecha","F.Turno","Nombre","Máquina","Turno","Siesa","Referencia","Prod.","Merma","T.M.","% Util.","Rend. Real","% Rend."].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {fr.map(r=>{
+                const u=calcUtilizacion(r), rd=calcRendimiento(r,metas);
+                return(
+                  <tr key={r.id||r.ts+r.consecutivo} style={{borderTop:"1px solid var(--line)"}}>
+                    <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
+                    <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fechaTurno||"-"}</td>
+                    <td style={{padding:"8px 10px"}}>{r.nombre}</td>
+                    <td style={{padding:"8px 10px"}}>{r.maquina}</td>
+                    <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:12}}>{r.turno}</td>
+                    <td style={{padding:"8px 10px"}}>{r.siesa}</td>
+                    <td style={{padding:"8px 10px",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
+                    <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.produccion} {r.unidad}</td>
+                    <td style={{padding:"8px 10px",color:"var(--bad)",whiteSpace:"nowrap"}}>{fmtMC(r)}</td>
+                    <td style={{padding:"8px 10px",color:"var(--amber)",whiteSpace:"nowrap"}}>{fmtTMin(r)}</td>
+                    <td style={{padding:"8px 10px"}}><UtilBar val={u?u.utilizacion+"%":"-"} hi={85} lo={60}/></td>
+                    <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{rd?rd.rendReal.toLocaleString()+" "+rd.unidad:"-"}</td>
+                    <td style={{padding:"8px 10px"}}><RendBar rend={rd?rd.pct:null}/></td>
+                  </tr>
+                );
+              })}
+              {fr.length===0 && <tr><td colSpan="13" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para estos filtros.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ================== VISTA POR BODEGA (PT / PP) ==================
+   Producto en Proceso incluye la ficha de MERMA %. */
+const TIPO_COLORS={"Bolsa de agua":"#3B82F6","Bolsa valvulada":"#16A34A","Bolsa abierta":"#D97706","Flow Pack":"#8B5CF6","Lámina":"#06B6D4","Lámina Termoencogible":"#0EA5E9","Lámina Impresa":"#6366F1","Tubular":"#EC4899","Semitubular":"#F97316","Rollo":"#84CC16","Sachet/Doypack":"#DC2626"};
+
+function Top5PorTipo({reports,tipos,getCategoria}){
+  const conDatos=tipos.filter(t=>t!=="Todos"&&reports.some(r=>getCategoria(r)===t));
+  if(conDatos.length===0) return null;
+  return(
+    <div style={{gridColumn:"1/-1"}}>
+      <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>Top 5 referencias por tipo</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+        {conDatos.map(t=><Top5Card key={t} title={`Top 5 · ${t}`} reports={reports.filter(r=>getCategoria(r)===t)} color={TIPO_COLORS[t]||"#6B7280"}/>)}
+      </div>
+    </div>
+  );
+}
+
+function BodegaView({reports,titulo,showFiltros}){
+  const [fTipo,setFTipo]=useState("Todos");
+  const [fSector,setFSector]=useState("Todos");
+  const [fMaquina,setFMaquina]=useState("Todas");
+  const [fOperario,setFOperario]=useState("Todos");
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
+  const [showFilter,setShowFilter]=useState(false);
+  const [showHist,setShowHist]=useState(false);
+
+  const getCategoria=r=>clasificarReporte(r).categoria;
+  const getSector=r=>clasificarReporte(r).sector;
+  const rb=reports.filter(r=>clasificarReporte(r).bodega===titulo);
+
+  const tipos=["Todos",...new Set(rb.map(getCategoria).filter(x=>x&&x!=="-"))].sort();
+  const sectores=["Todos",...new Set(rb.map(getSector).filter(x=>x&&x!=="-"))].sort();
+  const mqs=["Todas",...new Set(rb.map(r=>r.maquina).filter(Boolean))].sort();
+  const operarios=["Todos",...new Set(rb.map(r=>r.nombre).filter(Boolean))].sort();
+
+  const f=rb.filter(r=>{
+    if(fTipo!=="Todos"&&getCategoria(r)!==fTipo)return false;
+    if(fSector!=="Todos"&&getSector(r)!==fSector)return false;
+    if(fMaquina!=="Todas"&&r.maquina!==fMaquina)return false;
+    if(fOperario!=="Todos"&&r.nombre!==fOperario)return false;
+    const iso=getFechaISO(r);
+    if(fDesde&&iso&&iso<fDesde)return false;
+    if(fHasta&&iso&&iso>fHasta)return false;
+    return true;
+  });
+
+  const tProd=f.reduce((s,r)=>s+(Number(r.produccion)||0),0);
+  const tMerma=f.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  const tTM=f.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
+  const mermaPct = (tProd+tMerma)>0 ? Math.round((tMerma/(tProd+tMerma))*1000)/10 : 0;
+
+  const pieTipo=tipos.filter(t=>t!=="Todos").map(t=>({label:t,val:rb.filter(r=>getCategoria(r)===t).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
+  const pieSector=showFiltros?sectores.filter(s=>s!=="Todos").map(s=>({label:s,val:rb.filter(r=>getSector(r)===s).reduce((s2,r)=>s2+(Number(r.produccion)||0),0)})).filter(d=>d.val>0):[];
+
+  const activeF=[fTipo,fSector,fMaquina,fOperario,fDesde,fHasta].filter(v=>v&&v!=="Todos"&&v!=="Todas").length;
+  const clearF=()=>{setFTipo("Todos");setFSector("Todos");setFMaquina("Todas");setFOperario("Todos");setFDesde("");setFHasta("");};
+
+  const card=(label,value,color,extra)=>(
+    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:10.5,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em",marginBottom:4}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:700,fontFamily:"var(--mono)",color}}>{value}</div>
+      {extra && <div style={{fontSize:11,color:"var(--text-dim)",marginTop:3}}>{extra}</div>}
+    </div>
+  );
+
+  return(
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:showFiltros?"repeat(4,1fr)":"repeat(5,1fr)",gap:14,marginBottom:20}}>
+        {card("Reportes",`${f.length}`,"var(--accent)",`de ${rb.length}`)}
+        {card("Producción",tProd.toLocaleString(),"var(--good)")}
+        {card("Merma total",tMerma.toLocaleString(),"var(--bad)")}
+        {!showFiltros && card("Merma %",mermaPct+"%","var(--bad)","merma ÷ (producción + merma)")}
+        {card("T. Muertos",tTM.toLocaleString(),"var(--amber)",`≈ ${(tTM/60).toFixed(1)} h`)}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
+        <PieChart data={pieTipo} title={showFiltros?"Producción por tipo de producto":"Producción por tipo de lámina/proceso"}/>
+        {showFiltros && pieSector.length>0 ? <PieChart data={pieSector} title="Producción por sector"/> : <div/>}
+      </div>
+      <div style={{display:"grid",gap:14,marginBottom:20}}><Top5PorTipo reports={f} tipos={tipos} getCategoria={getCategoria}/></div>
+
+      {/* Filtros */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:showFilter?12:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setShowHist(!showHist)}><span style={{fontSize:14,fontWeight:600}}>Historial</span><span style={{fontSize:12,color:"var(--text-dim)"}}>{showHist?"▲":"▼"}</span></div>
+        <div style={{display:"flex",gap:8}}>
+          {activeF>0 && <button onClick={clearF} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+          <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
+        </div>
+      </div>
+      {showFilter && (
+        <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Tipo</div><select style={{...inputStyle,fontSize:13}} value={fTipo} onChange={e=>setFTipo(e.target.value)}>{tipos.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
+          {showFiltros && <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Sector</div><select style={{...inputStyle,fontSize:13}} value={fSector} onChange={e=>setFSector(e.target.value)}>{sectores.map(s=><option key={s} value={s}>{s}</option>)}</select></div>}
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Máquina</div><select style={{...inputStyle,fontSize:13}} value={fMaquina} onChange={e=>setFMaquina(e.target.value)}>{mqs.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Operario</div><select style={{...inputStyle,fontSize:13}} value={fOperario} onChange={e=>setFOperario(e.target.value)}>{operarios.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Desde</div><input type="date" style={{...inputStyle,fontSize:13}} value={fDesde} onChange={e=>setFDesde(e.target.value)}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Hasta</div><input type="date" style={{...inputStyle,fontSize:13}} value={fHasta} onChange={e=>setFHasta(e.target.value)}/></div>
+        </div>
+      )}
+      {showHist && (
+        <div style={{overflowX:"auto",border:"1px solid var(--line)",borderRadius:12,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+              {["Fecha","Nombre","Máquina","Turno","Referencia","Prod.","Tipo","Sector","Merma","Motivo Merma","T.M."].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {f.map(r=>{const c=clasificarReporte(r);return(
+                <tr key={r.id||r.ts+r.consecutivo} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
+                  <td style={{padding:"8px 10px"}}>{r.nombre}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:12}}>{r.turno}</td>
+                  <td style={{padding:"8px 10px",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.produccion} {r.unidad}</td>
+                  <td style={{padding:"8px 10px"}}><span style={{background:"#e8f4fd",color:"#1a6fa8",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.categoria}</span></td>
+                  <td style={{padding:"8px 10px"}}><span style={{background:"var(--panel-2)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.sector||"-"}</span></td>
+                  <td style={{padding:"8px 10px",color:"var(--bad)",whiteSpace:"nowrap"}}>{r.mermasCantidad||"-"}</td>
+                  <td style={{padding:"8px 10px",color:"var(--bad)"}}>{r.mermasMotivo||"-"}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.tiemposMuertosMinutos||"-"}</td>
+                </tr>
+              );})}
+              {f.length===0 && <tr><td colSpan="11" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para estos filtros.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ================== EDITOR DE METAS ================== */
+function MetasEditor({onClose,onSaved}){
+  const [local,setLocal]=useState(JSON.parse(JSON.stringify(loadMetas())));
+  const maquinas=Object.keys(DEFAULT_METAS);
+  const upd=(m,field,val)=>setLocal(p=>({...p,[m]:{...p[m],[field]:field==='meta'?Number(val):val}}));
+  function save(){ saveMetas(local); onSaved&&onSaved(); onClose(); }
+  return(
+    <Modal title="🎯 Metas de producción por máquina" onClose={onClose}>
+      <div style={{marginBottom:12,fontSize:12,color:"var(--text-dim)"}}>Al cambiar una meta, TODO el histórico se recalcula automáticamente. Ideal para plantear mejoras en el tiempo.</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+        <thead><tr style={{background:"var(--panel-2)"}}>
+          <th style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>Máquina</th>
+          <th style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>Meta</th>
+          <th style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>Unidad</th>
+        </tr></thead>
+        <tbody>
+          {maquinas.map(m=>(
+            <tr key={m} style={{borderTop:"1px solid var(--line)"}}>
+              <td style={{padding:"10px 12px",fontWeight:500}}>{m}</td>
+              <td style={{padding:"6px 12px"}}><input type="number" value={local[m]?.meta||0} onChange={e=>upd(m,'meta',e.target.value)} style={{...inputStyle,width:110,padding:"6px 10px"}}/></td>
+              <td style={{padding:"6px 12px",color:"var(--text-dim)",fontSize:12}}>{local[m]?.unidad}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:18}}>
+        <button onClick={onClose} style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"8px 18px",cursor:"pointer",fontSize:13}}>Cancelar</button>
+        <button onClick={save} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",cursor:"pointer",fontSize:13,fontWeight:600}}>Guardar metas</button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ================== EDITOR DE CATÁLOGO / MÁQUINAS ==================
+   El modal de SKU ahora captura TODOS los campos, incluida la clasificación. */
+const CATEGORIAS=["Bolsa abierta","Bolsa valvulada","Bolsa de agua","Flow Pack","Lámina","Lámina Termoencogible","Tubular","Semitubular","Rollo","Sachet/Doypack"];
+const SECTORES=["Construcción","Agua potable","Alimentos","Industrial","Mascotas"];
+const BODEGAS=["Producto Terminado","Producto en Proceso"];
+
+function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
+  const [showSKU,setShowSKU]=useState(false);
+  const [showMachines,setShowMachines]=useState(false);
+  const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción"});
+  const [newMachine,setNewMachine]=useState("");
+  const [msg,setMsg]=useState("");
+
+  function addCode(e){
+    e.preventDefault();
+    if(!f.siesa||!f.sku||!f.referencia){ setMsg("Siesa, SKU y Referencia son obligatorios."); return; }
+    const esProceso = f.bodega==="Producto en Proceso";
+    const nuevo={siesa:f.siesa.trim(),sku:f.sku.trim(),referencia:f.referencia.trim()};
+    const list=[...catalog.filter(c=>c.siesa!==nuevo.siesa),nuevo];
+    setCatalog(list); saveCatalog(list);
+    // Guardar clasificación del nuevo SKU
+    const extra=(()=>{try{return JSON.parse(localStorage.getItem('clasificacion-siesa')||"{}");}catch(e){return {};}})();
+    extra[nuevo.siesa]={bodega:f.bodega,categoria:f.categoria,sector:esProceso?null:f.sector};
+    saveClasificacionExtra(extra);
+    setF({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción"});
+    setMsg("✓ Producto agregado con su clasificación.");
+  }
+  function removeCode(s){ const list=catalog.filter(c=>c.siesa!==s); setCatalog(list); saveCatalog(list); }
+  function addMachine(e){ e.preventDefault(); if(!newMachine||machines.includes(newMachine))return; const u=[...machines,newMachine]; setMachines(u); saveMachines(u); setNewMachine(""); }
+  function removeMachine(m){ const u=machines.filter(x=>x!==m); setMachines(u); saveMachines(u); }
+
+  const esProceso=f.bodega==="Producto en Proceso";
+  const cardBtn={background:"#fff",border:"1px solid rgba(0,0,0,0.08)",borderRadius:12,padding:"14px 22px",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
+
+  return(
+    <div style={{display:"flex",gap:14,marginBottom:30,flexWrap:"wrap"}}>
+      <button onClick={()=>setShowSKU(true)} style={cardBtn}><span style={{fontSize:20}}>🏷️</span><div style={{textAlign:"left"}}><div>Códigos SKU / Siesa</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{catalog.length} referencias</div></div></button>
+      <button onClick={()=>setShowMachines(true)} style={cardBtn}><span style={{fontSize:20}}>⚙️</span><div style={{textAlign:"left"}}><div>Máquinas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{machines.length} registradas</div></div></button>
+      {onEditMetas && <button onClick={onEditMetas} style={cardBtn}><span style={{fontSize:20}}>🎯</span><div style={{textAlign:"left"}}><div>Metas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>Editar metas por máquina</div></div></button>}
+
+      {showSKU && (
+        <Modal title="Agregar producto (todos los campos)" onClose={()=>{setShowSKU(false);setMsg("");}}>
+          <form onSubmit={addCode} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Código Siesa *</div><input style={inputStyle} value={f.siesa} onChange={e=>setF({...f,siesa:e.target.value})} placeholder="Ej: 5991218"/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>SKU *</div><input style={inputStyle} value={f.sku} onChange={e=>setF({...f,sku:e.target.value})} placeholder="Ej: 5991218"/></div>
+            <div style={{gridColumn:"1/-1"}}><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Referencia *</div><input style={inputStyle} value={f.referencia} onChange={e=>setF({...f,referencia:e.target.value})} placeholder="Nombre / descripción del producto"/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Bodega *</div><select style={inputStyle} value={f.bodega} onChange={e=>setF({...f,bodega:e.target.value})}>{BODEGAS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Categoría *</div><select style={inputStyle} value={f.categoria} onChange={e=>setF({...f,categoria:e.target.value})}>{CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+            <div style={{gridColumn:"1/-1"}}><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Sector {esProceso?"(no aplica en Producto en Proceso)":"*"}</div><select style={{...inputStyle,opacity:esProceso?0.5:1}} disabled={esProceso} value={f.sector} onChange={e=>setF({...f,sector:e.target.value})}>{SECTORES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+              <span style={{fontSize:12,color:msg.startsWith("✓")?"var(--good)":"var(--bad)"}}>{msg}</span>
+              <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>+ Agregar producto</button>
+            </div>
+          </form>
+          <div style={{marginTop:14,borderTop:"1px solid var(--line)",paddingTop:12}}>
+            <div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:8}}>Catálogo actual ({catalog.length})</div>
+            {catalog.slice(0,60).map(c=>(
+              <div key={c.siesa} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13}}>
+                <span><b>{c.siesa}</b> · {c.referencia}</span>
+                <button onClick={()=>removeCode(c.siesa)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+              </div>
+            ))}
+            {catalog.length>60 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>… y {catalog.length-60} más.</div>}
+          </div>
+        </Modal>
+      )}
+      {showMachines && (
+        <Modal title="Máquinas" onClose={()=>setShowMachines(false)}>
+          <form onSubmit={addMachine} style={{display:"flex",gap:8,marginBottom:14}}>
+            <input style={inputStyle} placeholder="Nombre de la máquina" value={newMachine} onChange={e=>setNewMachine(e.target.value)}/>
+            <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"0 16px",fontWeight:700,cursor:"pointer"}}>+</button>
+          </form>
+          {machines.map(m=>(
+            <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13}}>
+              <span>{m}</span><button onClick={()=>removeMachine(m)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+            </div>
+          ))}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+
+/* ================== PANEL (ensamblaje) ================== */
+function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports}){
+  const [tab,setTab]=useState('general');
+  const [showMetas,setShowMetas]=useState(false);
+  const [metasVer,setMetasVer]=useState(0); // fuerza re-render al guardar metas
+
+  function exportXLSX(){
+    const headers=["Fecha","F.Turno","Nombre","Cargo","Maquina","H.Inicio","H.Final","Turno","Siesa","SKU","Referencia","Unidad","Produccion","Merma Cant.","Merma Motivo","T.M. Min","T.M. Motivo","Bodega","Categoria","Sector","% Util.","Rend. Real","% Rend.","Consecutivo","Observaciones"];
+    const metas=loadMetas();
+    const rows=reports.map(r=>{
+      const c=clasificarReporte(r), u=calcUtilizacion(r), rd=calcRendimiento(r,metas);
+      return [r.fecha,r.fechaTurno,r.nombre,r.cargo,r.maquina,r.horaInicio,r.horaFinal,r.turno,r.siesa,r.sku,r.referencia,r.unidad,r.produccion,r.mermasCantidad,r.mermasMotivo,r.tiemposMuertosMinutos,r.tiemposMuertosMotivo,c.bodega,c.categoria,c.sector,u?u.utilizacion+"%":"-",rd?rd.rendReal+" "+rd.unidad:"-",rd?rd.pct+"%":"-",r.consecutivo,r.observaciones];
+    });
+    const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+    ws['!cols']=headers.map(()=>({wch:16}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Reportes");
+    XLSX.writeFile(wb,"reportes_produccion.xlsx");
+  }
+
+  return(
+    <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)"}}>
+          {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso']].map(([k,label])=>(
+            <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"#fff":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 18px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={refreshReports} style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13}}>Actualizar</button>
+          <button onClick={exportXLSX} style={{background:"var(--accent)",border:"none",color:"#fff",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700}}>Exportar Excel</button>
+        </div>
+      </div>
+
+      {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
+
+      {tab==='general' && <>
+        <GeneralTab key={metasVer} reports={reports}/>
+        <div style={{marginTop:24}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Administración</div>
+          <CatalogEditor catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} onEditMetas={()=>setShowMetas(true)}/>
+        </div>
+      </>}
+      {tab==='pt' && <BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/>}
+      {tab==='pp' && <BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/>}
+    </div>
+  );
+}
+
+function App(){
+  const [catalog,setCatalog]=useState(loadCatalog());
+  const [machines,setMachines]=useState(loadMachines());
+  const [reports,setReports]=useState([]);
+  const [unlocked,setUnlocked]=useState(false);
+  const [loading,setLoading]=useState(false);
+
+  async function refreshReports(){
+    setLoading(true);
+    const data=await loadReports(SHEETS_URL_READ);
+    setReports(data);
+    setLoading(false);
+  }
+  useEffect(()=>{ if(unlocked) refreshReports(); },[unlocked]);
+
+  return(
+    <div id="app-root">
+      <header style={{background:"rgba(250,250,248,0.92)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+        <Logo/>
+        {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}
+      </header>
+      {unlocked
+        ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports}/>
+        : <PinGate onUnlock={()=>setUnlocked(true)}/>}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('app-root')).render(<App/>);
+</script>
+</body>
+</html>
