@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Innovapack · Producción 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  :root{ --bg:#F0EFE9; --text:#18181B; --text-dim:#71717A; --line:#D8D5CC; --accent:#2563EB; }
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+  .logo{height:90px;width:auto;object-fit:contain;margin-bottom:8px;}
+  h1{font-size:20px;font-weight:700;margin:10px 0 4px;letter-spacing:.01em;}
+  p.sub{color:var(--text-dim);font-size:14px;margin:0 0 32px;}
+  .cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:680px;width:100%;}
+  a.card{flex:1 1 260px;text-decoration:none;color:inherit;background:#fff;border:1px solid rgba(0,0,0,.08);
+    border-radius:16px;padding:26px 24px;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:transform .12s, box-shadow .12s;}
+  a.card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.10);}
+  .ico{font-size:34px;margin-bottom:12px;}
+  .t{font-size:16px;font-weight:700;margin-bottom:4px;}
+  .d{font-size:13px;color:var(--text-dim);line-height:1.5;}
+  .foot{margin-top:30px;font-size:12px;color:var(--text-dim);}
+</style>
+</head>
+<body>
+  <img class="logo" src="shared/logo.png" alt="Innovapack" onerror="this.style.display='none'"/>
+  <h1>Sistema de Producción · Innovapack 2026</h1>
+  <p class="sub">Selecciona a dónde quieres ir</p>
+  <div class="cards">
+    <a class="card" href="reporte/">
+      <div class="ico">📝</div>
+      <div class="t">Reporte de producción</div>
+      <div class="d">Para operarios. Registra la producción del turno (máquina, referencia, mermas y tiempos muertos).</div>
+    </a>
+    <a class="card" href="panel/">
+      <div class="ico">📊</div>
+      <div class="t">Panel administrativo</div>
+      <div class="d">Para jefes y administrativos. Dashboards, rendimiento y reportes. Requiere PIN.</div>
+    </a>
+  </div>
+  <div class="foot">Crea, contiene e informa</div>
+</body>
+</html>
