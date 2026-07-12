@@ -34,6 +34,8 @@
   ::-webkit-scrollbar-track{background:var(--sb-track);border-radius:12px;}
   ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
   ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-h);background-clip:content-box;}
+  .logo-img{mix-blend-mode:multiply;}
+  [data-theme="dark"] .logo-img{mix-blend-mode:screen;filter:brightness(1.8) saturate(1.2);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -63,7 +65,7 @@ function Logo(){
   return (
     <div style={{display:"flex",alignItems:"center",gap:14}}>
       <img src="../shared/logo.png" alt="Innovapack" onError={e=>{e.target.style.display='none';}}
-        style={{height:44,width:"auto",objectFit:"contain"}}/>
+        className="logo-img" style={{height:44,width:"auto",objectFit:"contain"}}/>
       <div style={{fontFamily:"var(--sans)",fontSize:18,color:"var(--text)",fontWeight:700,letterSpacing:"0.01em"}}>
         REPORTE DE PRODUCCIÓN
       </div>

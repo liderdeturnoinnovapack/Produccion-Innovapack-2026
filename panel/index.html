@@ -43,6 +43,8 @@
   button:active{transform:scale(0.97);}
   select,input{transition:border-color 0.15s ease,box-shadow 0.15s ease,background 0.2s ease;}
   path,rect,circle,line{transition:opacity 0.15s ease;}
+  .logo-img{mix-blend-mode:multiply;}
+  [data-theme="dark"] .logo-img{mix-blend-mode:screen;filter:brightness(1.8) saturate(1.2);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -73,7 +75,7 @@ function Logo(){
   return (
     <div style={{display:"flex",alignItems:"center",gap:14}}>
       <img src="../shared/logo.png" alt="Innovapack" onError={e=>{e.target.style.display='none';}}
-        style={{height:44,width:"auto",objectFit:"contain"}}/>
+        className="logo-img" style={{height:44,width:"auto",objectFit:"contain"}}/>
       <div style={{fontFamily:"var(--sans)",fontSize:18,color:"var(--text)",fontWeight:700,letterSpacing:"0.01em"}}>
         PANEL DE PRODUCCIÓN
       </div>
@@ -1301,7 +1303,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
     <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)"}}>
-          {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso'],['ops','👤 Operarios']].map(([k,label])=>(
+          {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso']].map(([k,label])=>(
             <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
@@ -1324,7 +1326,6 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       </>}
       {tab==='pt' && <><InventarioPT reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/></>}
       {tab==='pp' && <><InventarioRollos reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/></>}
-      {tab==='ops' && <OperariosTab reports={reports}/>}
       </div>
     </div>
   );
