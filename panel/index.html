@@ -660,35 +660,14 @@ function BodegaView({reports,titulo,showFiltros}){
     return true;
   });
 
-  const tProd=f.reduce((s,r)=>s+(Number(r.produccion)||0),0);
-  const tMerma=f.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
-  const tTM=f.reduce((s,r)=>s+sumNumeros(r.tiemposMuertosMinutos),0);
-  const rmMerma = resumenMerma(f); // merma % = merma kg ÷ producción kg (usando pesos)
-
   const pieTipo=tipos.filter(t=>t!=="Todos").map(t=>({label:t,val:rb.filter(r=>getCategoria(r)===t).reduce((s,r)=>s+(Number(r.produccion)||0),0)})).filter(d=>d.val>0);
   const pieSector=showFiltros?sectores.filter(s=>s!=="Todos").map(s=>({label:s,val:rb.filter(r=>getSector(r)===s).reduce((s2,r)=>s2+(Number(r.produccion)||0),0)})).filter(d=>d.val>0):[];
 
   const activeF=[fTipo,fSector,fMaquina,fOperario,fDesde,fHasta].filter(v=>v&&v!=="Todos"&&v!=="Todas").length;
   const clearF=()=>{setFTipo("Todos");setFSector("Todos");setFMaquina("Todas");setFOperario("Todos");setFDesde("");setFHasta("");};
 
-  const card=(label,value,color,extra)=>(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:10.5,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em",marginBottom:4}}>{label}</div>
-      <div style={{fontSize:22,fontWeight:700,fontFamily:"var(--mono)",color}}>{value}</div>
-      {extra && <div style={{fontSize:11,color:"var(--text-dim)",marginTop:3}}>{extra}</div>}
-    </div>
-  );
-
   return(
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:20}}>
-        {card("Reportes",`${f.length}`,"var(--accent)",`de ${rb.length}`)}
-        {card("Producción",tProd.toLocaleString(),"var(--good)")}
-        {card("Merma total",tMerma.toLocaleString(),"var(--bad)")}
-        {card("Merma %",rmMerma.pct!==null?rmMerma.pct+"%":"—","var(--bad)",rmMerma.pct!==null?`${rmMerma.mermaKg.toLocaleString()} kg ÷ ${rmMerma.prodKg.toLocaleString()} kg${rmMerma.sinPeso>0?` · ${rmMerma.sinPeso} sin peso`:""}`:"Define pesos para el %")}
-        {card("T. Muertos",tTM.toLocaleString(),"var(--amber)",`≈ ${(tTM/60).toFixed(1)} h`)}
-      </div>
-
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
         <PieChart data={pieTipo} title={showFiltros?"Producción por tipo de producto":"Producción por tipo de lámina/proceso"}/>
         {showFiltros && pieSector.length>0 ? <PieChart data={pieSector} title="Producción por sector"/> : <div/>}
