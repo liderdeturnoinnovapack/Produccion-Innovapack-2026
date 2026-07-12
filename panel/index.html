@@ -8,22 +8,32 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
     --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
+    --card:#FFFFFF; --header-bg:rgba(250,250,248,0.92); --th-text:#000; --badge-bg:#e8f4fd; --badge-text:#1a6fa8;
     --text:#18181B; --text-dim:#71717A; --accent:#2563EB; --accent-text:#fff;
     --accent-dim:#EFF6FF; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --sb-thumb:#a8a293; --sb-thumb-h:#7d7869; --sb-track:rgba(0,0,0,0.04); --row-hover:rgba(0,0,0,0.015);
     --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
     --sans:'Inter','Segoe UI',system-ui,sans-serif;
   }
+  [data-theme="dark"]{
+    --bg:#0F1115; --panel:#171A21; --panel-2:#20242E; --line:#2C313C;
+    --card:#171A21; --header-bg:rgba(15,17,21,0.92); --th-text:#E5E7EB; --badge-bg:#1E3A5F; --badge-text:#93C5FD;
+    --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#3B82F6; --accent-text:#fff;
+    --accent-dim:#1E293B; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
+    --sb-thumb:#3A404C; --sb-thumb-h:#4E5563; --sb-track:rgba(255,255,255,0.05); --row-hover:rgba(255,255,255,0.04);
+  }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background 0.2s,color 0.2s;}
   #app-root{min-height:100vh;}
   input,select,button{font-family:var(--sans);}
+  input,select,textarea{background:var(--card);color:var(--text);}
   input:focus,select:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(37,99,235,0.1)!important;}
-  tr:hover td{background:rgba(0,0,0,0.015);}
-  *{scrollbar-width:auto;scrollbar-color:#9c968a transparent;}
+  tr:hover td{background:var(--row-hover);}
+  *{scrollbar-width:auto;scrollbar-color:var(--sb-thumb) transparent;}
   ::-webkit-scrollbar{width:15px;height:15px;}
-  ::-webkit-scrollbar-track{background:rgba(0,0,0,0.04);border-radius:12px;}
-  ::-webkit-scrollbar-thumb{background:#a8a293;border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
-  ::-webkit-scrollbar-thumb:hover{background:#7d7869;background-clip:content-box;}
+  ::-webkit-scrollbar-track{background:var(--sb-track);border-radius:12px;}
+  ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-h);background-clip:content-box;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -45,7 +55,7 @@ const { useState, useEffect } = React;
 const SHEETS_URL_READ = "https://script.google.com/macros/s/AKfycby3m0ptMQjUEYkVmMt1Fij1fQWIhBxZ1WuyYF84fKJYLIrj3Cwn0Ifr8bRm0AF7m2ic/exec";
 
 const inputStyle = {
-  width:"100%", padding:"10px 13px", background:"#fff", border:"1px solid var(--line)",
+  width:"100%", padding:"10px 13px", background:"var(--card)", border:"1px solid var(--line)",
   borderRadius:9, color:"var(--text)", fontSize:14, fontFamily:"var(--sans)", outline:"none",
   boxShadow:"0 1px 2px rgba(0,0,0,0.04)", transition:"border-color 0.15s, box-shadow 0.15s"
 };
@@ -65,7 +75,7 @@ function Logo(){
 function Modal({title,onClose,children}){
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)"}}>
-      <div style={{background:"#fff",borderRadius:16,padding:26,width:"100%",maxWidth:700,maxHeight:"82vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+      <div style={{background:"var(--card)",borderRadius:16,padding:26,width:"100%",maxWidth:700,maxHeight:"82vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,paddingBottom:16,borderBottom:"1px solid var(--line)"}}>
           <div style={{fontWeight:700,fontSize:15}}>{title}</div>
           <button onClick={onClose} style={{background:"var(--panel-2)",border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14,color:"var(--text-dim)"}}>✕</button>
@@ -93,7 +103,7 @@ function StatCard({label,value,accent,borderColor,breakdown,trend,highlight}){
   const [open,setOpen]=useState(false);
   const hlBg=highlight==="bad"?"#FEE2E2":highlight==="amber"?"#FEF3C7":highlight==="good"?"#DCFCE7":null;
   return (
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:`3px solid ${borderColor||"var(--line)"}`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:`3px solid ${borderColor||"var(--line)"}`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:10.5,color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:5}}>{label}</div>
       {hlBg
         ? <div style={{display:"inline-block",fontSize:30,fontWeight:800,fontFamily:"var(--mono)",color:accent||"var(--text)",background:hlBg,borderRadius:10,padding:"3px 12px",marginBottom:6,letterSpacing:"-0.02em"}}>{value}</div>
@@ -177,7 +187,7 @@ function ProdCard({reports}){
     </>
   );
   return(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:"3px solid var(--good)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",borderLeft:"3px solid var(--good)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:10.5,color:"var(--text-dim)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:10}}>Producción total</div>
       <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:8}}>
         {row("Kg · Prod. Terminado",totalKgPT)}
@@ -201,7 +211,7 @@ function ProdCard({reports}){
 function DonutDash({data,title,unidad}){
   const total=data.reduce((s,d)=>s+d.val,0);
   const [hovered,setHovered]=useState(null);
-  if(total===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:180,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
+  if(total===0) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:180,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
   const COLORS=["#3B82F6","#16A34A","#D97706","#8B5CF6","#DC2626","#06B6D4","#EC4899","#84CC16"];
   const u = unidad ? " "+unidad : "";
   let cum=-Math.PI/2;
@@ -215,12 +225,12 @@ function DonutDash({data,title,unidad}){
   });
   const hov=hovered!==null?slices[hovered]:null;
   return(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
       <div style={{display:"flex",gap:16,alignItems:"center"}}>
         <svg width="140" height="140" viewBox="0 0 140 140" style={{flexShrink:0,cursor:"pointer"}}>
-          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.45} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)} style={{transition:"opacity 0.15s"}}/>)}
-          <circle cx="70" cy="70" r="30" fill="#fff"/>
+          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="var(--card)" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.45} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)} style={{transition:"opacity 0.15s"}}/>)}
+          <circle cx="70" cy="70" r="30" fill="var(--card)"/>
           {hov?<>
             <text x="70" y="62" textAnchor="middle" fontSize="8.5" fill="var(--text-dim)">{hov.label.length>13?hov.label.substring(0,12)+"…":hov.label}</text>
             <text x="70" y="76" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text>
@@ -246,7 +256,7 @@ function DonutDash({data,title,unidad}){
 
 function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
   const [hi,setHi]=useState(null);
-  if(!data||data.length===0) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
+  if(!data||data.length===0) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
   const W=440,H=192,padL=40,padB=36,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
@@ -254,7 +264,7 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
   const u=unidad?" "+unidad:"";
   const hov=hi!==null?data[hi]:null;
   return(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
@@ -282,7 +292,7 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad}){
 
 function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
   const [hi,setHi]=useState(null);
-  if(!data||data.length<2) return <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin suficientes datos</div>;
+  if(!data||data.length<2) return <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"var(--text-dim)",fontSize:13}}>{title}: sin suficientes datos</div>;
   const max=Math.max(...data.map(d=>d[valueKey]),1);
   const W=440,H=192,padL=40,padB=36,padT=22,padR=10;
   const chartW=W-padL-padR,chartH=H-padB-padT;
@@ -292,7 +302,7 @@ function LineChartDash({data,title,color,labelKey,valueKey,unidad}){
   const area=`M${pts[0].x},${padT+chartH} `+pts.map(p=>`L${p.x},${p.y}`).join(" ")+` L${pts[pts.length-1].x},${padT+chartH} Z`;
   const hov=hi!==null?pts[hi]:null;
   return(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
         {[0,0.25,0.5,0.75,1].map(t=>(
@@ -328,12 +338,12 @@ function PieChart({data,title}){
   });
   const hov=hovered!==null?slices[hovered]:null;
   return(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:14}}>{title}</div>
       <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
         <svg width="160" height="160" viewBox="0 0 160 160" style={{cursor:"pointer",flexShrink:0}}>
-          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.5} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}/>)}
-          <circle cx="80" cy="80" r="35" fill="#fff"/>
+          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="var(--card)" strokeWidth="2" opacity={hovered===null||hovered===i?1:0.5} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}/>)}
+          <circle cx="80" cy="80" r="35" fill="var(--card)"/>
           {hov?<><text x="80" y="74" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.label.length>12?hov.label.substring(0,11)+"…":hov.label}</text><text x="80" y="88" textAnchor="middle" fontSize="12" fontWeight="600" fill={hov.color}>{hov.pct}%</text><text x="80" y="100" textAnchor="middle" fontSize="10" fill="var(--text-dim)">{hov.val.toLocaleString()}</text></>:<><text x="80" y="76" textAnchor="middle" fontSize="10" fill="var(--text-dim)">Total</text><text x="80" y="92" textAnchor="middle" fontSize="13" fontWeight="600">{total.toLocaleString()}</text></>}
         </svg>
         <div style={{flex:1,minWidth:120}}>
@@ -357,7 +367,7 @@ function Top5Card({title,reports,color}){
   if(top5.length===0) return null;
   const max=top5[0][1];
   return(
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:12,fontWeight:600,marginBottom:12}}>{title}</div>
       {top5.map(([ref,val],i)=>(
         <div key={i} style={{marginBottom:8}}>
@@ -496,7 +506,7 @@ function GeneralTab({reports}){
         </div>
       </div>
       {showFilter && (
-        <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:16}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:16}}>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Máquina</div><select style={selStyle} value={fMaquina} onChange={e=>setFMaquina(e.target.value)}><option value="">Todas</option>{maquinas.filter(Boolean).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Operario</div><select style={selStyle} value={fOperario} onChange={e=>setFOperario(e.target.value)}><option value="">Todos</option>{operarios.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Turno</div><select style={selStyle} value={fTurno} onChange={e=>setFTurno(e.target.value)}><option value="">Todos</option>{turnos.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}</select></div>
@@ -529,11 +539,11 @@ function GeneralTab({reports}){
       </div>
 
       {/* RESUMEN POR MÁQUINA (ya filtrado) */}
-      <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,marginBottom:24,overflowX:"auto",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,marginBottom:24,overflowX:"auto",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <div style={{padding:"14px 18px",borderBottom:"1px solid var(--line)",fontWeight:600,fontSize:13}}>Resumen por máquina</div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Máquina","Reportes","Producción","Merma","T. Muertos (min)","Hrs Prog.","Hrs Prod.","% Eficiencia","Meta","vs Meta"].map(h=><th key={h} style={{padding:"9px 14px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+            {["Máquina","Reportes","Producción","Merma","T. Muertos (min)","Hrs Prog.","Hrs Prod.","% Eficiencia","Meta","vs Meta"].map(h=><th key={h} style={{padding:"9px 14px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {byMaq.filter(x=>x.reportes>0).map(x=>(
@@ -568,7 +578,7 @@ function GeneralTab({reports}){
         )}
       </div>
       {showHist && showHistFilter && (
-        <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:12}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:12}}>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Máquina</div><select style={selStyle} value={hMaquina} onChange={e=>setHMaquina(e.target.value)}><option value="">Todas</option>{maquinas.filter(Boolean).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Operario</div><select style={selStyle} value={hOperario} onChange={e=>setHOperario(e.target.value)}><option value="">Todos</option>{operarios.filter(Boolean).map(o=><option key={o} value={o}>{o}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Turno</div><select style={selStyle} value={hTurno} onChange={e=>setHTurno(e.target.value)}><option value="">Todos</option>{turnos.filter(Boolean).map(t=><option key={t} value={t}>{t}</option>)}</select></div>
@@ -577,10 +587,10 @@ function GeneralTab({reports}){
         </div>
       )}
       {showHist && (
-        <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
           <table style={{transform:"rotateX(180deg)",width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
             <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-              {["Fecha","F.Turno","Nombre","Máquina","Turno","Siesa","Referencia","Prod.","Merma","T.M.","% Util.","Rend. Real","% Rend."].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+              {["Fecha","F.Turno","Nombre","Máquina","Turno","Siesa","Referencia","Prod.","Merma","T.M.","% Util.","Rend. Real","% Rend."].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
             </tr></thead>
             <tbody>
               {frHist.map(r=>{
@@ -683,7 +693,7 @@ function BodegaView({reports,titulo,showFiltros}){
         </div>
       </div>
       {showFilter && (
-        <div style={{background:"#fff",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Tipo</div><select style={{...inputStyle,fontSize:13}} value={fTipo} onChange={e=>setFTipo(e.target.value)}>{tipos.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
           {showFiltros && <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Sector</div><select style={{...inputStyle,fontSize:13}} value={fSector} onChange={e=>setFSector(e.target.value)}>{sectores.map(s=><option key={s} value={s}>{s}</option>)}</select></div>}
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Máquina</div><select style={{...inputStyle,fontSize:13}} value={fMaquina} onChange={e=>setFMaquina(e.target.value)}>{mqs.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
@@ -693,10 +703,10 @@ function BodegaView({reports,titulo,showFiltros}){
         </div>
       )}
       {showHist && (
-        <div style={{overflowX:"auto",border:"1px solid var(--line)",borderRadius:12,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+        <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <table style={{transform:"rotateX(180deg)",width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
             <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-              {["Fecha","Nombre","Máquina","Turno","Referencia","Prod.","Tipo","Sector","Merma","Motivo Merma","T.M."].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+              {["Fecha","Nombre","Máquina","Turno","Referencia","Prod.","Tipo","Sector","Merma","Motivo Merma","T.M."].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
             </tr></thead>
             <tbody>
               {f.map(r=>{const c=clasificarReporte(r);return(
@@ -707,7 +717,7 @@ function BodegaView({reports,titulo,showFiltros}){
                   <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:12}}>{r.turno}</td>
                   <td style={{padding:"8px 10px",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
                   <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{r.produccion} {r.unidad}</td>
-                  <td style={{padding:"8px 10px"}}><span style={{background:"#e8f4fd",color:"#1a6fa8",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.categoria}</span></td>
+                  <td style={{padding:"8px 10px"}}><span style={{background:"var(--badge-bg)",color:"var(--badge-text)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.categoria}</span></td>
                   <td style={{padding:"8px 10px"}}><span style={{background:"var(--panel-2)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.sector||"-"}</span></td>
                   <td style={{padding:"8px 10px",color:"var(--bad)",whiteSpace:"nowrap"}}>{r.mermasCantidad||"-"}</td>
                   <td style={{padding:"8px 10px",color:"var(--bad)"}}>{r.mermasMotivo||"-"}</td>
@@ -804,7 +814,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
 
   const esProceso=f.bodega==="Producto en Proceso";
   const autoPeso=pesoPorTipoDe(f.categoria,f.sector,f.referencia); // peso sugerido por tipo
-  const cardBtn={background:"#fff",border:"1px solid rgba(0,0,0,0.08)",borderRadius:12,padding:"14px 22px",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
+  const cardBtn={background:"var(--card)",border:"1px solid rgba(0,0,0,0.08)",borderRadius:12,padding:"14px 22px",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
 
   return(
     <div style={{display:"flex",gap:14,marginBottom:30,flexWrap:"wrap"}}>
@@ -883,7 +893,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
 /* ================== INVENTARIO (Fase 1) ================== */
 function InvCard({label,value,color,sub}){
   return (
-    <div style={{background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderLeft:`3px solid ${color}`,borderRadius:14,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:10.5,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em",marginBottom:4}}>{label}</div>
       <div style={{fontSize:22,fontWeight:700,fontFamily:"var(--mono)",color}}>{value}</div>
       {sub && <div style={{fontSize:11,color:"var(--text-dim)",marginTop:3}}>{sub}</div>}
@@ -925,7 +935,7 @@ function TrazabilidadModal({siesa, reports, onClose}){
       <div style={{overflowX:"auto",border:"1px solid var(--line)",borderRadius:10}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left"}}>
-            {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"8px 9px",color:"#000",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+            {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"8px 9px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rows.map((r,i)=>{
@@ -1010,10 +1020,10 @@ function InventarioRollos({reports}){
         <input style={{...selStyle,maxWidth:230}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar # rollo o código SISA…"/>
         {hayFiltro && <button onClick={()=>{setFMaq("");setFTipo("");setFMedida("");setFColor("");setBuscar("");}} style={{...selStyle,cursor:"pointer",background:"var(--panel-2)",maxWidth:110}}>✕ Limpiar</button>}
       </div>
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["# Rollo","Tipo","Color","Máquina","Medida (cm)","Calibre","Peso (kg)","Código SISA","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["# Rollo","Tipo","Color","Máquina","Medida (cm)","Calibre","Peso (kg)","Código SISA","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rollos.slice(0,500).map((r,i)=>(
@@ -1060,17 +1070,17 @@ function InventarioPT({reports}){
       </div>
       <input style={{...selStyle,maxWidth:320,marginBottom:6}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
       <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:12}}>💡 Haz clic en una fila para ver la <b>trazabilidad</b> completa de esa referencia.</div>
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:480,border:"1px solid var(--line)",borderRadius:12,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:480,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Código","Referencia","Categoría","Sector","Cantidad (und)","Peso (kg)",""].map(h=><th key={h} style={{padding:"9px 10px",color:"#000",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["Código","Referencia","Categoría","Sector","Cantidad (und)","Peso (kg)",""].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {inv.slice(0,500).map((x,i)=>(
               <tr key={i} onClick={()=>setTraza(x.siesa)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}}>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
                 <td style={{padding:"8px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
-                <td style={{padding:"8px 10px"}}><span style={{background:"#e8f4fd",color:"#1a6fa8",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{x.categoria}</span></td>
+                <td style={{padding:"8px 10px"}}><span style={{background:"var(--badge-bg)",color:"var(--badge-text)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{x.categoria}</span></td>
                 <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-dim)"}}>{x.sector||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.unidades).toLocaleString()}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{Math.round(x.kg).toLocaleString()}</td>
@@ -1112,7 +1122,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)"}}>
           {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso']].map(([k,label])=>(
-            <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"#fff":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 18px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+            <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 18px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
         <div style={{display:"flex",gap:10}}>
@@ -1136,12 +1146,24 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
   );
 }
 
+function ThemeToggle({theme,setTheme}){
+  const dark=theme==="dark";
+  return (
+    <button onClick={()=>setTheme(dark?"light":"dark")} title={dark?"Cambiar a modo claro":"Cambiar a modo oscuro"}
+      style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",cursor:"pointer",fontSize:13,color:"var(--text)",display:"flex",alignItems:"center",gap:6,fontWeight:600}}>
+      <span style={{fontSize:14}}>{dark?"☀️":"🌙"}</span><span style={{fontSize:12}}>{dark?"Claro":"Oscuro"}</span>
+    </button>
+  );
+}
+
 function App(){
   const [catalog,setCatalog]=useState(loadCatalog());
   const [machines,setMachines]=useState(loadMachines());
   const [reports,setReports]=useState([]);
   const [unlocked,setUnlocked]=useState(false);
   const [loading,setLoading]=useState(false);
+  const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-panel')||'light';}catch(e){return 'light';}});
+  useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-panel',theme);}catch(e){}},[theme]);
 
   async function refreshReports(){
     setLoading(true);
@@ -1153,9 +1175,12 @@ function App(){
 
   return(
     <div id="app-root">
-      <header style={{background:"rgba(250,250,248,0.92)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <header style={{background:"var(--header-bg)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
-        {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}
+          <ThemeToggle theme={theme} setTheme={setTheme}/>
+        </div>
       </header>
       {unlocked
         ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports}/>

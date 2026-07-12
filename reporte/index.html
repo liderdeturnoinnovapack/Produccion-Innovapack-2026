@@ -8,21 +8,32 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
     --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
+    --card:#FFFFFF; --header-bg:rgba(250,250,248,0.92); --th-text:#000;
     --text:#18181B; --text-dim:#71717A; --accent:#2563EB; --accent-text:#fff;
     --accent-dim:#EFF6FF; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
+    --sb-thumb:#a8a293; --sb-thumb-h:#7d7869; --sb-track:rgba(0,0,0,0.04); --row-hover:rgba(0,0,0,0.015);
     --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
     --sans:'Inter','Segoe UI',system-ui,sans-serif;
   }
+  [data-theme="dark"]{
+    --bg:#0F1115; --panel:#171A21; --panel-2:#20242E; --line:#2C313C;
+    --card:#171A21; --header-bg:rgba(15,17,21,0.92); --th-text:#E5E7EB;
+    --text:#E5E7EB; --text-dim:#9AA1AD; --accent:#3B82F6; --accent-text:#fff;
+    --accent-dim:#1E293B; --good:#4ADE80; --bad:#F87171; --amber:#FBBF24;
+    --sb-thumb:#3A404C; --sb-thumb-h:#4E5563; --sb-track:rgba(255,255,255,0.05); --row-hover:rgba(255,255,255,0.04);
+  }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;transition:background 0.2s,color 0.2s;}
   #app-root{min-height:100vh;}
   input,select,button{font-family:var(--sans);}
+  input,select,textarea{background:var(--card);color:var(--text);}
   input:focus,select:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(37,99,235,0.1)!important;}
-  *{scrollbar-width:auto;scrollbar-color:#9c968a transparent;}
+  tr:hover td{background:var(--row-hover);}
+  *{scrollbar-width:auto;scrollbar-color:var(--sb-thumb) transparent;}
   ::-webkit-scrollbar{width:15px;height:15px;}
-  ::-webkit-scrollbar-track{background:rgba(0,0,0,0.04);border-radius:12px;}
-  ::-webkit-scrollbar-thumb{background:#a8a293;border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
-  ::-webkit-scrollbar-thumb:hover{background:#7d7869;background-clip:content-box;}
+  ::-webkit-scrollbar-track{background:var(--sb-track);border-radius:12px;}
+  ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:12px;border:3px solid transparent;background-clip:content-box;min-height:40px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-h);background-clip:content-box;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -37,13 +48,13 @@
 <div id="app-root"></div>
 
 <script type="text/babel" data-presets="react">
-const { useState } = React;
+const { useState, useEffect } = React;
 
 /* URL de ESCRITURA del formulario (endpoint Apps Script del operario). */
 const SHEETS_URL_WRITE = "https://script.google.com/macros/s/AKfycbwv0-tKDdA8uOn6UYy3Z0YG0V-wg7ZNyKUkynpuupWXysWfkXXmRuNQmCGivPwBxKyF/exec";
 
 const inputStyle = {
-  width:"100%", padding:"10px 13px", background:"#fff", border:"1px solid var(--line)",
+  width:"100%", padding:"10px 13px", background:"var(--card)", border:"1px solid var(--line)",
   borderRadius:9, color:"var(--text)", fontSize:14, fontFamily:"var(--sans)", outline:"none",
   boxShadow:"0 1px 2px rgba(0,0,0,0.04)", transition:"border-color 0.15s, box-shadow 0.15s"
 };
@@ -76,7 +87,7 @@ function MachineFields({maquina, datosExtra, setDatosExtra}){
   function addRow(key, template){ setDatosExtra(prev=>({...prev, [key]: [...(prev[key]||[]), {id:uid("r"), ...template}]})); }
   function removeRow(key, id){ setDatosExtra(prev=>({...prev, [key]: (prev[key]||[]).filter(r=>r.id!==id)})); }
 
-  const sectionStyle = {background:"#fff",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:22,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
+  const sectionStyle = {background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:22,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"};
   const addBtn = {background:"var(--panel-2)",border:"1px dashed var(--line)",borderRadius:8,color:"var(--text-dim)",padding:"8px 12px",cursor:"pointer",fontSize:13,marginTop:6};
   const remBtn = {background:"none",border:"1px solid var(--line)",borderRadius:8,color:"var(--bad)",cursor:"pointer",padding:"0 10px",flexShrink:0};
 
@@ -304,7 +315,7 @@ function FormView({catalog, machines}){
       }>
         <input style={inputStyle} value={siesa} onChange={e=>setSiesa(e.target.value)} placeholder="Ej: 5991217"/>
       </Field>
-      {match && <Field label="Referencia (automática)"><input style={{...inputStyle,background:"var(--panel)",color:"#000",fontWeight:"700"}} value={match.referencia} disabled readOnly/></Field>}
+      {match && <Field label="Referencia (automática)"><input style={{...inputStyle,background:"var(--panel)",color:"var(--th-text)",fontWeight:"700"}} value={match.referencia} disabled readOnly/></Field>}
 
       {maquina && <MachineFields maquina={maquina} datosExtra={datosExtra} setDatosExtra={setDatosExtra}/>}
 
@@ -357,13 +368,26 @@ function FormView({catalog, machines}){
   );
 }
 
+function ThemeToggle({theme,setTheme}){
+  const dark=theme==="dark";
+  return (
+    <button onClick={()=>setTheme(dark?"light":"dark")} title={dark?"Cambiar a modo claro":"Cambiar a modo oscuro"}
+      style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",cursor:"pointer",fontSize:13,color:"var(--text)",display:"flex",alignItems:"center",gap:6,fontWeight:600}}>
+      <span style={{fontSize:14}}>{dark?"☀️":"🌙"}</span><span style={{fontSize:12}}>{dark?"Claro":"Oscuro"}</span>
+    </button>
+  );
+}
+
 function App(){
   const [catalog] = useState(loadCatalog());
   const [machines] = useState(loadMachines());
+  const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-reporte')||'light';}catch(e){return 'light';}});
+  useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-reporte',theme);}catch(e){}},[theme]);
   return (
     <div id="app-root">
-      <header style={{background:"rgba(250,250,248,0.92)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <header style={{background:"var(--header-bg)",borderBottom:"1px solid var(--line)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
+        <ThemeToggle theme={theme} setTheme={setTheme}/>
       </header>
       <FormView catalog={catalog} machines={machines}/>
     </div>
