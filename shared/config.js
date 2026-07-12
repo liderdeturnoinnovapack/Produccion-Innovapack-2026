@@ -26,7 +26,8 @@ window.TURNOS_HORAS = {
 
 window.CARGOS = ["Op.Extrusión", "Op.Impresión", "Op.Sellado", "Ax.Integral"];
 
-window.ADMIN_PIN = "1234";
+/* El PIN del panel YA NO vive en el código: se valida en el servidor (Apps Script),
+   contra el valor guardado en Script Properties (ADMIN_PIN). */
 
 /* Máquinas por defecto (editable desde el panel, se guarda en localStorage) */
 window.DEFAULT_MACHINES = ["Extrusora 1","Extrusora 2","Impresora","Selladora 1","Selladora 2","Selladora Manual","Refiladora"];

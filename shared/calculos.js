@@ -98,7 +98,7 @@ var _CFG_KEYS = { catalogo:'catalogo-siesa', maquinas:'catalogo-maquinas', metas
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
   try{
-    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor }) });
+    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor, pin: window.__AUTH_PIN || "" }) });
   }catch(e){}
 }
 
@@ -225,14 +225,28 @@ function calcRendimiento(report, metasOverride){
 }
 
 /* ---------------------- Google Sheets ----------------------------- */
-/* La URL se pasa por parámetro: cada app usa la suya. */
-async function loadReports(url){
+/* La URL se pasa por parámetro. La lectura de reportes exige PIN (validado en
+   el servidor); si el PIN es inválido el Apps Script devuelve {error:"auth"}. */
+async function loadReports(url, pin){
   try{
-    const resp = await fetch(url);
+    const sep = url.indexOf("?")>=0 ? "&" : "?";
+    const full = pin ? (url + sep + "pin=" + encodeURIComponent(pin)) : url;
+    const resp = await fetch(full);
     const data = await resp.json();
-    if(!Array.isArray(data)) return [];
+    if(!Array.isArray(data)) return [];   // {error:"auth"} u otro → sin datos
     return data.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
   }catch(e){ return []; }
+}
+
+/* Valida el PIN contra el servidor. Devuelve true si el endpoint entrega los
+   reportes (autorizado), false si responde {error:"auth"} o falla. */
+async function validarPin(url, pin){
+  try{
+    const sep = url.indexOf("?")>=0 ? "&" : "?";
+    const resp = await fetch(url + sep + "pin=" + encodeURIComponent(pin));
+    const data = await resp.json();
+    return Array.isArray(data);
+  }catch(e){ return false; }
 }
 
 /* Guarda un reporte enviando SOLO datos crudos + una foto de clasificación

@@ -101,14 +101,19 @@ function Modal({title,onClose,children}){
 }
 
 function PinGate({onUnlock}){
-  const [pin,setPin]=useState(""); const [err,setErr]=useState("");
-  function check(e){ e.preventDefault(); if(pin===ADMIN_PIN) onUnlock(); else setErr("PIN incorrecto."); }
+  const [pin,setPin]=useState(""); const [err,setErr]=useState(""); const [checking,setChecking]=useState(false);
+  async function check(e){
+    e.preventDefault(); setErr(""); setChecking(true);
+    const ok=await validarPin(SHEETS_URL_READ, pin);
+    setChecking(false);
+    if(ok) onUnlock(pin); else setErr("PIN incorrecto.");
+  }
   return (
     <form onSubmit={check} style={{maxWidth:320,margin:"80px auto",textAlign:"center"}}>
       <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:14,textTransform:"uppercase",letterSpacing:"0.05em",fontFamily:"var(--mono)"}}>Panel privado</div>
       <input style={{...inputStyle,textAlign:"center",letterSpacing:"0.3em",fontSize:18}} value={pin} onChange={e=>setPin(e.target.value)} placeholder="PIN" type="password" autoFocus/>
       {err && <div style={{color:"var(--bad)",fontSize:13,marginTop:10}}>{err}</div>}
-      <button type="submit" style={{marginTop:16,background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"11px 24px",fontWeight:700,cursor:"pointer"}}>Entrar</button>
+      <button type="submit" disabled={checking} style={{marginTop:16,background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"11px 24px",fontWeight:700,cursor:checking?"default":"pointer",opacity:checking?0.7:1}}>{checking?"Verificando…":"Entrar"}</button>
     </form>
   );
 }
@@ -1359,7 +1364,7 @@ function App(){
     const cfg=await loadConfigRemoto(SHEETS_URL_READ); // config compartida desde el Sheet
     await migrarConfigInicial(cfg);                    // sube lo local si el Sheet aún no lo tiene
     setCatalog(loadCatalog()); setMachines(loadMachines());
-    const data=await loadReports(SHEETS_URL_READ);
+    const data=await loadReports(SHEETS_URL_READ, window.__AUTH_PIN); // lectura con PIN
     setReports(data);
     setLastUpdated(Date.now());
     setLoading(false);
@@ -1377,7 +1382,7 @@ function App(){
       </header>
       {unlocked
         ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
-        : <PinGate onUnlock={()=>setUnlocked(true)}/>}
+        : <PinGate onUnlock={(p)=>{ window.__AUTH_PIN=p; setUnlocked(true); }}/>}
     </div>
   );
 }
