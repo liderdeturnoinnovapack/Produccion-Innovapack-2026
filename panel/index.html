@@ -782,7 +782,7 @@ function GeneralTab({reports}){
                 return(
                   <tr key={r.id||r.ts+r.consecutivo} style={{borderTop:"1px solid var(--line)"}}>
                     <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
-                    <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fechaTurno||"-"}</td>
+                    <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{fechaLarga(getFechaISO(r))||"-"}</td>
                     <td style={{padding:"8px 10px"}}>{r.nombre}</td>
                     <td style={{padding:"8px 10px"}}>{r.maquina}</td>
                     <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:12}}>{r.turno}</td>
@@ -1132,7 +1132,7 @@ function TrazabilidadModal({siesa, reports, onClose}){
               const traza=[madres?("Madre: "+madres):"",prods?("Prod: #"+prods):""].filter(Boolean).join(" · ")||"-";
               return (
                 <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
-                  <td style={{padding:"7px 9px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.fechaTurno||"-"}</td>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{fechaLarga(getFechaISO(r))||"-"}</td>
                   <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.turno||"-"}</td>
                   <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.maquina}</td>
                   <td style={{padding:"7px 9px"}}>{r.nombre}</td>
@@ -1210,7 +1210,7 @@ function InventarioRollos({reports}){
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["# Rollo","Tipo","Color","Máquina","Medida (cm)","Calibre","Peso (kg)","Código SISA","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["# Rollo","Tipo","Color","Máquina","Medida (cm)","Calibre","Peso (kg)","Código SISA","Referencia","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {rollos.slice(0,500).map((r,i)=>(
@@ -1223,12 +1223,13 @@ function InventarioRollos({reports}){
                 <td style={{padding:"8px 10px"}}>{r.calibre||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)"}}>{r.peso||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{r.codigo||"-"}</td>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fechaTurno||r.fecha||"-"}</td>
+                <td style={{padding:"8px 10px",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{fechaLarga(getFechaISO(r))||"-"}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:12}}>{r.turno||"-"}</td>
                 <td style={{padding:"8px 10px"}}>{r.operario||"-"}</td>
               </tr>
             ))}
-            {rollos.length===0 && <tr><td colSpan="11" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin registros de producto en proceso.</td></tr>}
+            {rollos.length===0 && <tr><td colSpan="12" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin registros de producto en proceso.</td></tr>}
           </tbody>
         </table>
       </div>
