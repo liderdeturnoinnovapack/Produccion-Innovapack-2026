@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Producción · Innovapack</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
     --bg:#F0EFE9; --panel:#FAFAF8; --panel-2:#ECEAE3; --line:#D8D5CC;
-    --card:#FFFFFF; --header-bg:rgba(250,250,248,0.92); --th-text:#000; --badge-bg:#e8f4fd; --badge-text:#1a6fa8;
+    --card:#FCFBF8; --header-bg:rgba(250,250,248,0.92); --th-text:#000; --badge-bg:#e8f4fd; --badge-text:#1a6fa8;
     --text:#18181B; --text-dim:#71717A; --accent:#0091C7; --accent-text:#fff;
     --accent-dim:#E1F3FA; --good:#15803D; --bad:#B91C1C; --amber:#B45309;
     --brand-blue:#0091C7; --brand-green:#7CB342;
@@ -16,7 +16,7 @@
     --sb-thumb:#a8a293; --sb-thumb-h:#7d7869; --sb-track:rgba(0,0,0,0.04); --row-hover:rgba(0,0,0,0.015);
     --mono:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;
     --sans:'Inter','Segoe UI',system-ui,sans-serif;
-    --head:'Roboto','Inter','Segoe UI',system-ui,sans-serif;
+    --head:'IBM Plex Sans','Inter','Segoe UI',system-ui,sans-serif;
     color-scheme:light;
   }
   [data-theme="dark"]{
@@ -256,7 +256,7 @@ function DonutDash({data,title,unidad}){
   });
   const hov=hovered!==null?slices[hovered]:null;
   return(
-    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"16px 20px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)",borderTop:"3px solid var(--brand-blue)"}}>
       <div style={{fontSize:12.5,fontWeight:700,marginBottom:12,fontFamily:"var(--head)"}}>{title}</div>
       <div style={{display:"flex",gap:16,alignItems:"center"}}>
         <svg width="140" height="140" viewBox="0 0 140 140" style={{flexShrink:0,cursor:"pointer"}}>
@@ -295,7 +295,7 @@ function BarChartDash({data,title,color,labelKey,valueKey,unidad,sub}){
   const u=unidad?" "+unidad:"";
   const hov=hi!==null?data[hi]:null;
   return(
-    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"16px 20px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)",borderTop:"3px solid var(--brand-blue)"}}>
       <div style={{fontSize:12.5,fontWeight:700,marginBottom:sub?3:12,fontFamily:"var(--head)"}}>{title}</div>
       {sub && <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>{sub}</div>}
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
@@ -334,7 +334,7 @@ function LineChartDash({data,title,color,labelKey,valueKey,unidad,sub}){
   const area=`M${pts[0].x},${padT+chartH} `+pts.map(p=>`L${p.x},${p.y}`).join(" ")+` L${pts[pts.length-1].x},${padT+chartH} Z`;
   const hov=hi!==null?pts[hi]:null;
   return(
-    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"16px 20px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)",borderTop:"3px solid var(--brand-blue)"}}>
       <div style={{fontSize:12.5,fontWeight:700,marginBottom:sub?3:12,fontFamily:"var(--head)"}}>{title}</div>
       {sub && <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>{sub}</div>}
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{cursor:"pointer"}}>
@@ -371,7 +371,7 @@ function PieChart({data,title}){
   });
   const hov=hovered!==null?slices[hovered]:null;
   return(
-    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+    <div style={{background:"var(--card)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,padding:"16px 20px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)",borderTop:"3px solid var(--brand-blue)"}}>
       <div style={{fontSize:12.5,fontWeight:700,marginBottom:14,fontFamily:"var(--head)"}}>{title}</div>
       <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
         <svg width="160" height="160" viewBox="0 0 160 160" style={{cursor:"pointer",flexShrink:0}}>
