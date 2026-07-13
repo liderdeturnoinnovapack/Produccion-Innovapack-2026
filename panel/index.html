@@ -1091,10 +1091,12 @@ function TrazabilidadModal({siesa, reports, onClose}){
   const cls=rows.length?clasificarReporte(rows[0]):{};
   const p=loadPesos();
   const totalUnd=rows.reduce((s,r)=>{const u=String(r.unidad||"").toLowerCase();return s+(u.indexOf("kg")===0?0:(Number(r.produccion)||0));},0);
-  const totalKg=rows.reduce((s,r)=>s+produccionKg(r,p),0);
+  // Peso separado por bodega: NO mezclar producto terminado con producto en proceso.
+  const kgPT=rows.filter(r=>clasificarReporte(r).bodega==="Producto Terminado").reduce((s,r)=>s+produccionKg(r,p),0);
+  const kgPP=rows.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso").reduce((s,r)=>s+produccionKg(r,p),0);
   const totalMerma=rows.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
-  const fechas=rows.map(r=>r.fechaTurno).filter(x=>x&&x!=="-").sort();
-  const rango=fechas.length?`${fechas[0]} → ${fechas[fechas.length-1]}`:"-";
+  const fechasISO=rows.map(getFechaISO).filter(Boolean).sort();
+  const rango=fechasISO.length?`${fechaLarga(fechasISO[0])} → ${fechaLarga(fechasISO[fechasISO.length-1])}`:"-";
   const mini=(label,val,color)=>(
     <div style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 14px",flex:"1 1 120px"}}>
       <div style={{fontSize:10,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em"}}>{label}</div>
@@ -1112,7 +1114,8 @@ function TrazabilidadModal({siesa, reports, onClose}){
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         {mini("Reportes",rows.length,"var(--accent)")}
         {mini("Unidades",Math.round(totalUnd).toLocaleString(),"var(--good)")}
-        {mini("Peso total",Math.round(totalKg).toLocaleString()+" kg","var(--good)")}
+        {mini("Peso · Terminado",Math.round(kgPT).toLocaleString()+" kg","var(--good)")}
+        {mini("Peso · En proceso",Math.round(kgPP).toLocaleString()+" kg","var(--brand-blue)")}
         {mini("Merma",totalMerma.toLocaleString(),"var(--bad)")}
         {mini("Periodo",rango)}
       </div>
