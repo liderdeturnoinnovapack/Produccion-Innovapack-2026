@@ -138,10 +138,13 @@ function StatCard({label,value,accent,borderColor,breakdown,trend,highlight}){
           <button onClick={()=>setOpen(!open)} style={{background:"none",border:"1px solid var(--line)",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",color:"var(--text-dim)",marginTop:4}}>{open?"▲ Ocultar":"▼ Por máquina"}</button>
           {open && (
             <div style={{marginTop:10}}>
-              {breakdown.map(({maquina,val,pct})=>(
-                <div key={maquina} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--line)"}}>
-                  <span style={{color:"var(--text-dim)",fontWeight:500}}>{maquina}</span>
-                  <span style={{fontWeight:600,fontFamily:"var(--mono)",color:accent||"var(--text)"}}>{typeof val==="number"?val.toLocaleString():val}{pct!==null&&pct!==undefined?<span style={{color:"var(--text-dim)",fontWeight:500,marginLeft:5}}>({pct}%)</span>:""}</span>
+              {breakdown.map(({maquina,val,pct,detail})=>(
+                <div key={maquina} style={{padding:"7px 0",borderBottom:"1px solid var(--line)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10}}>
+                    <span style={{color:"var(--text-dim)",fontWeight:500,fontSize:12}}>{maquina}</span>
+                    <span style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:13,color:accent||"var(--text)",whiteSpace:"nowrap"}}>{typeof val==="number"?val.toLocaleString():val}{pct!==null&&pct!==undefined?<span style={{color:"var(--text-dim)",fontWeight:500,marginLeft:5}}>({pct}%)</span>:""}</span>
+                  </div>
+                  {detail && <div style={{fontSize:10.5,color:"var(--text-dim)",fontFamily:"var(--mono)",marginTop:2}}>{detail}</div>}
                 </div>
               ))}
             </div>
@@ -207,9 +210,9 @@ function ProdCard({reports}){
     <>
       <div style={{fontSize:10,fontWeight:700,color:"var(--text-dim)",textTransform:"uppercase",letterSpacing:"0.06em",padding:"8px 0 4px",borderBottom:"2px solid var(--line)"}}>{title}</div>
       {arr.map(({maquina,val})=>(
-        <div key={maquina} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--line)"}}>
+        <div key={maquina} style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10,fontSize:12,padding:"5px 0",borderBottom:"1px solid var(--line)"}}>
           <span style={{color:"var(--text-dim)",fontWeight:500}}>{maquina}</span>
-          <span style={{fontWeight:600,fontFamily:"var(--mono)",color:"var(--good)"}}>{val.toLocaleString()} {unit}</span>
+          <span style={{fontWeight:600,fontFamily:"var(--mono)",color:"var(--good)",whiteSpace:"nowrap"}}>{val.toLocaleString()} {unit}</span>
         </div>
       ))}
     </>
@@ -611,7 +614,7 @@ function GeneralTab({reports}){
   const totalProdMin=byMaq.reduce((s,x)=>s+x.prodMin,0);
   const avgEfic=totalProgMin>0?Math.round((totalProdMin/totalProgMin)*100)+"%":"-";
   const tmPct=totalProgMin>0?Math.round((totalTM/totalProgMin)*1000)/10:null; // % de tiempo muerto vs tiempo programado
-  const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?`${x.horasProd}/${x.horasProg} · ${x.eficiencia}%`:"-"})).filter(x=>x.val!=="-");
+  const bdEfic=byMaq.map(x=>({maquina:x.maquina,val:x.eficiencia!==null?x.eficiencia+"%":"-",detail:x.eficiencia!==null?`${x.horasProd} prod · ${x.horasProg} prog`:""})).filter(x=>x.val!=="-");
   const totalTMh=(totalTM/60).toFixed(1), totalProgH=(totalProgMin/60).toFixed(1), totalProdH=(totalProdMin/60).toFixed(1);
 
   /* ---- Datos de gráficas (sobre fr) ---- */
