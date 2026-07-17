@@ -74,11 +74,30 @@ function normalizarReporte(r){
 }
 
 /* ---------------------- persistencia local ------------------------ */
+/* Catálogo = base (DEFAULT_CATALOG, en data.js, sin límite de tamaño) +
+   EXTRAS (SKU agregados/editados desde el panel, guardados en Config).
+   Se guardan solo los extras para no exceder el límite de ~50k caracteres por
+   celda de Google Sheets. */
 function loadCatalog(){
-  try{ const r = localStorage.getItem('catalogo-siesa'); return r ? JSON.parse(r) : window.DEFAULT_CATALOG; }
-  catch(e){ return window.DEFAULT_CATALOG; }
+  const base = window.DEFAULT_CATALOG || [];
+  let extra = [];
+  try{ const r = localStorage.getItem('catalogo-extra'); extra = r ? JSON.parse(r) : []; }catch(e){ extra = []; }
+  if(!Array.isArray(extra) || extra.length === 0) return base.slice();
+  const map = {};
+  base.forEach(x=>{ const k=x.siesa||x.sku; if(k) map[k]=x; });
+  extra.forEach(x=>{ const k=x&&(x.siesa||x.sku); if(k) map[k]=x; });
+  return Object.values(map);
 }
-function saveCatalog(list){ try{ localStorage.setItem('catalogo-siesa', JSON.stringify(list)); }catch(e){} postConfig_('catalogo', list); }
+function saveCatalog(list){
+  const base = {}; (window.DEFAULT_CATALOG||[]).forEach(x=>{ const k=x.siesa||x.sku; if(k) base[k]=x; });
+  const extra = (list||[]).filter(x=>{
+    const k = x && (x.siesa||x.sku); if(!k) return false;
+    const b = base[k];
+    return !b || b.referencia !== x.referencia;   // solo lo nuevo o distinto del base
+  });
+  try{ localStorage.setItem('catalogo-extra', JSON.stringify(extra)); }catch(e){}
+  postConfig_('catalogo_extra', extra);
+}
 
 /* Clasificación editable (para SKUs nuevos agregados desde el panel). */
 function loadClasificacion(){
@@ -106,7 +125,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo:'catalogo-siesa', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
