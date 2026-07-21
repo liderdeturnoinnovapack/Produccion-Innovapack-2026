@@ -40,12 +40,28 @@ Todo en **español**. Desplegado en **GitHub Pages**:
 - **fs_write/append grandes pueden abortar:** hacer cambios en trozos moderados.
 - El usuario está en navegador: no puede ver el filesystem. Surface de cambios = repo.
 
-## Seguridad (Etapa 2 — hecha)
-- El **PIN del panel NO está en el código.** Se valida en el servidor (Apps Script)
-  contra `ADMIN_PIN` en Script Properties. El panel manda el PIN en las peticiones.
-- Lectura de **reportes** exige PIN; **config** (catálogo) queda abierta (la usa el
-  formulario); envío de reportes abierto (operarios).
-- Repo público. Cambiar el PIN = editar/ejecutar `configurarPin()` en Apps Script.
+## Seguridad
+### Etapa 2 (PIN) — reemplazada por Fase A
+- (Histórico) El PIN del panel se validaba en el servidor contra `ADMIN_PIN`.
+
+### Fase A — usuarios + roles + auditoría (hecha en frontend, requiere Apps Script nuevo)
+- Login del panel = **usuario + contraseña** (ya no PIN). Se valida en el servidor
+  contra la hoja **`Usuarios`** (columnas `usuario | pass | nombre | rol | activo`).
+- Roles: **admin** (Gabriel Unda `gabriel.unda`, Jose Cortes `jose.cortes`, clave
+  `072026`) y **lectura** (`consulta1`, `consulta2`, clave `12345678`, solo visualiza:
+  sin editor de catálogo/config ni check SIESA).
+- Frontend: `LoginGate` (panel) llama `validarLogin(url,usuario,pass)` → GET
+  `?tipo=login&usuario=&pass=` → `{ok,nombre,rol}`. `loadReports` manda `?usuario=&pass=`.
+  `postConfig_` manda `{tipo:"config",clave,valor,usuario,pass}`. `PanelView` recibe `rol`
+  y define `readonly = rol==='lectura'` (oculta Administración, deshabilita check SIESA).
+- **Auditoría:** hoja **`Auditoria`** (`ts | fecha | usuario | evento | detalle`).
+  El servidor registra login y escrituras de config.
+- Reglas Apps Script: doGet `tipo=login`→valida; `tipo=config`→abierto (lo usa el
+  formulario); resto (lectura de reportes)→exige usuario válido. doPost `tipo=config`→
+  exige rol **admin**; `tipo=audit`→append; resto (guardar reporte)→abierto (operarios).
+- Campo de contraseña en payloads se llama **`pass`** (no choca con `clave` de config).
+- Semilla de usuarios: ejecutar `configurarUsuarios()` una vez en el editor de Apps Script.
+- Repo público → las contraseñas NO van en el código; viven en la hoja `Usuarios`.
 
 ## Reglas de negocio
 ### Clasificación (en `clasificarReporte`, calculos.js)
