@@ -193,7 +193,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -205,6 +205,17 @@ async function postConfig_(clave, valor){
 /* Checklist compartido "cargado en SIESA" (lista de códigos siesa verificados). */
 function loadVerificadoSiesa(){ try{ const r=localStorage.getItem('siesa-ok'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
 function saveVerificadoSiesa(arr){ try{ localStorage.setItem('siesa-ok', JSON.stringify(arr)); }catch(e){} postConfig_('siesa_ok', arr); }
+
+/* ===== FASE B: ingreso a SIESA por REPORTE (standby → bodega de inventario) =====
+   Cada reporte de PRODUCTO TERMINADO queda en "standby" hasta que se confirma su
+   ingreso a SIESA. Solo entonces su producción entra a la bodega de inventario
+   (antesala de despachos). El check se guarda por id de reporte. */
+function reporteId(r){ return r && (r.id || ((String(r.maquina||'X')).replace(/\s+/g,'_')+'_'+(r.consecutivo||r.ts||''))); }
+function loadReportesSiesa(){ try{ const r=localStorage.getItem('reportes-siesa-ok'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function saveReportesSiesa(arr){ try{ localStorage.setItem('reportes-siesa-ok', JSON.stringify(arr)); }catch(e){} postConfig_('reportes_siesa', arr); }
+/* ¿El reporte necesita ingreso a SIESA? Solo los de Producto Terminado
+   (los que alimentan la bodega de inventario / despachos). */
+function requiereSiesa(r){ return clasificarReporte(r).bodega === "Producto Terminado"; }
 
 /* Descarga la config remota y la refleja en localStorage (misma clave que usan
    los loaders). Devuelve el objeto remoto (o null si falla). */

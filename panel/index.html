@@ -57,10 +57,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712c"></script>
-<script src="../shared/config.js?v=20260712c"></script>
-<script src="../shared/inventario_base.js?v=20260712c"></script>
-<script src="../shared/calculos.js?v=20260712c"></script>
+<script src="../shared/data.js?v=20260712d"></script>
+<script src="../shared/config.js?v=20260712d"></script>
+<script src="../shared/inventario_base.js?v=20260712d"></script>
+<script src="../shared/calculos.js?v=20260712d"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1399,6 +1399,126 @@ function InventarioPT({reports}){
   );
 }
 
+/* ===== FASE B: PENDIENTES DE INGRESO A SIESA (prioridad, en la parte superior) =====
+   Reportes de PRODUCTO TERMINADO que aún no se han confirmado en SIESA. Quedan en
+   standby hasta marcarlos; al marcarlos pasan a la Bodega de Inventario. */
+function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
+  const [buscar,setBuscar]=useState("");
+  const [abierto,setAbierto]=useState(true);
+  const totalPend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
+  const q=buscar.trim().toLowerCase();
+  let pend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r)));
+  if(q) pend=pend.filter(r=>((r.referencia||'')+' '+(r.siesa||'')+' '+(r.maquina||'')+' '+(r.consecutivo||'')+' '+(r.nombre||'')).toLowerCase().includes(q));
+  pend=pend.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(totalPend===0) return (
+    <div style={{background:"var(--card)",border:"1px solid var(--line)",borderLeft:"4px solid var(--good)",borderRadius:12,padding:"12px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:18}}>✅</span>
+      <div style={{fontSize:13,color:"var(--text-dim)"}}>No hay reportes pendientes de ingreso a SIESA. Toda la producción terminada ya está en la <b>Bodega de Inventario</b>.</div>
+    </div>
+  );
+  const idsVisibles=pend.map(reporteId);
+  return (
+    <div style={{background:"var(--card)",border:"1px solid var(--amber)",borderLeft:"4px solid var(--amber)",borderRadius:12,marginBottom:18,boxShadow:"0 1px 6px rgba(217,119,6,0.12)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",cursor:"pointer"}} onClick={()=>setAbierto(!abierto)}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>⏳</span>
+          <div>
+            <div style={{fontWeight:700,fontSize:14,fontFamily:"var(--head)"}}>Pendientes de ingreso a SIESA <span style={{background:"var(--amber)",color:"#fff",borderRadius:20,padding:"1px 9px",fontSize:12,marginLeft:6}}>{totalPend}</span></div>
+            <div style={{fontSize:11.5,color:"var(--text-dim)",marginTop:2}}>Reportes de producto terminado en <b>standby</b>. Márcalos cuando los ingreses a SIESA para que pasen a la Bodega de Inventario.</div>
+          </div>
+        </div>
+        <span style={{fontSize:13,color:"var(--text-dim)"}}>{abierto?"▲":"▼"}</span>
+      </div>
+      {abierto && (
+        <div style={{padding:"0 16px 14px"}}>
+          <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+            <input style={{...inputStyle,fontSize:12,padding:"7px 10px",maxWidth:280}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia, código, máquina…"/>
+            <button onClick={()=>onMarcarTodos(idsVisibles)} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ Marcar {q?`los ${pend.length} visibles`:"todos"} como ingresados</button>
+          </div>
+          <div style={{overflowX:"auto",overflowY:"auto",maxHeight:320,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel-2)"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+              <thead><tr style={{textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Consecutivo"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {pend.slice(0,400).map((r,i)=>{
+                  const id=reporteId(r);
+                  return (
+                    <tr key={id||i} style={{borderTop:"1px solid var(--line)"}}>
+                      <td style={{padding:"7px 10px",textAlign:"center"}}><input type="checkbox" checked={false} onChange={()=>onToggle(id)} title="Marcar ingreso a SIESA" style={{width:16,height:16,cursor:"pointer",accentColor:"var(--good)"}}/></td>
+                      <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
+                      <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
+                      <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
+                      <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.produccion} {r.unidad}</td>
+                      <td style={{padding:"7px 10px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {pend.length>400 && <div style={{fontSize:11,color:"var(--text-dim)",marginTop:6}}>Mostrando 400 de {pend.length}. Usa el buscador para acotar.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===== FASE C: BODEGA DE INVENTARIO (solo lo confirmado en SIESA, antesala de Despachos) ===== */
+function BodegaInventario({reports, okSet}){
+  const [buscar,setBuscar]=useState("");
+  const [traza,setTraza]=useState(null);
+  // Solo Producto Terminado CON ingreso a SIESA confirmado.
+  const confirmados=reports.filter(r=>requiereSiesa(r) && okSet.has(reporteId(r)));
+  let inv=inventarioPT(confirmados);
+  if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
+  const totalUnd=inv.reduce((s,x)=>s+x.unidades,0);
+  const totalKg=inv.reduce((s,x)=>s+x.kg,0);
+  const pendientes=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
+  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+  return (
+    <div style={{marginBottom:26}}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>🏬 Bodega de Inventario <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(confirmado en SIESA · listo para despacho)</span></div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Solo entra la producción de <b>producto terminado</b> con <b>✓ ingreso a SIESA</b>. Es la antesala de <b>Despachos</b>, separada de Producto Terminado y en Proceso. Haz clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
+        <InvCard label="Referencias en bodega" value={inv.length.toLocaleString()} color="var(--accent)"/>
+        <InvCard label="Unidades confirmadas" value={Math.round(totalUnd).toLocaleString()} color="var(--good)"/>
+        <InvCard label="Peso confirmado" value={Math.round(totalKg).toLocaleString()+" kg"} color="var(--good)"/>
+      </div>
+      <input style={{...selStyle,maxWidth:320,marginBottom:12}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+            {["#","Código","Referencia","Categoría","Sector","Existencia (und)","Peso (kg)","Reportes","Últ. ingreso","Trazabilidad"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {inv.slice(0,500).map((x,i)=>{
+              const dd=diasDesde(x.ultima);
+              const ddTxt=x.ultima?(dd===0?"hoy":dd===1?"ayer":"hace "+dd+"d"):"-";
+              return (
+              <tr key={i} onClick={()=>setTraza(x.siesa)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}}>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,color:"var(--text-dim)"}}>{i+1}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
+                <td style={{padding:"8px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
+                <td style={{padding:"8px 10px"}}><span style={{background:"var(--badge-bg)",color:"var(--badge-text)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{x.categoria}</span></td>
+                <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-dim)"}}>{x.sector||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.unidades).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{Math.round(x.kg).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",textAlign:"center"}}>{x.reportes}</td>
+                <td style={{padding:"8px 10px",fontSize:12,fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{ddTxt}</td>
+                <td style={{padding:"8px 10px",color:"var(--accent)",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>🔎 ver</td>
+              </tr>
+            );})}
+            {inv.length===0 && <tr><td colSpan="10" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Aún no hay producción confirmada en SIESA. Marca los reportes pendientes (arriba) para que entren a la bodega.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {inv.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {inv.length.toLocaleString()}. Usa el buscador para acotar.</div>}
+      {traza && <TrazabilidadModal siesa={traza} reports={confirmados} onClose={()=>setTraza(null)}/>}
+    </div>
+  );
+}
+
 /* ================== PANEL (ensamblaje) ================== */
 /* Exportación reutilizable: exporta la lista que se le pase (todo o filtrado). */
 function exportReportesXLSX(list, filename){
@@ -1428,12 +1548,16 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
   const [tab,setTab]=useState('general');
   const [showMetas,setShowMetas]=useState(false);
   const [metasVer,setMetasVer]=useState(0); // fuerza re-render al guardar metas
+  // Fase B: check de ingreso a SIESA por reporte (compartido con la Bodega de Inventario)
+  const [siesaOk,setSiesaOk]=useState(()=>{ try{ return new Set(loadReportesSiesa()); }catch(e){ return new Set(); } });
+  function toggleSiesa(id){ if(!id) return; const n=new Set(siesaOk); if(n.has(id)) n.delete(id); else n.add(id); setSiesaOk(n); saveReportesSiesa([...n]); }
+  function marcarTodosSiesa(ids){ const n=new Set(siesaOk); (ids||[]).forEach(i=>{ if(i) n.add(i); }); setSiesaOk(n); saveReportesSiesa([...n]); }
 
   return(
     <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
-        <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)"}}>
-          {[['general','📊 General'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso']].map(([k,label])=>(
+        <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",flexWrap:"wrap"}}>
+          {[['general','📊 General'],['inv','🏬 Bodega Inventario'],['pt','📦 Prod. Terminado'],['pp','⚙️ Prod. en Proceso']].map(([k,label])=>(
             <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
@@ -1446,7 +1570,11 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
 
       {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
 
+      {/* Fase B: prioridad arriba — reportes en standby hasta ingreso a SIESA */}
+      <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa}/>
+
       <div className="fade-in" key={tab+"_"+metasVer}>
+      {tab==='inv' && <BodegaInventario reports={reports} okSet={siesaOk}/>}
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
         <div style={{marginTop:24}}>
