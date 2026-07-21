@@ -429,13 +429,16 @@ function pesoPorTipoDe(categoria, sector, referencia){
   if(cat === "Bolsa valvulada") return /40\s*k/.test(ref) ? 0.08 : 0.05;
   if(cat === "Bolsa abierta"){
     if(sec === "Alimentos"){                       // bolsas de alimentos
-      if(/2[.,]5\s*k/.test(ref)) return 0.012;      // 2.5 kg
+      if(/2[.,]5/.test(ref)) return 0.014;          // 2.5 kg (ej. "X2.5")
       if(/1\s*k/.test(ref)) return 0.008;           // 1 kg
       return 0;                                      // otra medida: sin regla
     }
     return ref.indexOf("estuco") !== -1 ? 0.07 : 0.05; // estuco 0.07 / resto 0.05
   }
   if(cat === "Flow Pack"){
+    if(/2[.,]5\s*k/.test(ref)) return 0.014;        // 2.5 kg
+    if(/25\s*k/.test(ref)) return 0.05;             // 25 kg  (revisar antes que "5 kg")
+    if(/5\s*k/.test(ref)) return 0.022;             // 5 kg
     if(/2\s*k/.test(ref)) return 0.017;             // 2 kg
     if(/1\s*k/.test(ref)) return 0.012;             // 1 kg
     return 0;                                        // otra medida: sin regla
