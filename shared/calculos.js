@@ -63,13 +63,73 @@ function getFechaISO(r){
   return norm(r.fechaTurno) || norm(r.fecha) || "";
 }
 
-/* Normaliza un reporte que llega de Google Sheets. */
+/* Normaliza un reporte que llega de Google Sheets (soporta ambos formatos:
+   keys camelCase del Apps Script viejo y keys "legibles" del nuevo). */
 function normalizarReporte(r){
+  /* Si el reporte ya viene con keys camelCase (formato viejo) se pasa directo;
+     si trae keys legibles ("Fecha", "Nombre") lo mapeamos. */
+  var out = r;
+  if(r['Nombre'] !== undefined || r['Maquina'] !== undefined){
+    // Derivar timestamp de Fecha ISO
+    var tsVal = 0;
+    try{ tsVal = new Date(r['Fecha']).getTime(); }catch(e){}
+    // Formatear fecha a DD/MM/AAAA HH:MM
+    var fechaStr = '';
+    try{
+      var d=new Date(r['Fecha']);
+      fechaStr = ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    }catch(e){}
+    // Hora: extraer HH:MM de ISO date 1899-...
+    function parseHora(v){
+      if(!v||v==='-') return v||'-';
+      try{ var x=new Date(v); return ('0'+x.getUTCHours()).slice(-2)+':'+('0'+x.getUTCMinutes()).slice(-2); }
+      catch(e){ return String(v); }
+    }
+    out = {
+      ts: tsVal,
+      fecha: fechaStr,
+      nombre: r['Nombre']||'',
+      cargo: r['Cargo']||'',
+      maquina: r['Maquina']||'',
+      horaInicio: parseHora(r['Hora inicio']),
+      horaFinal: parseHora(r['Hora final']),
+      turno: r['Turno']||'',
+      siesa: String(r['Codigo Siesa']||r['SKU']||''),
+      sku: String(r['SKU']||r['Codigo Siesa']||''),
+      referencia: r['Referencia']||'',
+      unidad: r['Unidad']||'',
+      produccion: Number(r['Produccion'])||0,
+      mermasCantidad: r['Merma Cantidad']||'-',
+      mermasMotivo: r['Merma Motivo']||'-',
+      tiemposMuertosMinutos: r['Tiempo muerto (min)']||'-',
+      tiemposMuertosMotivo: r['Motivo tiempo muerto']||'-',
+      extraMedida: r['Medida']!=null?String(r['Medida']):'-',
+      extraCalibre: r['Calibre']!=null?String(r['Calibre']):'-',
+      extraSentido: r['Sentido']||'-',
+      extraRolloInicial: r['Rollo Inicial']!=null?String(r['Rollo Inicial']):'-',
+      extraRolloFinal: r['Rollo Final']!=null?String(r['Rollo Final']):'-',
+      extraRollosTotales: r['Rollos Totales']!=null?String(r['Rollos Totales']):'-',
+      extraRollosProducidos: r['Rollos Producidos']!=null?String(r['Rollos Producidos']):'-',
+      extraPaqueteInicial: r['Paquete Inicial']!=null?String(r['Paquete Inicial']):'-',
+      extraPaqueteFinal: r['Paquete Final']!=null?String(r['Paquete Final']):'-',
+      extraUnidadesPorPaquete: r['Unidades x Paquete']!=null?String(r['Unidades x Paquete']):'-',
+      extraSaldo: r['Saldo']!=null?String(r['Saldo']):'-',
+      extraRollos: r['Rollos Detalle']||'-',
+      fechaTurno: r['Fecha Turno']||'',
+      consecutivo: r['Consecutivo']||'',
+      observaciones: r['Observaciones']||'-',
+      bodega: r['Bodega']||'',
+      categoria: r['Categoria']||'',
+      sector: r['Sector']||'-'
+    };
+    // Generar ID estable
+    out.id = (out.maquina||'X').replace(/\s+/g,'_') + '_' + (out.consecutivo||out.ts);
+  }
   return {
-    ...r,
-    horaInicio: cleanTime(r.horaInicio),
-    horaFinal:  cleanTime(r.horaFinal),
-    produccion: Number(r.produccion) || 0
+    ...out,
+    horaInicio: cleanTime(out.horaInicio),
+    horaFinal:  cleanTime(out.horaFinal),
+    produccion: Number(out.produccion) || 0
   };
 }
 
