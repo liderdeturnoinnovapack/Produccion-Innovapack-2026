@@ -130,7 +130,7 @@ var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas',
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
   try{
-    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor, pin: window.__AUTH_PIN || "" }) });
+    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor }) });
   }catch(e){}
 }
 
@@ -261,28 +261,20 @@ function calcRendimiento(report, metasOverride){
 }
 
 /* ---------------------- Google Sheets ----------------------------- */
-/* La URL se pasa por parámetro. La lectura de reportes exige PIN (validado en
-   el servidor); si el PIN es inválido el Apps Script devuelve {error:"auth"}. */
+/* La URL se pasa por parámetro. El endpoint nuevo no exige PIN en la URL;
+   la protección es el PinGate local del panel. */
 async function loadReports(url, pin){
   try{
-    const sep = url.indexOf("?")>=0 ? "&" : "?";
-    const full = pin ? (url + sep + "pin=" + encodeURIComponent(pin)) : url;
-    const resp = await fetch(full);
+    const resp = await fetch(url);
     const data = await resp.json();
-    if(!Array.isArray(data)) return [];   // {error:"auth"} u otro → sin datos
+    if(!Array.isArray(data)) return [];
     return data.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
   }catch(e){ return []; }
 }
 
-/* Valida el PIN contra el servidor. Devuelve true si el endpoint entrega los
-   reportes (autorizado), false si responde {error:"auth"} o falla. */
+/* Validación de PIN local (ya no llama al servidor). */
 async function validarPin(url, pin){
-  try{
-    const sep = url.indexOf("?")>=0 ? "&" : "?";
-    const resp = await fetch(url + sep + "pin=" + encodeURIComponent(pin));
-    const data = await resp.json();
-    return Array.isArray(data);
-  }catch(e){ return false; }
+  return pin === "072026";
 }
 
 /* Guarda un reporte enviando SOLO datos crudos + una foto de clasificación
