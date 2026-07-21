@@ -1245,6 +1245,8 @@ function InventarioRollos({reports}){
 /* ===== INVENTARIO FÍSICO (corte inicial cargado desde bodega) ===== */
 function InventarioFisico({bodega}){
   const [buscar,setBuscar]=useState("");
+  const [ok,setOk]=useState(()=>{ try{ return new Set(loadVerificadoSiesa()); }catch(e){ return new Set(); } });
+  function toggleOk(siesa){ const n=new Set(ok); if(n.has(siesa)) n.delete(siesa); else n.add(siesa); setOk(n); saveVerificadoSiesa([...n]); }
   const B = window.INVENTARIO_BASE || {};
   const fecha = B.fechaCorte ? fechaLarga(B.fechaCorte) : "-";
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
@@ -1255,22 +1257,25 @@ function InventarioFisico({bodega}){
     let inv=(B.pt||[]);
     if(q) inv=inv.filter(x=>((x.referencia||'')+' '+(x.siesa||'')).toLowerCase().includes(q));
     const tU=inv.reduce((s,x)=>s+(x.und||0),0), tK=inv.reduce((s,x)=>s+(x.kg||0),0);
+    const okCount=(B.pt||[]).filter(x=>ok.has(x.siesa)).length;
     return (
       <div style={{marginBottom:26}}>
         <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📸 Inventario físico · Producto Terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(corte {fecha})</span></div>
-        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Conteo físico de bodega = <b>stock real</b> al corte. Desde aquí se sumará la producción y se restarán las salidas (fases siguientes).</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:14}}>
+        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Conteo físico de bodega = <b>stock real</b> al corte. Marca <b>✓ En SIESA</b> cada ítem cuando confirmes que quedó cargado en SIESA (se guarda para todo el equipo).</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
           <InvCard label="Referencias" value={inv.length.toLocaleString()} color="var(--accent)"/>
           <InvCard label="Existencia" value={Math.round(tU).toLocaleString()+" und"} color="var(--good)"/>
           <InvCard label="Peso total" value={Math.round(tK).toLocaleString()+" kg"} color="var(--good)"/>
+          <InvCard label="Cargados en SIESA" value={okCount+" / "+(B.pt||[]).length} color={okCount===(B.pt||[]).length&&okCount>0?"var(--good)":"var(--amber)"} sub={okCount===(B.pt||[]).length&&okCount>0?"¡Todo verificado!":"Pendientes por verificar"}/>
         </div>
         <input style={{...selStyle,maxWidth:320,marginBottom:10}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
         <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
-            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>{["Código SISA","Referencia","Existencia (und)","Peso (kg)"].map(th)}</tr></thead>
+            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>{["En SIESA","Código SISA","Referencia","Existencia (und)","Peso (kg)"].map(th)}</tr></thead>
             <tbody>
               {inv.map((x,i)=>(
-                <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+                <tr key={i} style={{borderTop:"1px solid var(--line)",background:ok.has(x.siesa)?"rgba(22,163,74,0.06)":"transparent"}}>
+                  <td style={{padding:"8px 10px",textAlign:"center"}}><input type="checkbox" checked={ok.has(x.siesa)} onChange={()=>toggleOk(x.siesa)} style={{width:16,height:16,cursor:"pointer",accentColor:"var(--good)"}}/></td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
                   <td style={{padding:"8px 10px",maxWidth:300,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.und||0).toLocaleString()}</td>

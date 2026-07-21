@@ -125,7 +125,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -133,6 +133,10 @@ async function postConfig_(clave, valor){
     await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor, pin: window.__AUTH_PIN || "" }) });
   }catch(e){}
 }
+
+/* Checklist compartido "cargado en SIESA" (lista de códigos siesa verificados). */
+function loadVerificadoSiesa(){ try{ const r=localStorage.getItem('siesa-ok'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function saveVerificadoSiesa(arr){ try{ localStorage.setItem('siesa-ok', JSON.stringify(arr)); }catch(e){} postConfig_('siesa_ok', arr); }
 
 /* Descarga la config remota y la refleja en localStorage (misma clave que usan
    los loaders). Devuelve el objeto remoto (o null si falla). */
