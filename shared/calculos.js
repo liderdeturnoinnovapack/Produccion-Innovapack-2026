@@ -73,17 +73,25 @@ function normalizarReporte(r){
     // Derivar timestamp de Fecha ISO
     var tsVal = 0;
     try{ tsVal = new Date(r['Fecha']).getTime(); }catch(e){}
-    // Formatear fecha a DD/MM/AAAA HH:MM
+    // Formatear fecha a DD/MM/AAAA HH:MM en hora de Bogotá
     var fechaStr = '';
     try{
       var d=new Date(r['Fecha']);
-      fechaStr = ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
-    }catch(e){}
-    // Hora: extraer HH:MM de ISO date 1899-...
+      var parts=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
+      var g={}; parts.forEach(function(p){g[p.type]=p.value;});
+      fechaStr = g.day+'/'+g.month+'/'+g.year+' '+(g.hour==='24'?'00':g.hour)+':'+g.minute;
+    }catch(e){ try{ fechaStr=new Date(r['Fecha']).toISOString(); }catch(e2){} }
+    // Hora: los tiempos vienen como fecha 1899 en UTC con el offset LMT de
+    // Bogotá (-04:56:16). Restándolo se recupera la hora local exacta (11:00).
     function parseHora(v){
-      if(!v||v==='-') return v||'-';
-      try{ var x=new Date(v); return ('0'+x.getUTCHours()).slice(-2)+':'+('0'+x.getUTCMinutes()).slice(-2); }
-      catch(e){ return String(v); }
+      if(v==null||v==='-'||v==='') return '-';
+      var x=new Date(v);
+      if(isNaN(x.getTime())) return String(v);
+      var totalMin = x.getUTCHours()*60 + x.getUTCMinutes() + x.getUTCSeconds()/60 - (4*60+56+16/60);
+      totalMin = Math.round(totalMin);
+      totalMin = ((totalMin % 1440) + 1440) % 1440;
+      var hh=Math.floor(totalMin/60), mm=totalMin%60;
+      return ('0'+hh).slice(-2)+':'+('0'+mm).slice(-2);
     }
     out = {
       ts: tsVal,
