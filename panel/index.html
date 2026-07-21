@@ -1243,7 +1243,7 @@ function InventarioRollos({reports}){
 }
 
 /* ===== INVENTARIO FÍSICO (corte inicial cargado desde bodega) ===== */
-function InventarioFisico({bodega}){
+function InventarioFisico({bodega,reports}){
   const [buscar,setBuscar]=useState("");
   const [ok,setOk]=useState(()=>{ try{ return new Set(loadVerificadoSiesa()); }catch(e){ return new Set(); } });
   function toggleOk(siesa){ const n=new Set(ok); if(n.has(siesa)) n.delete(siesa); else n.add(siesa); setOk(n); saveVerificadoSiesa([...n]); }
@@ -1254,30 +1254,35 @@ function InventarioFisico({bodega}){
   const th = h => <th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>;
 
   if(bodega==='pt'){
-    let inv=(B.pt||[]);
+    const base=(B.pt||[]).map(x=>({siesa:x.siesa,referencia:x.referencia,und:x.und,kg:x.kg,origen:'corte'}));
+    const baseSet=new Set(base.map(x=>x.siesa));
+    const prodPT=inventarioPT((reports||[]).filter(r=>clasificarReporte(r).bodega==="Producto Terminado"));
+    const faltantes=prodPT.filter(x=>!baseSet.has(x.siesa)).map(x=>({siesa:x.siesa,referencia:x.referencia,und:Math.round(x.unidades||0),kg:Math.round(x.kg||0),origen:'reporte'}));
+    let inv=base.concat(faltantes);
     if(q) inv=inv.filter(x=>((x.referencia||'')+' '+(x.siesa||'')).toLowerCase().includes(q));
     const tU=inv.reduce((s,x)=>s+(x.und||0),0), tK=inv.reduce((s,x)=>s+(x.kg||0),0);
-    const okCount=(B.pt||[]).filter(x=>ok.has(x.siesa)).length;
+    const okCount=base.filter(x=>ok.has(x.siesa)).length;
     return (
       <div style={{marginBottom:26}}>
         <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📸 Inventario físico · Producto Terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(corte {fecha})</span></div>
-        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Conteo físico de bodega = <b>stock real</b> al corte. Marca <b>✓ En SIESA</b> cada ítem cuando confirmes que quedó cargado en SIESA (se guarda para todo el equipo).</div>
+        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Conteo físico del corte + lo <b>fabricado en reportes que no estaba en el corte</b> (resaltado en ámbar). Marca <b>✓ En SIESA</b> cuando confirmes que el ítem quedó cargado en SIESA (se guarda para todo el equipo).</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
-          <InvCard label="Referencias" value={inv.length.toLocaleString()} color="var(--accent)"/>
+          <InvCard label="Referencias" value={inv.length.toLocaleString()} color="var(--accent)" sub={base.length+" corte + "+faltantes.length+" reportes"}/>
           <InvCard label="Existencia" value={Math.round(tU).toLocaleString()+" und"} color="var(--good)"/>
-          <InvCard label="Peso total" value={Math.round(tK).toLocaleString()+" kg"} color="var(--good)"/>
-          <InvCard label="Cargados en SIESA" value={okCount+" / "+(B.pt||[]).length} color={okCount===(B.pt||[]).length&&okCount>0?"var(--good)":"var(--amber)"} sub={okCount===(B.pt||[]).length&&okCount>0?"¡Todo verificado!":"Pendientes por verificar"}/>
+          <InvCard label="Fuera de corte" value={faltantes.length.toLocaleString()} color={faltantes.length?"var(--amber)":"var(--text-dim)"} sub="producido, no en el corte"/>
+          <InvCard label="Cargados en SIESA" value={okCount+" / "+base.length} color={okCount===base.length&&okCount>0?"var(--good)":"var(--amber)"} sub={okCount===base.length&&okCount>0?"¡Corte verificado!":"Pendientes por verificar"}/>
         </div>
         <input style={{...selStyle,maxWidth:320,marginBottom:10}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
-        <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <div style={{overflowX:"auto",overflowY:"auto",maxHeight:460,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
-            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>{["En SIESA","Código SISA","Referencia","Existencia (und)","Peso (kg)"].map(th)}</tr></thead>
+            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>{["En SIESA","Código SISA","Referencia","Origen","Existencia (und)","Peso (kg)"].map(th)}</tr></thead>
             <tbody>
               {inv.map((x,i)=>(
-                <tr key={i} style={{borderTop:"1px solid var(--line)",background:ok.has(x.siesa)?"rgba(22,163,74,0.06)":"transparent"}}>
+                <tr key={i} style={{borderTop:"1px solid var(--line)",background:ok.has(x.siesa)?"rgba(22,163,74,0.06)":(x.origen==='reporte'?"rgba(217,119,6,0.08)":"transparent")}}>
                   <td style={{padding:"8px 10px",textAlign:"center"}}><input type="checkbox" checked={ok.has(x.siesa)} onChange={()=>toggleOk(x.siesa)} style={{width:16,height:16,cursor:"pointer",accentColor:"var(--good)"}}/></td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
-                  <td style={{padding:"8px 10px",maxWidth:300,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
+                  <td style={{padding:"8px 10px",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{x.origen==='reporte'?<span style={{background:"#FEF3C7",color:"var(--amber)",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600}}>⚠ Fuera de corte</span>:<span style={{color:"var(--text-dim)",fontSize:11}}>Corte</span>}</td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.und||0).toLocaleString()}</td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{(x.kg||0).toLocaleString()}</td>
                 </tr>
@@ -1444,8 +1449,8 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
           <CatalogEditor catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} onEditMetas={()=>setShowMetas(true)}/>
         </div>
       </>}
-      {tab==='pt' && <><InventarioFisico bodega="pt"/><InventarioPT reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/></>}
-      {tab==='pp' && <><InventarioFisico bodega="pp"/><InventarioRollos reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/></>}
+      {tab==='pt' && <><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/></>}
+      {tab==='pp' && <><InventarioFisico bodega="pp" reports={reports}/><InventarioRollos reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/></>}
       </div>
     </div>
   );
