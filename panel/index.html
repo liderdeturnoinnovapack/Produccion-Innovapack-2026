@@ -106,20 +106,22 @@ function Modal({title,onClose,children}){
   );
 }
 
-function PinGate({onUnlock}){
-  const [pin,setPin]=useState(""); const [err,setErr]=useState(""); const [checking,setChecking]=useState(false);
+function LoginGate({onUnlock}){
+  const [usuario,setUsuario]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [checking,setChecking]=useState(false);
   async function check(e){
     e.preventDefault(); setErr(""); setChecking(true);
-    const ok=await validarPin(SHEETS_URL_READ, pin);
+    const r=await validarLogin(SHEETS_URL_READ, usuario.trim(), pass);
     setChecking(false);
-    if(ok) onUnlock(pin); else setErr("PIN incorrecto.");
+    if(r && r.ok) onUnlock({usuario:usuario.trim(), pass, rol:r.rol, nombre:r.nombre});
+    else setErr("Usuario o contraseña incorrectos.");
   }
   return (
-    <form onSubmit={check} style={{maxWidth:320,margin:"80px auto",textAlign:"center"}}>
-      <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:14,textTransform:"uppercase",letterSpacing:"0.05em",fontFamily:"var(--mono)"}}>Panel privado</div>
-      <input style={{...inputStyle,textAlign:"center",letterSpacing:"0.3em",fontSize:18}} value={pin} onChange={e=>setPin(e.target.value)} placeholder="PIN" type="password" autoFocus/>
+    <form onSubmit={check} style={{maxWidth:340,margin:"70px auto",textAlign:"center"}}>
+      <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:16,textTransform:"uppercase",letterSpacing:"0.05em",fontFamily:"var(--mono)"}}>Panel privado · Iniciar sesión</div>
+      <input style={{...inputStyle,marginBottom:10,textAlign:"center"}} value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Usuario" autoFocus/>
+      <input style={{...inputStyle,textAlign:"center"}} value={pass} onChange={e=>setPass(e.target.value)} placeholder="Contraseña" type="password"/>
       {err && <div style={{color:"var(--bad)",fontSize:13,marginTop:10}}>{err}</div>}
-      <button type="submit" disabled={checking} style={{marginTop:16,background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"11px 24px",fontWeight:700,cursor:checking?"default":"pointer",opacity:checking?0.7:1}}>{checking?"Verificando…":"Entrar"}</button>
+      <button type="submit" disabled={checking} style={{marginTop:16,width:"100%",background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"11px 24px",fontWeight:700,cursor:checking?"default":"pointer",opacity:checking?0.7:1}}>{checking?"Verificando…":"Entrar"}</button>
     </form>
   );
 }
@@ -1243,10 +1245,10 @@ function InventarioRollos({reports}){
 }
 
 /* ===== INVENTARIO FÍSICO (corte inicial cargado desde bodega) ===== */
-function InventarioFisico({bodega,reports}){
+function InventarioFisico({bodega,reports,readonly}){
   const [buscar,setBuscar]=useState("");
   const [ok,setOk]=useState(()=>{ try{ return new Set(loadVerificadoSiesa()); }catch(e){ return new Set(); } });
-  function toggleOk(siesa){ const n=new Set(ok); if(n.has(siesa)) n.delete(siesa); else n.add(siesa); setOk(n); saveVerificadoSiesa([...n]); }
+  function toggleOk(siesa){ if(readonly) return; const n=new Set(ok); if(n.has(siesa)) n.delete(siesa); else n.add(siesa); setOk(n); saveVerificadoSiesa([...n]); }
   const B = window.INVENTARIO_BASE || {};
   const fecha = B.fechaCorte ? fechaLarga(B.fechaCorte) : "-";
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
@@ -1276,7 +1278,7 @@ function InventarioFisico({bodega,reports}){
             <tbody>
               {inv.map((x,i)=>(
                 <tr key={i} style={{borderTop:"1px solid var(--line)",background:ok.has(x.siesa)?"rgba(22,163,74,0.06)":"transparent"}}>
-                  <td style={{padding:"8px 10px",textAlign:"center"}}><input type="checkbox" checked={ok.has(x.siesa)} onChange={()=>toggleOk(x.siesa)} style={{width:16,height:16,cursor:"pointer",accentColor:"var(--good)"}}/></td>
+                  <td style={{padding:"8px 10px",textAlign:"center"}}><input type="checkbox" checked={ok.has(x.siesa)} disabled={readonly} onChange={()=>toggleOk(x.siesa)} style={{width:16,height:16,cursor:readonly?"not-allowed":"pointer",accentColor:"var(--good)",opacity:readonly?0.55:1}}/></td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{x.siesa}</td>
                   <td style={{padding:"8px 10px",maxWidth:300,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia}</td>
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(x.und||0).toLocaleString()}</td>
@@ -1415,10 +1417,11 @@ function LastUpdated({ts}){
   return <span style={{fontSize:11.5,color:"var(--text-dim)",whiteSpace:"nowrap"}}>🕒 Actualizado {txt}</span>;
 }
 
-function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
+function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated,rol}){
   const [tab,setTab]=useState('general');
   const [showMetas,setShowMetas]=useState(false);
   const [metasVer,setMetasVer]=useState(0); // fuerza re-render al guardar metas
+  const readonly = rol==='lectura'; // rol de solo lectura: no toca catálogo/config/SIESA
 
   return(
     <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
@@ -1440,13 +1443,15 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
+        {!readonly && (
         <div style={{marginTop:24}}>
           <div style={{fontWeight:700,fontSize:15,marginBottom:12,fontFamily:"var(--head)"}}>Administración</div>
           <CatalogEditor catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} onEditMetas={()=>setShowMetas(true)}/>
         </div>
+        )}
       </>}
-      {tab==='pt' && <><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/></>}
-      {tab==='pp' && <><InventarioFisico bodega="pp" reports={reports}/><InventarioRollos reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/></>}
+      {tab==='pt' && <><InventarioFisico bodega="pt" reports={reports} readonly={readonly}/><InventarioPT reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto Terminado" showFiltros={true}/></>}
+      {tab==='pp' && <><InventarioFisico bodega="pp" reports={reports} readonly={readonly}/><InventarioRollos reports={reports}/><BodegaView key={metasVer} reports={reports} titulo="Producto en Proceso" showFiltros={false}/></>}
       </div>
     </div>
   );
@@ -1466,23 +1471,25 @@ function App(){
   const [catalog,setCatalog]=useState(loadCatalog());
   const [machines,setMachines]=useState(loadMachines());
   const [reports,setReports]=useState([]);
-  const [unlocked,setUnlocked]=useState(false);
+  const [auth,setAuth]=useState(null);
   const [loading,setLoading]=useState(false);
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-panel')||'light';}catch(e){return 'light';}});
   const [lastUpdated,setLastUpdated]=useState(null);
+  const unlocked=!!auth;
   useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-panel',theme);}catch(e){}},[theme]);
 
   async function refreshReports(){
     setLoading(true);
     const cfg=await loadConfigRemoto(SHEETS_URL_READ); // config compartida desde el Sheet
-    await migrarConfigInicial(cfg);                    // sube lo local si el Sheet aún no lo tiene
+    if(window.__AUTH && window.__AUTH.rol==='admin') await migrarConfigInicial(cfg); // solo admin sube config
     setCatalog(loadCatalog()); setMachines(loadMachines());
-    const data=await loadReports(SHEETS_URL_READ, window.__AUTH_PIN); // lectura con PIN
+    const data=await loadReports(SHEETS_URL_READ, window.__AUTH); // lectura con usuario+contraseña
     setReports(data);
     setLastUpdated(Date.now());
     setLoading(false);
   }
   useEffect(()=>{ if(unlocked) refreshReports(); },[unlocked]);
+  function logout(){ window.__AUTH=null; setAuth(null); setReports([]); }
 
   return(
     <div id="app-root">
@@ -1490,12 +1497,14 @@ function App(){
         <Logo/>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}
+          {unlocked && <span style={{fontSize:12,color:"var(--text-dim)"}}>👤 {auth.nombre} · <b style={{color:auth.rol==='admin'?"var(--good)":"var(--brand-blue)"}}>{auth.rol==='admin'?"Administrador":"Solo lectura"}</b></span>}
+          {unlocked && <button onClick={logout} style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--text)"}}>Salir</button>}
           <ThemeToggle theme={theme} setTheme={setTheme}/>
         </div>
       </header>
       {unlocked
-        ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
-        : <PinGate onUnlock={(p)=>{ window.__AUTH_PIN=p; setUnlocked(true); }}/>}
+        ? <PanelView rol={auth.rol} catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
+        : <LoginGate onUnlock={(a)=>{ window.__AUTH=a; setAuth(a); }}/>}
     </div>
   );
 }

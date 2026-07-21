@@ -129,8 +129,9 @@ var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas',
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
+  const a = window.__AUTH || {};
   try{
-    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor, pin: window.__AUTH_PIN || "" }) });
+    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor, usuario: a.usuario||"", pass: a.pass||"" }) });
   }catch(e){}
 }
 
@@ -263,10 +264,11 @@ function calcRendimiento(report, metasOverride){
 /* ---------------------- Google Sheets ----------------------------- */
 /* La URL se pasa por parámetro. La lectura de reportes exige PIN (validado en
    el servidor); si el PIN es inválido el Apps Script devuelve {error:"auth"}. */
-async function loadReports(url, pin){
+async function loadReports(url, auth){
   try{
+    const a = auth || window.__AUTH || {};
     const sep = url.indexOf("?")>=0 ? "&" : "?";
-    const full = pin ? (url + sep + "pin=" + encodeURIComponent(pin)) : url;
+    const full = url + sep + "usuario=" + encodeURIComponent(a.usuario||"") + "&pass=" + encodeURIComponent(a.pass||"");
     const resp = await fetch(full);
     const data = await resp.json();
     if(!Array.isArray(data)) return [];   // {error:"auth"} u otro → sin datos
@@ -274,15 +276,15 @@ async function loadReports(url, pin){
   }catch(e){ return []; }
 }
 
-/* Valida el PIN contra el servidor. Devuelve true si el endpoint entrega los
-   reportes (autorizado), false si responde {error:"auth"} o falla. */
-async function validarPin(url, pin){
+/* Login por usuario + contraseña (validado en el servidor contra la hoja
+   Usuarios). Devuelve {ok, nombre, rol} o null. */
+async function validarLogin(url, usuario, pass){
   try{
     const sep = url.indexOf("?")>=0 ? "&" : "?";
-    const resp = await fetch(url + sep + "pin=" + encodeURIComponent(pin));
-    const data = await resp.json();
-    return Array.isArray(data);
-  }catch(e){ return false; }
+    const resp = await fetch(url + sep + "tipo=login&usuario=" + encodeURIComponent(usuario) + "&pass=" + encodeURIComponent(pass));
+    const d = await resp.json();
+    return (d && d.ok) ? d : null;
+  }catch(e){ return null; }
 }
 
 /* Guarda un reporte enviando SOLO datos crudos + una foto de clasificación
