@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712l"></script>
-<script src="../shared/config.js?v=20260712l"></script>
-<script src="../shared/inventario_base.js?v=20260712l"></script>
-<script src="../shared/sku_maestro.js?v=20260712l"></script>
-<script src="../shared/pedidos_base.js?v=20260712l"></script>
-<script src="../shared/calculos.js?v=20260712l"></script>
+<script src="../shared/data.js?v=20260712m"></script>
+<script src="../shared/config.js?v=20260712m"></script>
+<script src="../shared/inventario_base.js?v=20260712m"></script>
+<script src="../shared/sku_maestro.js?v=20260712m"></script>
+<script src="../shared/pedidos_base.js?v=20260712m"></script>
+<script src="../shared/calculos.js?v=20260712m"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1841,6 +1841,7 @@ function LastUpdated({ts}){
 function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
   const [tab,setTab]=useState('general');
   const [subBodega,setSubBodega]=useState('pt'); // sub-pestaña dentro de "Producción por bodega"
+  const [subInv,setSubInv]=useState('pt'); // sub-pestaña dentro de "Bodega de Inventario"
   const [showMetas,setShowMetas]=useState(false);
   const [metasVer,setMetasVer]=useState(0); // fuerza re-render al guardar metas
   // Fase B: check de ingreso a SIESA por reporte (compartido con la Bodega de Inventario)
@@ -1869,7 +1870,15 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa}/>
 
       <div className="fade-in" key={tab+"_"+metasVer}>
-      {tab==='inv' && <BodegaInventario reports={reports} okSet={siesaOk}/>}
+      {tab==='inv' && <>
+        <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
+          {[['pt','📦 Producto Terminado'],['pp','⚙️ Producto en Proceso']].map(([k,label])=>(
+            <button key={k} onClick={()=>setSubInv(k)} style={{background:subInv===k?"var(--card)":"transparent",color:subInv===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subInv===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subInv===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+          ))}
+        </div>
+        {subInv==='pt' && <div className="fade-in" key={"ipt_"+metasVer}><BodegaInventario reports={reports} okSet={siesaOk}/></div>}
+        {subInv==='pp' && <div className="fade-in" key={"ipp_"+metasVer}><ConsumosLamina reports={reports}/></div>}
+      </>}
       {tab==='despachos' && <Despachos reports={reports} okSet={siesaOk}/>}
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
@@ -1885,7 +1894,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
           ))}
         </div>
         {subBodega==='pt' && <div className="fade-in" key={"spt_"+metasVer}><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/><BodegaView reports={reports} titulo="Producto Terminado" showFiltros={true}/></div>}
-        {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}><InventarioFisico bodega="pp" reports={reports}/><ConsumosLamina reports={reports}/><InventarioRollos reports={reports}/><BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/></div>}
+        {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}><InventarioFisico bodega="pp" reports={reports}/><InventarioRollos reports={reports}/><BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/></div>}
       </>}
       </div>
     </div>
