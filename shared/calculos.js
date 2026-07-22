@@ -217,6 +217,23 @@ function saveReportesSiesa(arr){ try{ localStorage.setItem('reportes-siesa-ok', 
    (los que alimentan la bodega de inventario / despachos). */
 function requiereSiesa(r){ return clasificarReporte(r).bodega === "Producto Terminado"; }
 
+/* ===== MAESTRO DE SKU: receta de lámina (tipo+medida) y cliente =====
+   Datos en window.SKU_MAESTRO (shared/sku_maestro.js). El consumo se vincula
+   por TIPO (color+material) + MEDIDA (sin calibre, porque varía). */
+function skuMaestro(siesa){ return (window.SKU_MAESTRO||{})[String(siesa||'').trim()] || null; }
+/* Receta de lámina que consume una referencia: {color, material, medida} o null. */
+function recetaLamina(siesa){
+  var m = skuMaestro(siesa);
+  if(!m || !m.mat || !m.med) return null;
+  return { color: m.col || '', material: m.mat, medida: Number(m.med)||0 };
+}
+/* Cliente de una referencia (para Pedidos/Despachos). */
+function clienteDe(siesa){ var m = skuMaestro(siesa); return (m && m.cli) ? m.cli : ''; }
+/* Clave de familia de lámina (para casar consumo con inventario de proceso). */
+function claveLamina(color, material, medida){
+  return [String(material||'').toLowerCase(), Math.round(Number(medida)||0), String(color||'').toLowerCase()].join('|');
+}
+
 /* Descarga la config remota y la refleja en localStorage (misma clave que usan
    los loaders). Devuelve el objeto remoto (o null si falla). */
 async function loadConfigRemoto(url){
