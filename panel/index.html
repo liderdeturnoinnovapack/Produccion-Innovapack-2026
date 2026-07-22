@@ -57,10 +57,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712f"></script>
-<script src="../shared/config.js?v=20260712f"></script>
-<script src="../shared/inventario_base.js?v=20260712f"></script>
-<script src="../shared/calculos.js?v=20260712f"></script>
+<script src="../shared/data.js?v=20260712g"></script>
+<script src="../shared/config.js?v=20260712g"></script>
+<script src="../shared/inventario_base.js?v=20260712g"></script>
+<script src="../shared/calculos.js?v=20260712g"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -865,8 +865,22 @@ function BodegaView({reports,titulo,showFiltros}){
   const activeF=[fTipo,fSector,fMaquina,fOperario,fDesde,fHasta].filter(v=>v&&v!=="Todos"&&v!=="Todas").length;
   const clearF=()=>{setFTipo("Todos");setFSector("Todos");setFMaquina("Todas");setFOperario("Todos");setFDesde("");setFHasta("");};
 
+  // Tarjetas resumen de la bodega (contexto general)
+  const ovKg=Math.round(rb.reduce((s,r)=>s+produccionKg(r),0));
+  const ovUnd=rb.filter(r=>MAQUINAS_UND.includes(r.maquina)).reduce((s,r)=>s+(Number(r.produccion)||0),0);
+  const ovRefs=new Set(rb.map(r=>r.siesa||r.sku).filter(Boolean)).size;
+  const ovTipos=new Set(rb.map(getCategoria).filter(c=>c&&c!=="-")).size;
+
   return(
     <div>
+      {/* 1) TARJETAS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:18}}>
+        <InvCard label="Reportes" value={rb.length.toLocaleString()} color="var(--accent)"/>
+        <InvCard label="Producción (kg)" value={ovKg.toLocaleString()+" kg"} color="var(--good)"/>
+        <InvCard label={showFiltros?"Producción (und)":"Referencias"} value={showFiltros?ovUnd.toLocaleString():ovRefs.toLocaleString()} color="var(--brand-blue)"/>
+        <InvCard label="Tipos de producto" value={ovTipos.toLocaleString()} color="var(--accent)"/>
+      </div>
+      {/* 2) GRÁFICOS */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
         <PieChart data={pieTipo} title={showFiltros?"Producción por tipo de producto":"Producción por tipo de lámina/proceso"}/>
         {showFiltros && pieSector.length>0 ? <PieChart data={pieSector} title="Producción por sector"/> : <div/>}
@@ -1492,25 +1506,65 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
 /* ===== FASE C: BODEGA DE INVENTARIO (solo lo confirmado en SIESA, antesala de Despachos) ===== */
 function BodegaInventario({reports, okSet}){
   const [buscar,setBuscar]=useState("");
+  const [fCategoria,setFCategoria]=useState("Todas");
+  const [fSector,setFSector]=useState("Todos");
+  const [showFilter,setShowFilter]=useState(false);
   const [traza,setTraza]=useState(null);
+  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   // Solo Producto Terminado CON ingreso a SIESA confirmado.
   const confirmados=reports.filter(r=>requiereSiesa(r) && okSet.has(reporteId(r)));
-  let inv=inventarioPT(confirmados);
+  const invAll=inventarioPT(confirmados);
+  const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
+  const sectores=["Todos",...new Set(invAll.map(x=>x.sector).filter(s=>s&&s!=="-"))].sort();
+  // Filtros (afectan tarjetas, gráficos y lista)
+  let inv=invAll;
+  if(fCategoria!=="Todas") inv=inv.filter(x=>x.categoria===fCategoria);
+  if(fSector!=="Todos") inv=inv.filter(x=>(x.sector||"-")===fSector);
   if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
   const totalUnd=inv.reduce((s,x)=>s+x.unidades,0);
   const totalKg=inv.reduce((s,x)=>s+x.kg,0);
+  const nCat=new Set(inv.map(x=>x.categoria).filter(c=>c&&c!=="-")).size;
   const pendientes=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
-  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+  const activeF=[fCategoria!=="Todas",fSector!=="Todos"].filter(Boolean).length;
+  const clearF=()=>{setFCategoria("Todas");setFSector("Todos");};
+  // Datos de gráficos
+  const kgPorCat={}; inv.forEach(x=>{ const c=x.categoria||"—"; kgPorCat[c]=(kgPorCat[c]||0)+x.kg; });
+  const pieCat=Object.entries(kgPorCat).map(([label,val])=>({label,val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
+  const topRefs=[...inv].sort((a,b)=>b.kg-a.kg).slice(0,10).map(x=>({label:(x.referencia||x.siesa||"").slice(0,22),val:Math.round(x.kg)})).filter(d=>d.val>0);
   return (
     <div style={{marginBottom:26}}>
       <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>🏬 Bodega de Inventario <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(confirmado en SIESA · listo para despacho)</span></div>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Solo entra la producción de <b>producto terminado</b> con <b>✓ ingreso a SIESA</b>. Es la antesala de <b>Despachos</b>, separada de Producto Terminado y en Proceso. Haz clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
-        <InvCard label="Referencias en bodega" value={inv.length.toLocaleString()} color="var(--accent)"/>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:16}}>Solo entra la producción de <b>producto terminado</b> con <b>✓ ingreso a SIESA</b>. Antesala de <b>Despachos</b>, separada de Producto Terminado y en Proceso. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
+
+      {/* 1) TARJETAS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:18}}>
+        <InvCard label="Referencias" value={inv.length.toLocaleString()} color="var(--accent)"/>
         <InvCard label="Unidades confirmadas" value={Math.round(totalUnd).toLocaleString()} color="var(--good)"/>
         <InvCard label="Peso confirmado" value={Math.round(totalKg).toLocaleString()+" kg"} color="var(--good)"/>
+        <InvCard label="Categorías" value={nCat.toLocaleString()} color="var(--brand-blue)"/>
+        <InvCard label="Pendientes (standby)" value={pendientes.toLocaleString()} color={pendientes===0?"var(--good)":"var(--amber)"} sub={pendientes===0?"Todo ingresado":"Por ingresar a SIESA"}/>
       </div>
-      <input style={{...selStyle,maxWidth:320,marginBottom:12}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+
+      {/* 2) GRÁFICOS */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
+        <PieChart data={pieCat} title="Inventario por categoría (kg)"/>
+        <BarChartDash data={topRefs} title="Top 10 referencias por peso" sub="Eje X: referencia" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
+      </div>
+
+      {/* 3) FILTROS + BUSCADOR */}
+      <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+        <input style={{...selStyle,maxWidth:320}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+        {activeF>0 && <button onClick={clearF} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+        <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
+      </div>
+      {showFilter && (
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Categoría / Tipo</div><select style={{...inputStyle,fontSize:13}} value={fCategoria} onChange={e=>setFCategoria(e.target.value)}>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Sector</div><select style={{...inputStyle,fontSize:13}} value={fSector} onChange={e=>setFSector(e.target.value)}>{sectores.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+        </div>
+      )}
+
+      {/* 4) LISTA */}
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
