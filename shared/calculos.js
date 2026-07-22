@@ -242,6 +242,53 @@ function loadPedidosExtra(){ try{ const r=localStorage.getItem('pedidos-extra');
 function savePedidosExtra(arr){ try{ localStorage.setItem('pedidos-extra', JSON.stringify(arr)); }catch(e){} postConfig_('pedidos_extra', arr); }
 function loadPedidos(){ return (window.PEDIDOS_BASE||[]).concat(loadPedidosExtra()); }
 function agregarPedido(p){ const arr=loadPedidosExtra(); arr.push(p); savePedidosExtra(arr); return arr; }
+/* ===== CONSUMO DE LÁMINA (extrusión produce, impresión consume) =====
+   Consumo = Kg producidos + merma del proceso. Se casa por TIPO+MEDIDA. */
+function _parseMedidaRef(ref){ var m=String(ref||'').match(/(\d+(?:[.,]\d+)?)\s*cm/i); return m?Math.round(parseFloat(m[1].replace(',','.'))):0; }
+function _materialDeRef(ref, categoria){
+  var s=String(ref||'').toUpperCase(), c=String(categoria||'');
+  if(/termo/i.test(c)||s.indexOf('TERMO')>=0) return 'Termoencogible';
+  if(/semi/i.test(c)||s.indexOf('SEM')===0||s.indexOf('SEMI')>=0) return 'Semitubular';
+  if(/tubular/i.test(c)||s.indexOf('TUB')===0) return 'Tubular';
+  if(/l[aá]mina/i.test(c)||s.indexOf('LAM')===0||s.indexOf('LAMINA')>=0) return 'Lamina';
+  return '';
+}
+/* Familia de lámina de un reporte {color,material,medida} o null (maestro + fallback). */
+function familiaLaminaDeReporte(r){
+  var m=skuMaestro(r&&r.siesa);
+  if(m && m.mat && m.med) return { color:m.col||'', material:m.mat, medida:Number(m.med) };
+  var c=clasificarReporte(r);
+  var mat=_materialDeRef(r.referencia, c.categoria);
+  var med=Math.round(Number(r.extraMedida)||0) || _parseMedidaRef(r.referencia);
+  if(!mat || !med) return null;
+  var col=/trans/i.test(r.referencia||'')?'Transparente':'Blanco';
+  return { color:col, material:mat, medida:med };
+}
+/* Balance de lámina por familia:
+   Saldo = inventario inicial del corte (rollos) + producido (extrusoras) − consumido (impresión).
+   Consumo = Kg producidos + merma. */
+function balanceLamina(reports){
+  var pool={};
+  function get(sp){ var k=claveLamina(sp.color,sp.material,sp.medida); if(!pool[k]) pool[k]={color:sp.color,material:sp.material,medida:sp.medida,inicial:0,producido:0,consumido:0,rProd:0,rCons:0}; return pool[k]; }
+  // Inventario inicial del corte: rollos de extrusión en bodega
+  var B=window.INVENTARIO_BASE||{};
+  (B.ppRollos||[]).forEach(function(x){
+    var sp=familiaLaminaDeReporte({siesa:x.siesa, referencia:x.desc, extraMedida:''});
+    if(!sp) return; get(sp).inicial+=Number(x.kg)||0;
+  });
+  (reports||[]).forEach(function(r){
+    var maq=String(r.maquina||'');
+    if(/extrusora/i.test(maq)){
+      var sp=familiaLaminaDeReporte(r); if(!sp) return;
+      var g=get(sp); g.producido+=produccionKg(r); g.rProd++;
+    } else if(/impresora/i.test(maq)){
+      var sp2=recetaLamina(r.siesa); if(!sp2) sp2=familiaLaminaDeReporte(r); if(!sp2) return;
+      var g2=get(sp2); g2.consumido+=produccionKg(r)+mermaKg(r); g2.rCons++;
+    }
+  });
+  return Object.keys(pool).map(function(k){ var x=pool[k]; x.disponible=x.inicial+x.producido; x.saldo=x.disponible-x.consumido; return x; }).sort(function(a,b){return b.saldo-a.saldo;});
+}
+
 /* Inventario CONFIRMADO (en SIESA) disponible por código, en unidades y kg.
    reports = lista completa; okSet = set de ids de reportes con ingreso a SIESA. */
 function inventarioDisponible(reports, okSet){

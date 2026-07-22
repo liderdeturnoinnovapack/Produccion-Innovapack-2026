@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712k"></script>
-<script src="../shared/config.js?v=20260712k"></script>
-<script src="../shared/inventario_base.js?v=20260712k"></script>
-<script src="../shared/sku_maestro.js?v=20260712k"></script>
-<script src="../shared/pedidos_base.js?v=20260712k"></script>
-<script src="../shared/calculos.js?v=20260712k"></script>
+<script src="../shared/data.js?v=20260712l"></script>
+<script src="../shared/config.js?v=20260712l"></script>
+<script src="../shared/inventario_base.js?v=20260712l"></script>
+<script src="../shared/sku_maestro.js?v=20260712l"></script>
+<script src="../shared/pedidos_base.js?v=20260712l"></script>
+<script src="../shared/calculos.js?v=20260712l"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1756,6 +1756,63 @@ function Despachos({reports, okSet}){
   );
 }
 
+/* ===== CONSUMO DE LÁMINA (extrusión produce → impresión consume) ===== */
+function ConsumosLamina({reports}){
+  const [buscar,setBuscar]=useState("");
+  const bal=balanceLamina(reports);
+  let list=bal;
+  if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(x=>(x.material+" "+x.medida+" "+x.color).toLowerCase().includes(q)); }
+  const totIni=bal.reduce((s,x)=>s+x.inicial,0);
+  const totProd=bal.reduce((s,x)=>s+x.producido,0);
+  const totCons=bal.reduce((s,x)=>s+x.consumido,0);
+  const totSaldo=bal.reduce((s,x)=>s+x.saldo,0);
+  const deficit=bal.filter(x=>x.saldo<0).length;
+  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+  const barSaldo=[...bal].sort((a,b)=>b.saldo-a.saldo).slice(0,12).map(x=>({label:(x.material.slice(0,4)+" "+x.medida+(x.color?(" "+x.color[0]):"")),val:Math.round(x.saldo)})).filter(d=>d.val!==0);
+  return (
+    <div style={{marginBottom:26}}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>🔄 Consumo de lámina <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(extrusión produce · impresión consume)</span></div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Balance por <b>tipo + medida</b> de lámina. El consumo se descuenta al <b>imprimir</b> cada referencia (Kg producidos + merma), según la lámina que necesita en el maestro de SKU. <b>Saldo = inventario inicial (corte) + producido − consumido.</b></div>
+      {/* 1) TARJETAS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:18}}>
+        <InvCard label="Familias de lámina" value={bal.length.toLocaleString()} color="var(--accent)"/>
+        <InvCard label="Inicial (corte)" value={Math.round(totIni).toLocaleString()+" kg"} color="var(--brand-blue)"/>
+        <InvCard label="Producido (extrusión)" value={Math.round(totProd).toLocaleString()+" kg"} color="var(--good)"/>
+        <InvCard label="Consumido (impresión)" value={Math.round(totCons).toLocaleString()+" kg"} color="var(--amber)"/>
+        <InvCard label="Saldo disponible" value={Math.round(totSaldo).toLocaleString()+" kg"} color={totSaldo>=0?"var(--good)":"var(--bad)"} sub={deficit>0?deficit+" familia(s) en déficit":"Todo con saldo"}/>
+      </div>
+      {/* 2) GRÁFICO */}
+      <div style={{marginBottom:18}}>
+        <BarChartDash data={barSaldo} title="Saldo de lámina por familia (top)" sub="Eje X: tipo+medida" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
+      </div>
+      {/* 3) LISTA */}
+      <input style={{...selStyle,maxWidth:320,marginBottom:10}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar tipo o medida…"/>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:460,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+            {["Tipo","Medida","Color","Inicial (kg)","Producido (kg)","Consumido (kg)","Saldo (kg)"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {list.map((x,i)=>(
+              <tr key={i} style={{borderTop:"1px solid var(--line)",background:x.saldo<0?"rgba(220,38,38,0.06)":"transparent"}}>
+                <td style={{padding:"8px 10px",fontWeight:600}}>{x.material}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)"}}>{x.medida} cm</td>
+                <td style={{padding:"8px 10px",fontSize:12,color:"var(--text-dim)"}}>{x.color||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)"}}>{Math.round(x.inicial).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",color:"var(--good)"}}>{Math.round(x.producido).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",color:"var(--amber)"}}>{Math.round(x.consumido).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:700,color:x.saldo<0?"var(--bad)":"var(--good)"}}>{Math.round(x.saldo).toLocaleString()}</td>
+              </tr>
+            ))}
+            {list.length===0 && <tr><td colSpan="7" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Sin datos de lámina.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div style={{fontSize:11,color:"var(--text-dim)",marginTop:8}}>Nota: el consumo se toma de la <b>impresión</b>. Un saldo negativo indica que se imprimió más de lo que hay registrado como producido+corte en esa familia (revisar corte o producción de extrusión).</div>
+    </div>
+  );
+}
+
 /* ================== PANEL (ensamblaje) ================== */
 /* Exportación reutilizable: exporta la lista que se le pase (todo o filtrado). */
 function exportReportesXLSX(list, filename){
@@ -1828,7 +1885,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
           ))}
         </div>
         {subBodega==='pt' && <div className="fade-in" key={"spt_"+metasVer}><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/><BodegaView reports={reports} titulo="Producto Terminado" showFiltros={true}/></div>}
-        {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}><InventarioFisico bodega="pp" reports={reports}/><InventarioRollos reports={reports}/><BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/></div>}
+        {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}><InventarioFisico bodega="pp" reports={reports}/><ConsumosLamina reports={reports}/><InventarioRollos reports={reports}/><BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/></div>}
       </>}
       </div>
     </div>
