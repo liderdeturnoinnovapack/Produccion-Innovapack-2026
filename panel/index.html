@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712m"></script>
-<script src="../shared/config.js?v=20260712m"></script>
-<script src="../shared/inventario_base.js?v=20260712m"></script>
-<script src="../shared/sku_maestro.js?v=20260712m"></script>
-<script src="../shared/pedidos_base.js?v=20260712m"></script>
-<script src="../shared/calculos.js?v=20260712m"></script>
+<script src="../shared/data.js?v=20260712n"></script>
+<script src="../shared/config.js?v=20260712n"></script>
+<script src="../shared/inventario_base.js?v=20260712n"></script>
+<script src="../shared/sku_maestro.js?v=20260712n"></script>
+<script src="../shared/pedidos_base.js?v=20260712n"></script>
+<script src="../shared/calculos.js?v=20260712n"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1866,8 +1866,8 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
 
       {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
 
-      {/* Fase B: prioridad arriba — reportes en standby hasta ingreso a SIESA */}
-      <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa}/>
+      {/* Fase B: reportes en standby hasta ingreso a SIESA — solo en el panel de Producción por bodega */}
+      {tab==='bodegas' && <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa}/>}
 
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='inv' && <>
