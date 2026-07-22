@@ -57,11 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712j"></script>
-<script src="../shared/config.js?v=20260712j"></script>
-<script src="../shared/inventario_base.js?v=20260712j"></script>
-<script src="../shared/sku_maestro.js?v=20260712j"></script>
-<script src="../shared/calculos.js?v=20260712j"></script>
+<script src="../shared/data.js?v=20260712k"></script>
+<script src="../shared/config.js?v=20260712k"></script>
+<script src="../shared/inventario_base.js?v=20260712k"></script>
+<script src="../shared/sku_maestro.js?v=20260712k"></script>
+<script src="../shared/pedidos_base.js?v=20260712k"></script>
+<script src="../shared/calculos.js?v=20260712k"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1609,6 +1610,152 @@ function BodegaInventario({reports, okSet}){
   );
 }
 
+/* ===== FORMULARIO: AGREGAR PEDIDO (misma estructura que PEDIDOS.xlsx) ===== */
+function PedidoForm({onClose, onSaved}){
+  const cat=loadCatalog();
+  const [f,setF]=useState({fecha:new Date().toISOString().slice(0,10), pedido:"", cliente:"", item:"", resumen:"", estado:"☺ en promesa", pedida:"", pendiente:""});
+  const [msg,setMsg]=useState("");
+  function pickItem(item){
+    const c=cat.find(x=>String(x.siesa)===String(item).trim());
+    setF(p=>({...p, item, resumen: c?("0"+c.siesa+" "+c.referencia):p.resumen, cliente: p.cliente || clienteDe(item)}));
+  }
+  function guardar(e){
+    e.preventDefault();
+    if(!f.pedido||!f.cliente||!f.item||f.pedida===""){ setMsg("N° pedido, cliente, item y cantidad pedida son obligatorios."); return; }
+    const p={fecha:f.fecha, pedido:f.pedido.trim(), cliente:f.cliente.trim(), item:String(f.item).trim(), resumen:(f.resumen||"").trim(), estado:f.estado||"Sin estado", pedida:Number(f.pedida)||0, pendiente:(f.pendiente!==""?Number(f.pendiente):Number(f.pedida))||0};
+    agregarPedido(p);
+    onSaved&&onSaved();
+  }
+  const lab={fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4};
+  return (
+    <Modal title="➕ Agregar pedido" onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Misma estructura del cuadro de pedidos. Al escribir el código Item se autocompleta la referencia y el cliente sugerido. Se guarda para todo el equipo.</div>
+      <form onSubmit={guardar} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div><div style={lab}>Fecha</div><input type="date" style={inputStyle} value={f.fecha} onChange={e=>setF({...f,fecha:e.target.value})}/></div>
+        <div><div style={lab}>N° pedido *</div><input style={inputStyle} value={f.pedido} onChange={e=>setF({...f,pedido:e.target.value})} placeholder="Ej: PEV-00003100"/></div>
+        <div style={{gridColumn:"1/-1"}}><div style={lab}>Cliente (razón social) *</div><input style={inputStyle} value={f.cliente} onChange={e=>setF({...f,cliente:e.target.value})} placeholder="Nombre del cliente"/></div>
+        <div><div style={lab}>Item (código SIESA) *</div><input list="catalogo-items" style={inputStyle} value={f.item} onChange={e=>pickItem(e.target.value)} placeholder="Ej: 5010351"/>
+          <datalist id="catalogo-items">{cat.slice(0,900).map(c=><option key={c.siesa} value={c.siesa}>{c.referencia}</option>)}</datalist></div>
+        <div><div style={lab}>Estado promesa</div><select style={inputStyle} value={f.estado} onChange={e=>setF({...f,estado:e.target.value})}><option>☺ en promesa</option><option>⚠️+35 dias</option><option>Sin estado</option></select></div>
+        <div style={{gridColumn:"1/-1"}}><div style={lab}>Item resumen (referencia)</div><input style={inputStyle} value={f.resumen} onChange={e=>setF({...f,resumen:e.target.value})} placeholder="Se autocompleta con el código"/></div>
+        <div><div style={lab}>Cant. pedida *</div><input type="number" step="any" style={inputStyle} value={f.pedida} onChange={e=>setF({...f,pedida:e.target.value})} placeholder="Ej: 10000"/></div>
+        <div><div style={lab}>Cant. pendiente</div><input type="number" step="any" style={inputStyle} value={f.pendiente} onChange={e=>setF({...f,pendiente:e.target.value})} placeholder="Vacío = igual a pedida"/></div>
+        <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+          <span style={{fontSize:12,color:"var(--bad)"}}>{msg}</span>
+          <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>+ Guardar pedido</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ===== PEDIDOS Y DESPACHOS (vinculado a la Bodega de Inventario) ===== */
+function Despachos({reports, okSet}){
+  const [buscar,setBuscar]=useState("");
+  const [fCliente,setFCliente]=useState("Todos");
+  const [fEstado,setFEstado]=useState("Todos");
+  const [showFilter,setShowFilter]=useState(false);
+  const [showForm,setShowForm]=useState(false);
+  const [ver,setVer]=useState(0);
+  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+
+  const pedidos=loadPedidos(); ver; // ver fuerza re-lectura tras agregar
+  const disp=inventarioDisponible(reports, okSet);
+  const clientes=["Todos",...new Set(pedidos.map(p=>p.cliente).filter(Boolean))].sort();
+  const estados=["Todos",...new Set(pedidos.map(p=>p.estado).filter(Boolean))].sort();
+
+  let list=pedidos.map(p=>{
+    const d=disp[String(p.item).trim()]||{unidades:0,kg:0};
+    const pend=Number(p.pendiente)||0;
+    return {...p, dispUnd:Math.round(d.unidades), alcanza: d.unidades>=pend && pend>0, parcial: d.unidades>0 && d.unidades<pend};
+  });
+  if(fCliente!=="Todos") list=list.filter(p=>p.cliente===fCliente);
+  if(fEstado!=="Todos") list=list.filter(p=>p.estado===fEstado);
+  if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(p=>((p.cliente||'')+' '+(p.item||'')+' '+(p.resumen||'')+' '+(p.pedido||'')).toLowerCase().includes(q)); }
+  list=list.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+
+  const totPend=list.reduce((s,p)=>s+(Number(p.pendiente)||0),0);
+  const totPed=list.reduce((s,p)=>s+(Number(p.pedida)||0),0);
+  const nClientes=new Set(list.map(p=>p.cliente)).size;
+  const conInv=list.filter(p=>p.alcanza).length;
+
+  const porEstado={}; list.forEach(p=>{const e=p.estado||'—'; porEstado[e]=(porEstado[e]||0)+1;});
+  const pieEstado=Object.entries(porEstado).map(([label,val])=>({label,val})).filter(d=>d.val>0);
+  const porCli={}; list.forEach(p=>{const c=p.cliente||'—'; porCli[c]=(porCli[c]||0)+(Number(p.pendiente)||0);});
+  const topCli=Object.entries(porCli).map(([label,val])=>({label:String(label).slice(0,20),val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,10);
+
+  const activeF=[fCliente!=="Todos",fEstado!=="Todos"].filter(Boolean).length;
+
+  return (
+    <div style={{marginBottom:26}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:4}}>
+        <div>
+          <div style={{fontSize:15,fontWeight:700,fontFamily:"var(--head)"}}>🚚 Pedidos y Despachos</div>
+          <div style={{fontSize:12,color:"var(--text-dim)",marginTop:2,maxWidth:640}}>Pedidos de clientes vs. lo <b>disponible en la Bodega de Inventario</b> (producción confirmada en SIESA). El ✅ indica que hay inventario suficiente para el pendiente.</div>
+        </div>
+        <button onClick={()=>setShowForm(true)} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>➕ Agregar pedido</button>
+      </div>
+
+      {/* 1) TARJETAS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,margin:"14px 0 18px"}}>
+        <InvCard label="Pedidos" value={list.length.toLocaleString()} color="var(--accent)"/>
+        <InvCard label="Clientes" value={nClientes.toLocaleString()} color="var(--brand-blue)"/>
+        <InvCard label="Cant. pedida" value={Math.round(totPed).toLocaleString()} color="var(--good)"/>
+        <InvCard label="Cant. pendiente" value={Math.round(totPend).toLocaleString()} color="var(--amber)"/>
+        <InvCard label="Con inventario" value={conInv+" / "+list.length} color={conInv===list.length&&list.length>0?"var(--good)":"var(--amber)"} sub="Pendiente cubierto por bodega"/>
+      </div>
+
+      {/* 2) GRÁFICOS */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
+        <PieChart data={pieEstado} title="Pedidos por estado"/>
+        <BarChartDash data={topCli} title="Top 10 clientes por cant. pendiente" sub="Eje X: cliente" color="var(--amber)" labelKey="label" valueKey="val" unidad="und"/>
+      </div>
+
+      {/* 3) FILTROS + BUSCADOR */}
+      <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+        <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar cliente, item, N° pedido…"/>
+        {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+        <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
+      </div>
+      {showFilter && (
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Cliente</div><select style={{...inputStyle,fontSize:13}} value={fCliente} onChange={e=>setFCliente(e.target.value)}>{clientes.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Estado</div><select style={{...inputStyle,fontSize:13}} value={fEstado} onChange={e=>setFEstado(e.target.value)}>{estados.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+        </div>
+      )}
+
+      {/* 4) LISTA */}
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+            {["Fecha","N° pedido","Cliente","Item","Referencia","Estado","Pedida","Pendiente","Disp. bodega","Cobertura"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {list.slice(0,500).map((p,i)=>(
+              <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{p.fecha?fechaLarga(p.fecha):"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{p.pedido||"-"}</td>
+                <td style={{padding:"8px 10px",maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.cliente||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{p.item||"-"}</td>
+                <td style={{padding:"8px 10px",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.resumen||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5}}>{p.estado||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(Number(p.pedida)||0).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--amber)"}}>{Math.round(Number(p.pendiente)||0).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{p.dispUnd.toLocaleString()}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontWeight:600}}>{p.alcanza?<span style={{color:"var(--good)"}}>✅ Completo</span>:(p.parcial?<span style={{color:"var(--amber)"}}>⚠️ Parcial</span>:<span style={{color:"var(--text-dim)"}}>— Sin inv.</span>)}</td>
+              </tr>
+            ))}
+            {list.length===0 && <tr><td colSpan="10" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>No hay pedidos con estos filtros. Usa “➕ Agregar pedido”.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {list.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {list.length}.</div>}
+
+      {showForm && <PedidoForm onClose={()=>setShowForm(false)} onSaved={()=>{ setShowForm(false); setVer(v=>v+1); }}/>}
+    </div>
+  );
+}
+
 /* ================== PANEL (ensamblaje) ================== */
 /* Exportación reutilizable: exporta la lista que se le pase (todo o filtrado). */
 function exportReportesXLSX(list, filename){
@@ -1648,7 +1795,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
     <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",flexWrap:"wrap"}}>
-          {[['general','📊 General'],['inv','🏬 Bodega Inventario'],['bodegas','📦 Producción por bodega']].map(([k,label])=>(
+          {[['general','📊 General'],['inv','🏬 Bodega Inventario'],['despachos','🚚 Pedidos y Despachos'],['bodegas','📦 Producción por bodega']].map(([k,label])=>(
             <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
@@ -1666,6 +1813,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
 
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='inv' && <BodegaInventario reports={reports} okSet={siesaOk}/>}
+      {tab==='despachos' && <Despachos reports={reports} okSet={siesaOk}/>}
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
         <div style={{marginTop:24}}>

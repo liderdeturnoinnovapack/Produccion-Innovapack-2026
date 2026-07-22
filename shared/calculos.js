@@ -193,7 +193,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -232,6 +232,30 @@ function clienteDe(siesa){ var m = skuMaestro(siesa); return (m && m.cli) ? m.cl
 /* Clave de familia de lámina (para casar consumo con inventario de proceso). */
 function claveLamina(color, material, medida){
   return [String(material||'').toLowerCase(), Math.round(Number(medida)||0), String(color||'').toLowerCase()].join('|');
+}
+
+/* ===== PEDIDOS Y DESPACHOS =====
+   Base en shared/pedidos_base.js (PEDIDOS_BASE) + los que se agregan desde el
+   panel (config "pedidos_extra"). Cada pedido: {fecha,pedido,cliente,item,
+   resumen,estado,pedida,pendiente}. */
+function loadPedidosExtra(){ try{ const r=localStorage.getItem('pedidos-extra'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function savePedidosExtra(arr){ try{ localStorage.setItem('pedidos-extra', JSON.stringify(arr)); }catch(e){} postConfig_('pedidos_extra', arr); }
+function loadPedidos(){ return (window.PEDIDOS_BASE||[]).concat(loadPedidosExtra()); }
+function agregarPedido(p){ const arr=loadPedidosExtra(); arr.push(p); savePedidosExtra(arr); return arr; }
+/* Inventario CONFIRMADO (en SIESA) disponible por código, en unidades y kg.
+   reports = lista completa; okSet = set de ids de reportes con ingreso a SIESA. */
+function inventarioDisponible(reports, okSet){
+  const map={};
+  (reports||[]).forEach(r=>{
+    if(!requiereSiesa(r)) return;
+    if(okSet && !okSet.has(reporteId(r))) return;
+    const key=String(r.siesa||r.sku||'').trim(); if(!key) return;
+    if(!map[key]) map[key]={unidades:0,kg:0};
+    const unidad=String(r.unidad||'').toLowerCase();
+    const prod=Number(r.produccion)||0;
+    if(unidad.indexOf('kg')===0) map[key].kg+=prod; else { map[key].unidades+=prod; map[key].kg+=produccionKg(r); }
+  });
+  return map;
 }
 
 /* Descarga la config remota y la refleja en localStorage (misma clave que usan
