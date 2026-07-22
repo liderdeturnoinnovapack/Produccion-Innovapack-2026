@@ -265,10 +265,11 @@ function familiaLaminaDeReporte(r){
   return { color:col, material:mat, medida:med };
 }
 /* Balance de lámina por familia:
-   Saldo = inventario inicial del corte (rollos) + producido (extrusoras) − consumido (impresión).
-   Consumo = Kg producidos + merma. */
+   Saldo = inventario inicial del corte (rollos) + producido (extrusoras POST-CORTE) − consumido (impresión POST-CORTE).
+   Consumo = Kg producidos + merma. Solo se cuentan reportes POSTERIORES al corte del inventario. */
 function balanceLamina(reports){
   var pool={};
+  var corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
   function get(sp){ var k=claveLamina(sp.color,sp.material,sp.medida); if(!pool[k]) pool[k]={color:sp.color,material:sp.material,medida:sp.medida,inicial:0,producido:0,consumido:0,rProd:0,rCons:0}; return pool[k]; }
   // Inventario inicial del corte: rollos de extrusión en bodega
   var B=window.INVENTARIO_BASE||{};
@@ -277,6 +278,8 @@ function balanceLamina(reports){
     if(!sp) return; get(sp).inicial+=Number(x.kg)||0;
   });
   (reports||[]).forEach(function(r){
+    // Solo reportes POSTERIORES al corte (el inventario ya incluye todo hasta el corte)
+    var iso=getFechaISO(r); if(!iso || iso<=corte) return;
     var maq=String(r.maquina||'');
     if(/extrusora/i.test(maq)){
       var sp=familiaLaminaDeReporte(r); if(!sp) return;
