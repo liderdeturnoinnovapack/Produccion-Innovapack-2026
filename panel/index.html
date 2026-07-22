@@ -57,10 +57,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712e"></script>
-<script src="../shared/config.js?v=20260712e"></script>
-<script src="../shared/inventario_base.js?v=20260712e"></script>
-<script src="../shared/calculos.js?v=20260712e"></script>
+<script src="../shared/data.js?v=20260712f"></script>
+<script src="../shared/config.js?v=20260712f"></script>
+<script src="../shared/inventario_base.js?v=20260712f"></script>
+<script src="../shared/calculos.js?v=20260712f"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1247,6 +1247,7 @@ function InventarioRollos({reports}){
 function InventarioFisico({bodega,reports}){
   const [buscar,setBuscar]=useState("");
   const [ok,setOk]=useState(()=>{ try{ return new Set(loadVerificadoSiesa()); }catch(e){ return new Set(); } });
+  const [soloPend,setSoloPend]=useState(true); // vista limpia: solo referencias pendientes de ingreso a SIESA
   function toggleOk(siesa){ const n=new Set(ok); if(n.has(siesa)) n.delete(siesa); else n.add(siesa); setOk(n); saveVerificadoSiesa([...n]); }
   const B = window.INVENTARIO_BASE || {};
   const fecha = B.fechaCorte ? fechaLarga(B.fechaCorte) : "-";
@@ -1257,28 +1258,51 @@ function InventarioFisico({bodega,reports}){
   if(bodega==='pt'){
     const P=loadPesos();
     const CLS=loadClasificacion();
+    const totalPt=(B.pt||[]).length;
+    const okCount=(B.pt||[]).filter(x=>ok.has(x.siesa)).length;
+    const pendCount=totalPt-okCount;
     // Productos manejados en KG (lámina, rollo, termoencogible): su existencia YA está en kilos.
-    let inv=(B.pt||[]).map(x=>{
+    const invAll=(B.pt||[]).map(x=>{
       const c=CLS[x.siesa]||{};
       const enKg=/l[aá]mina|rollo|termo/i.test(c.categoria||'');
       const pu=pesoUnidad({siesa:x.siesa,sku:x.siesa,referencia:x.referencia},P)||0;
       const kg=enKg?Math.round(x.und||0):Math.round((x.und||0)*pu);
       return {siesa:x.siesa,referencia:x.referencia,und:x.und||0,kg:kg,enKg:enKg};
     });
+    // Totales sobre TODO el corte (contexto estable, no cambian al filtrar)
+    const tU=invAll.reduce((s,x)=>s+(x.enKg?0:(x.und||0)),0), tK=invAll.reduce((s,x)=>s+(x.kg||0),0);
+    // Vista limpia: por defecto solo las referencias PENDIENTES de ingreso a SIESA
+    let inv = soloPend ? invAll.filter(x=>!ok.has(x.siesa)) : invAll;
     if(q) inv=inv.filter(x=>((x.referencia||'')+' '+(x.siesa||'')).toLowerCase().includes(q));
-    const tU=inv.reduce((s,x)=>s+(x.enKg?0:(x.und||0)),0), tK=inv.reduce((s,x)=>s+(x.kg||0),0);
-    const okCount=(B.pt||[]).filter(x=>ok.has(x.siesa)).length;
+
+    // Si todo está cargado y estamos en modo "solo pendientes": vista colapsada y limpia
+    if(soloPend && pendCount===0){
+      return (
+        <div style={{marginBottom:20}}>
+          <div style={{background:"var(--card)",border:"1px solid var(--line)",borderLeft:"4px solid var(--good)",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:18}}>✅</span>
+              <div style={{fontSize:13,color:"var(--text-dim)"}}>Ingresos a SIESA al día: las <b>{totalPt}</b> referencias del corte ({fecha}) ya están cargadas. Este cuadro reaparece automáticamente cuando quede material por ingresar.</div>
+            </div>
+            <button onClick={()=>setSoloPend(false)} style={{background:"var(--panel-2)",color:"var(--text-dim)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>Ver todas ({totalPt})</button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={{marginBottom:26}}>
-        <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📸 Inventario físico · Producto Terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(corte {fecha})</span></div>
-        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Cantidades <b>reales</b> conciliadas (inventario + producción). El peso sale de la base de cada referencia (unidades × peso por unidad); las <b>láminas, rollos y termoencogibles</b> ya se manejan en kg, por eso su existencia se muestra directamente como peso. Marca <b>✓ En SIESA</b> cuando confirmes la carga en SIESA (se guarda para todo el equipo).</div>
+        <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📸 Ingresos a SIESA · Producto Terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(corte {fecha})</span></div>
+        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>{soloPend?<span>Solo se muestran las referencias <b>pendientes de ingreso a SIESA</b>; las ya cargadas se ocultan para mantener la vista limpia.</span>:<span>Mostrando <b>todas</b> las referencias del corte (unidades × peso por referencia; láminas/rollos/termoencogibles ya en kg).</span>} Marca <b>✓ En SIESA</b> al confirmar la carga (se guarda para todo el equipo).</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
-          <InvCard label="Referencias" value={inv.length.toLocaleString()} color="var(--accent)"/>
+          <InvCard label="Referencias (corte)" value={totalPt.toLocaleString()} color="var(--accent)"/>
           <InvCard label="Existencia real" value={Math.round(tU).toLocaleString()+" und"} color="var(--good)"/>
           <InvCard label="Peso aprox." value={"≈ "+Math.round(tK).toLocaleString()+" kg"} color="var(--good)"/>
-          <InvCard label="Cargados en SIESA" value={okCount+" / "+(B.pt||[]).length} color={okCount===(B.pt||[]).length&&okCount>0?"var(--good)":"var(--amber)"} sub={okCount===(B.pt||[]).length&&okCount>0?"¡Todo verificado!":"Pendientes por verificar"}/>
+          <InvCard label="Pendientes por ingresar" value={pendCount.toLocaleString()} color={pendCount===0?"var(--good)":"var(--amber)"} sub={pendCount===0?"¡Todo en SIESA!":okCount+" / "+totalPt+" cargados"}/>
         </div>
-        <input style={{...selStyle,maxWidth:320,marginBottom:10}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+        <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+          <input style={{...selStyle,maxWidth:320}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+          <button onClick={()=>setSoloPend(!soloPend)} style={{background:"var(--panel-2)",color:"var(--text-dim)",border:"1px solid var(--line)",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>{soloPend?`Ver todas (${totalPt})`:`Ver solo pendientes (${pendCount})`}</button>
+        </div>
         <div style={{overflowX:"auto",overflowY:"auto",maxHeight:460,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
             <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>{["En SIESA","Código SISA","Referencia","Existencia real (und)","≈ Peso (kg)"].map(th)}</tr></thead>
@@ -1292,6 +1316,7 @@ function InventarioFisico({bodega,reports}){
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{(x.kg||0).toLocaleString()}</td>
                 </tr>
               ))}
+              {inv.length===0 && <tr><td colSpan="5" style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>Sin resultados para la búsqueda.</td></tr>}
             </tbody>
           </table>
         </div>
