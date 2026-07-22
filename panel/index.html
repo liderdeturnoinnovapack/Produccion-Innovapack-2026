@@ -57,10 +57,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712g"></script>
-<script src="../shared/config.js?v=20260712g"></script>
-<script src="../shared/inventario_base.js?v=20260712g"></script>
-<script src="../shared/calculos.js?v=20260712g"></script>
+<script src="../shared/data.js?v=20260712h"></script>
+<script src="../shared/config.js?v=20260712h"></script>
+<script src="../shared/inventario_base.js?v=20260712h"></script>
+<script src="../shared/calculos.js?v=20260712h"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1203,6 +1203,10 @@ function InventarioRollos({reports}){
   // Conteo por tipo (sobre el resultado filtrado) para las "chips".
   const porTipo={}; rollos.forEach(r=>{const t=r.tipo;if(!porTipo[t])porTipo[t]={n:0,kg:0};porTipo[t].n++;porTipo[t].kg+=Number(r.peso)||0;});
   const chips=Object.entries(porTipo).sort((a,b)=>b[1].kg-a[1].kg);
+  // Datos de gráficos (sobre lo filtrado)
+  const pieTipo=chips.map(([t,d])=>({label:t,val:Math.round(d.kg)})).filter(d=>d.val>0);
+  const kgPorMaq={}; rollos.forEach(r=>{const m=r.maquina||"—"; kgPorMaq[m]=(kgPorMaq[m]||0)+(Number(r.peso)||0);});
+  const barMaq=Object.entries(kgPorMaq).map(([label,val])=>({label,val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
 
   return (
     <div style={{marginBottom:26}}>
@@ -1218,6 +1222,11 @@ function InventarioRollos({reports}){
           <span key={t} style={{fontSize:11.5,fontWeight:600,padding:"4px 10px",borderRadius:20,color:"#fff",background:tipoColor(t)}}>{t}: {d.n.toLocaleString()} reg{d.kg>0?` · ${Math.round(d.kg).toLocaleString()} kg`:""}</span>
         ))}
       </div>}
+      {/* GRÁFICOS */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
+        <DonutDash data={pieTipo} title="Peso por tipo (kg)" unidad="kg"/>
+        <BarChartDash data={barMaq} title="Peso por máquina" sub="Eje X: máquina" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
+      </div>
       <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
         <select style={{...selStyle,maxWidth:190}} value={fMaq} onChange={e=>setFMaq(e.target.value)}><option value="">Todas las máquinas</option>{maquinas.map(m=><option key={m} value={m}>{m}</option>)}</select>
         <select style={{...selStyle,maxWidth:190}} value={fTipo} onChange={e=>setFTipo(e.target.value)}><option value="">Todos los tipos</option>{tipos.map(t=><option key={t} value={t}>{t}</option>)}</select>
