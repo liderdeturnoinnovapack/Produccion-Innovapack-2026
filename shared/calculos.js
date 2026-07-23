@@ -193,7 +193,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -242,6 +242,25 @@ function loadPedidosExtra(){ try{ const r=localStorage.getItem('pedidos-extra');
 function savePedidosExtra(arr){ try{ localStorage.setItem('pedidos-extra', JSON.stringify(arr)); }catch(e){} postConfig_('pedidos_extra', arr); }
 function loadPedidos(){ return (window.PEDIDOS_BASE||[]).concat(loadPedidosExtra()); }
 function agregarPedido(p){ const arr=loadPedidosExtra(); arr.push(p); savePedidosExtra(arr); return arr; }
+/* ===== AJUSTES DE INVENTARIO (salidas / correcciones) =====
+   Cada ajuste resta unidades del disponible de una referencia.
+   Requiere motivo obligatorio. Se comparte para todo el equipo.
+   Estructura: {id, fecha, siesa, referencia, cantidad, motivo, observaciones} */
+function _ajId(){ return 'aj_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+function loadAjustes(){ try{ var r=localStorage.getItem('ajustes-inventario'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function saveAjustes(arr){ try{ localStorage.setItem('ajustes-inventario', JSON.stringify(arr)); }catch(e){} postConfig_('ajustes_inventario', arr); }
+function registrarAjuste(a){
+  var arr=loadAjustes();
+  arr.push(Object.assign({}, a, {id:_ajId(), registradoEn:new Date().toISOString()}));
+  saveAjustes(arr);
+  return arr;
+}
+/* Total ajustado (restado) para un siesa específico. */
+function totalAjustado(siesa){
+  return loadAjustes().filter(function(a){ return String(a.siesa).trim()===String(siesa).trim(); })
+    .reduce(function(s,a){ return s+(Number(a.cantidad)||0); }, 0);
+}
+
 /* ===== DESPACHOS =====
    Cada despacho vincula un N° de pedido + item con su remisión, cantidad despachada
    y datos de envío. Al despachar parcialmente, el pendiente del pedido se reduce.
@@ -351,7 +370,14 @@ function inventarioBodegaPT(reports, okSet){
     if(enKg){ g.kg+=Number(x.und)||0; } else { g.unidades+=Number(x.und)||0; g.kg+=(Number(x.und)||0)*pu; }
     g.desdeCorte=true; if(!g.ultima) g.ultima=corte;
   });
-  // + producción confirmada POSTERIOR al corte (lo previo ya está en el corte)
+  // Descontar ajustes de salida (eliminaciones manuales con causa)
+  loadAjustes().forEach(function(a){
+    var g=map[String(a.siesa||'').trim()]; if(!g) return;
+    var cant=Number(a.cantidad)||0;
+    var pu2=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0;
+    g.unidades=Math.max(0, g.unidades-cant);
+    g.kg=Math.max(0, g.kg-cant*pu2);
+  });  // + producción confirmada POSTERIOR al corte (lo previo ya está en el corte)
   (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;
     if(okSet && !okSet.has(reporteId(r))) return;

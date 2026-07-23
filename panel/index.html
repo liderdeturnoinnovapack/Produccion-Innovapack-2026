@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712y"></script>
-<script src="../shared/config.js?v=20260712y"></script>
-<script src="../shared/inventario_base.js?v=20260712y"></script>
-<script src="../shared/sku_maestro.js?v=20260712y"></script>
-<script src="../shared/pedidos_base.js?v=20260712y"></script>
-<script src="../shared/calculos.js?v=20260712y"></script>
+<script src="../shared/data.js?v=20260712z"></script>
+<script src="../shared/config.js?v=20260712z"></script>
+<script src="../shared/inventario_base.js?v=20260712z"></script>
+<script src="../shared/sku_maestro.js?v=20260712z"></script>
+<script src="../shared/pedidos_base.js?v=20260712z"></script>
+<script src="../shared/calculos.js?v=20260712z"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1581,18 +1581,136 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
   );
 }
 
+/* ===== AJUSTE DE INVENTARIO (salida con causa) ===== */
+const MOTIVOS_AJUSTE=[
+  'Devolución a cliente','Producto dañado / no conforme',
+  'Ajuste de inventario','Traslado interno','Otro'
+];
+function AjusteForm({siesa, referencia, disponible, onClose, onSaved}){
+  const hoy=new Date().toISOString().slice(0,10);
+  const [f,setF]=useState({fecha:hoy, cantidad:'', motivo:MOTIVOS_AJUSTE[0], motivoOtro:'', observaciones:''});
+  const [msg,setMsg]=useState('');
+  const maxDisp=Math.round(disponible||0);
+  function guardar(e){
+    e.preventDefault();
+    const cant=Number(f.cantidad);
+    if(!cant||cant<=0){ setMsg('La cantidad debe ser mayor que 0.'); return; }
+    if(cant>maxDisp){ setMsg('No puedes restar más que el disponible ('+maxDisp.toLocaleString()+' und).'); return; }
+    const motivoFinal=f.motivo==='Otro'?(f.motivoOtro.trim()||'Otro'):f.motivo;
+    if(f.motivo==='Otro'&&!f.motivoOtro.trim()){ setMsg('Describe el motivo.'); return; }
+    registrarAjuste({fecha:f.fecha, siesa:String(siesa), referencia, cantidad:cant, motivo:motivoFinal, observaciones:f.observaciones.trim()});
+    onSaved&&onSaved(); onClose&&onClose();
+  }
+  const lab={fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
+  return(
+    <Modal title={'✂️ Ajuste de salida · '+((referencia||'').slice(0,40))} onClose={onClose}>
+      <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>
+        Código: <b style={{fontFamily:'var(--mono)'}}>{siesa}</b> · Disponible actual: <b style={{color:'var(--amber)'}}>{maxDisp.toLocaleString()} und</b><br/>
+        Esta operación <b>resta unidades permanentemente</b> del inventario y queda registrada con causa.
+      </div>
+      <form onSubmit={guardar} style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div><div style={lab}>Fecha del ajuste</div><input type="date" style={inputStyle} value={f.fecha} onChange={e=>setF({...f,fecha:e.target.value})}/></div>
+        <div>
+          <div style={lab}>Cantidad a restar * (máx. {maxDisp.toLocaleString()})</div>
+          <input type="number" min="1" max={maxDisp} style={inputStyle} value={f.cantidad} onChange={e=>setF({...f,cantidad:e.target.value})} placeholder={maxDisp.toLocaleString()}/>
+        </div>
+        <div style={{gridColumn:'1/-1'}}>
+          <div style={lab}>Motivo *</div>
+          <select style={inputStyle} value={f.motivo} onChange={e=>setF({...f,motivo:e.target.value})}>
+            {MOTIVOS_AJUSTE.map(m=><option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        {f.motivo==='Otro' && (
+          <div style={{gridColumn:'1/-1'}}><div style={lab}>Describe el motivo *</div><input style={inputStyle} value={f.motivoOtro} onChange={e=>setF({...f,motivoOtro:e.target.value})} placeholder="Ej: Envío a muestras, faltante en conteo…"/></div>
+        )}
+        <div style={{gridColumn:'1/-1'}}><div style={lab}>Observaciones (opcional)</div><input style={inputStyle} value={f.observaciones} onChange={e=>setF({...f,observaciones:e.target.value})} placeholder="Detalles adicionales"/></div>
+        <div style={{gridColumn:'1/-1',display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}>
+          <span style={{fontSize:12,color:'var(--bad)'}}>{msg}</span>
+          <button type="submit" style={{background:'var(--bad)',color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',fontWeight:700,cursor:'pointer'}}>✂️ Confirmar ajuste</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ===== HISTORIAL DE AJUSTES DE INVENTARIO ===== */
+function HistorialAjustes({onVer}){
+  const [buscar,setBuscar]=useState('');
+  const [fMotivo,setFMotivo]=useState('Todos');
+  const [fDesde,setFDesde]=useState('');
+  const [fHasta,setFHasta]=useState('');
+  const sort=useSort('fecha','desc');
+  const selStyle={...inputStyle,fontSize:12,padding:'7px 10px'};
+  const ajustes=loadAjustes();
+  const motivos=['Todos',...new Set(ajustes.map(a=>a.motivo).filter(Boolean))].sort();
+  let list=ajustes;
+  if(fMotivo!=='Todos') list=list.filter(a=>a.motivo===fMotivo);
+  if(fDesde) list=list.filter(a=>(a.fecha||'')>=fDesde);
+  if(fHasta) list=list.filter(a=>(a.fecha||'')<=fHasta);
+  if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(a=>((a.siesa||'')+' '+(a.referencia||'')+' '+(a.motivo||'')).toLowerCase().includes(q)); }
+  const getV=(a,k)=> k==='fecha'?(a.fecha||'') : k==='siesa'?String(a.siesa||'') : k==='referencia'?(a.referencia||'') : k==='cantidad'?(Number(a.cantidad)||0) : k==='motivo'?(a.motivo||'') : '';
+  list=aplicarOrden(list, sort, getV);
+  const totRest=list.reduce((s,a)=>s+(Number(a.cantidad)||0),0);
+  return(
+    <div style={{marginBottom:20}}>
+      <div style={{fontSize:13,fontWeight:700,marginBottom:12,fontFamily:'var(--head)'}}>📋 Historial de ajustes de inventario</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:14}}>
+        <InvCard label="Ajustes registrados" value={list.length.toLocaleString()} color="var(--accent)"/>
+        <InvCard label="Unidades restadas" value={Math.round(totRest).toLocaleString()} color="var(--bad)"/>
+        <InvCard label="Referencias afectadas" value={new Set(list.map(a=>a.siesa)).size.toLocaleString()} color="var(--amber)"/>
+      </div>
+      <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+        <input style={{...selStyle,maxWidth:280}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar código, referencia, motivo…"/>
+        <select style={{...selStyle,maxWidth:200}} value={fMotivo} onChange={e=>setFMotivo(e.target.value)}>{motivos.map(m=><option key={m} value={m}>{m}</option>)}</select>
+        <input type="date" style={{...selStyle,maxWidth:145}} value={fDesde} onChange={e=>setFDesde(e.target.value)} title="Desde"/>
+        <input type="date" style={{...selStyle,maxWidth:145}} value={fHasta} onChange={e=>setFHasta(e.target.value)} title="Hasta"/>
+        {(fMotivo!=='Todos'||fDesde||fHasta) && <button onClick={()=>{setFMotivo('Todos');setFDesde('');setFHasta('');}} style={{background:'#FEE2E2',color:'var(--bad)',border:'none',borderRadius:8,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>✕ Limpiar</button>}
+        <span style={{fontSize:11.5,color:'var(--text-dim)'}}>↕ toca encabezado para ordenar</span>
+      </div>
+      <div style={{overflowX:'auto',overflowY:'auto',maxHeight:440,border:'1px solid var(--line)',borderRadius:12,background:'var(--card)',boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+          <thead><tr style={{background:'var(--panel-2)',textAlign:'left',borderBottom:'1px solid var(--line)'}}>
+            <ThSort label="Fecha" k="fecha" sort={sort}/>
+            <ThSort label="Código" k="siesa" sort={sort}/>
+            <ThSort label="Referencia" k="referencia" sort={sort}/>
+            <ThSort label="Cant. restada" k="cantidad" sort={sort}/>
+            <ThSort label="Motivo" k="motivo" sort={sort}/>
+            <th style={{padding:'9px 10px',color:'var(--th-text)',fontWeight:700,whiteSpace:'nowrap',position:'sticky',top:0,background:'var(--panel-2)'}}>Observaciones</th>
+          </tr></thead>
+          <tbody>
+            {list.map((a,i)=>(
+              <tr key={a.id||i} style={{borderTop:'1px solid var(--line)'}}>
+                <td style={{padding:'8px 10px',fontFamily:'var(--mono)',whiteSpace:'nowrap'}}>{fechaLarga(a.fecha)||a.fecha||'-'}</td>
+                <td style={{padding:'8px 10px',fontFamily:'var(--mono)',fontSize:12}}>{a.siesa||'-'}</td>
+                <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>{a.referencia||'-'}</td>
+                <td style={{padding:'8px 10px',fontFamily:'var(--mono)',fontWeight:700,color:'var(--bad)'}}>-{Math.round(Number(a.cantidad)||0).toLocaleString()}</td>
+                <td style={{padding:'8px 10px'}}><span style={{background:'rgba(220,38,38,0.1)',color:'var(--bad)',borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:600}}>{a.motivo||'-'}</span></td>
+                <td style={{padding:'8px 10px',color:'var(--text-dim)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.observaciones||'-'}</td>
+              </tr>
+            ))}
+            {list.length===0 && <tr><td colSpan="6" style={{padding:18,textAlign:'center',color:'var(--text-dim)'}}>No hay ajustes registrados.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ===== FASE C: BODEGA DE INVENTARIO (solo lo confirmado en SIESA, antesala de Despachos) ===== */
 function BodegaInventario({reports, okSet}){
+  const [subTab,setSubTab]=useState('inv');
   const [buscar,setBuscar]=useState("");
   const [fCategoria,setFCategoria]=useState("Todas");
   const [fSector,setFSector]=useState("Todos");
   const [fCliente,setFCliente]=useState("Todos");
   const [showFilter,setShowFilter]=useState(false);
   const [traza,setTraza]=useState(null);
+  const [ajustando,setAjustando]=useState(null); // {siesa,referencia,disponible}
+  const [ver,setVer]=useState(0);
   const sort=useSort('unidades','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   // Inventario físico del corte + producción confirmada posterior al corte.
-  const invAll=inventarioBodegaPT(reports, okSet);
+  const invAll=inventarioBodegaPT(reports, okSet); ver;
   const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
   const sectores=["Todos",...new Set(invAll.map(x=>x.sector).filter(s=>s&&s!=="-"))].sort();
   const clientesInv=["Todos",...new Set(invAll.map(x=>clienteDe(x.siesa)).filter(Boolean))].sort();
@@ -1617,7 +1735,17 @@ function BodegaInventario({reports, okSet}){
   return (
     <div style={{marginBottom:26}}>
       <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>🏬 Bodega de Inventario <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(confirmado en SIESA · listo para despacho)</span></div>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:16}}>Inventario físico del <b>corte (17/07)</b> + producción confirmada en SIESA <b>posterior al corte</b>. Antesala de <b>Despachos</b>. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Inventario físico del <b>corte (17/07)</b> + producción confirmada en SIESA <b>posterior al corte</b>. Antesala de <b>Despachos</b>. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
+
+      {/* SUB-PESTAÑAS */}
+      <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
+        {[['inv','📦 Inventario ('+invAll.length+')'],['ajustes','✂️ Ajustes ('+loadAjustes().length+')']].map(([k,label])=>(
+          <button key={k} onClick={()=>setSubTab(k)} style={{background:subTab===k?"var(--card)":"transparent",color:subTab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subTab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subTab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+        ))}
+      </div>
+
+      {subTab==='ajustes' && <HistorialAjustes key={"haj_"+ver}/>}
+      {subTab==='inv' && <>
 
       {/* 1) TARJETAS */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:18}}>
@@ -1663,6 +1791,7 @@ function BodegaInventario({reports, okSet}){
             <ThSort label="Reportes" k="reportes" sort={sort}/>
             <ThSort label="Últ. ingreso" k="ultima" sort={sort}/>
             <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>Trazabilidad</th>
+            <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>Ajuste</th>
           </tr></thead>
           <tbody>
             {invOrden.slice(0,500).map((x,i)=>{
@@ -1681,6 +1810,9 @@ function BodegaInventario({reports, okSet}){
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",textAlign:"center"}}>{x.reportes}</td>
                 <td style={{padding:"8px 10px",fontSize:12,fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{ddTxt}</td>
                 <td style={{padding:"8px 10px",color:"var(--accent)",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>🔎 ver</td>
+                <td style={{padding:"8px 8px",whiteSpace:"nowrap"}}>
+                  <button title="Registrar salida / ajuste de inventario" onClick={e=>{e.stopPropagation();setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.unidades});}} style={{background:"rgba(220,38,38,0.1)",color:"var(--bad)",border:"1px solid rgba(220,38,38,0.2)",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✂️</button>
+                </td>
               </tr>
             );})}
             {inv.length===0 && <tr><td colSpan="11" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>Aún no hay producción confirmada en SIESA. Marca los reportes pendientes (arriba) para que entren a la bodega.</td></tr>}
@@ -1689,6 +1821,8 @@ function BodegaInventario({reports, okSet}){
       </div>
       {inv.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {inv.length.toLocaleString()}. Usa el buscador para acotar.</div>}
       {traza && <TrazabilidadModal siesa={traza} reports={reports} onClose={()=>setTraza(null)}/>}
+      </>}
+      {ajustando && <AjusteForm {...ajustando} onClose={()=>setAjustando(null)} onSaved={()=>{ setAjustando(null); setVer(v=>v+1); }}/>}
     </div>
   );
 }
