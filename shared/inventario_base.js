@@ -610,7 +610,7 @@ window.INVENTARIO_BASE = {
   {
    "siesa": "5020265",
    "referencia": "BOLSA ABIERTA PEGA BUENO PORCEL 25 KG",
-   "und": 29700
+   "und": 27900
   },
   {
    "siesa": "5010399",
