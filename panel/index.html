@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712z2"></script>
-<script src="../shared/config.js?v=20260712z2"></script>
-<script src="../shared/inventario_base.js?v=20260712z2"></script>
-<script src="../shared/sku_maestro.js?v=20260712z2"></script>
-<script src="../shared/pedidos_base.js?v=20260712z2"></script>
-<script src="../shared/calculos.js?v=20260712z2"></script>
+<script src="../shared/data.js?v=20260712z3"></script>
+<script src="../shared/config.js?v=20260712z3"></script>
+<script src="../shared/inventario_base.js?v=20260712z3"></script>
+<script src="../shared/sku_maestro.js?v=20260712z3"></script>
+<script src="../shared/pedidos_base.js?v=20260712z3"></script>
+<script src="../shared/calculos.js?v=20260712z3"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1530,14 +1530,14 @@ function DetalleReporteModal({r, onClose}){
   const mKg=mermaKg(r);
   const pu=pesoUnidad(r,pesos);
   return(
-    <Modal title={"📋 Reporte · "+(r.consecutivo||r.maquina||"")} onClose={onClose}>
+    <Modal title={"📋 "+String(r.siesa||'')+" · "+(r.referencia||'').slice(0,40)} onClose={onClose}>
       <div style={{fontSize:11.5,color:"var(--text-dim)",marginBottom:14,padding:"8px 12px",background:"rgba(234,179,8,0.08)",borderRadius:8,border:"1px solid rgba(234,179,8,0.2)"}}>
         ⏳ Pendiente de ingreso a SIESA. Usa esta información para cargarlo y luego márcalo con ✓.
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
         {[
           {label:"Producción",val:(r.produccion||0).toLocaleString()+" "+(r.unidad||""),color:"var(--good)"},
-          {label:"Peso estimado",val:prodKg>0?"≈ "+Math.round(prodKg).toLocaleString()+" kg":"-",color:"var(--good)"},
+          {label:String(r.unidad||'').toLowerCase().indexOf('kg')===0?"Producción (kg)":"Peso estimado",val:String(r.unidad||'').toLowerCase().indexOf('kg')===0?Math.round(r.produccion||0).toLocaleString()+" kg":(prodKg>0?"≈ "+Math.round(prodKg).toLocaleString()+" kg":"-"),color:"var(--good)"},
           {label:"Merma",val:mKg>0?"≈ "+Math.round(mKg).toLocaleString()+" kg":(r.mermasCantidad||"-"),color:"var(--bad)"},
         ].map(x=>(
           <div key={x.label} style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
@@ -1547,10 +1547,10 @@ function DetalleReporteModal({r, onClose}){
         ))}
       </div>
       <div style={{overflowY:"auto",maxHeight:"55vh"}}>
-        {fila("Consecutivo",r.consecutivo,true)}
         {fila("Código SIESA",r.siesa,true)}
-        {fila("SKU",r.sku,true)}
         {fila("Referencia",r.referencia)}
+        {fila("Consecutivo",r.consecutivo,true)}
+        {fila("SKU",r.sku,true)}
         {fila("Fecha reporte",r.fecha)}
         {fila("Fecha turno",fechaLarga(getFechaISO(r))||r.fechaTurno)}
         {fila("Turno",r.turno)}
