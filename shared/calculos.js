@@ -554,7 +554,22 @@ async function loadReports(url, pin){
     const resp = await fetch(url);
     const data = await resp.json();
     if(!Array.isArray(data)) return [];
-    return data.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
+    var arr = data.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
+    /* IDs UNICOS: varios reportes pueden compartir maquina+consecutivo (o venir
+       sin consecutivo, quedando como "Maquina_-"). Eso genera keys de React
+       repetidas -> filas duplicadas/omitidas y, al marcar una casilla de SIESA,
+       se marcarian TODOS los reportes con ese id (corrompiendo la vista).
+       Deduplicamos: la 1a aparicion conserva su id (para no perder los checks
+       ya guardados) y las repeticiones reciben un sufijo estable "#2", "#3"... */
+    var _seen = Object.create(null);
+    arr.forEach(function(r){
+      var base = r.id || ((String(r.maquina||'X')).replace(/\s+/g,'_')+'_'+(r.consecutivo||r.ts||''));
+      var id = base, k = 1;
+      while(_seen[id]){ k++; id = base + '#' + k; }
+      _seen[id] = true;
+      r.id = id;
+    });
+    return arr;
   }catch(e){ return []; }
 }
 
