@@ -93,43 +93,24 @@ function normalizarReporte(r){
       var hh=Math.floor(totalMin/60), mm=totalMin%60;
       return ('0'+hh).slice(-2)+':'+('0'+mm).slice(-2);
     }
-    // En reportes del Apps Script viejo, Fecha Turno y Consecutivo estaban
-    // invertidos: 'Fecha Turno' contenía el consecutivo (ej: 'EX1-0001') y
-    // 'Consecutivo' contenía '-'. Detectamos el caso y los intercambiamos.
+    // Reportes antiguos: 'Fecha Turno' guardaba el consecutivo (ej: 'EX1-0001') y
+    // 'Consecutivo' guardaba '-'. Si "Fecha Turno" tiene forma de consecutivo
+    // (letras + guión + 4 dígitos, no una fecha ISO), los intercambiamos.
+    // NOTA: se conserva porque MUCHOS reportes históricos tienen este formato.
     var rawFechaTurno = String(r['Fecha Turno']||'');
     var rawConsecutivo = String(r['Consecutivo']||'');
-    // Si "Fecha Turno" parece un consecutivo (letras + guión + números, sin 'T' de ISO)
     var pareceConsecutivo = /^[A-Z]{2,4}[-_]\d{4}$/i.test(rawFechaTurno.trim());
     var fechaTurnoFinal = pareceConsecutivo ? rawConsecutivo : rawFechaTurno;
     var consecutivoFinal = pareceConsecutivo ? rawFechaTurno : rawConsecutivo;
-    // En reportes viejos los campos también estaban desplazados: Turno tenía la hora,
-    // Maquina tenía el operario, Nombre tenía el cargo, Cargo tenía la máquina real,
-    // Hora inicio/final tenían fechas Turno y consecutivo. Detectamos por el patrón.
-    var turnoFinal = r['Turno']||'';
-    var maquinaFinal = r['Maquina']||'';
-    var nombreFinal = r['Nombre']||'';
-    var cargoFinal = r['Cargo']||'';
-    // Si "Turno" parece una fecha ISO 1899 → es un reporte viejo con campos desplazados
-    var turnoEsFechaISO = /^1899-/.test(String(turnoFinal));
-    if(turnoEsFechaISO){
-      // En el viejo: Nombre=cargo, Cargo=máquina, Maquina=operario, Turno=horaInicio
-      // El turno real estaba en la columna que ahora viene como 'Hora inicio' pero con
-      // otro valor. No podemos recuperarlo limpiamente, lo dejamos vacío.
-      turnoFinal = '';
-      // Cargo=máquina, Maquina=operario, Nombre=cargo → reordenar
-      maquinaFinal = r['Cargo']||'';
-      nombreFinal = r['Maquina']||'';
-      cargoFinal = r['Nombre']||'';
-    }
     out = {
       ts: tsVal,
       fecha: fechaStr,
-      nombre: nombreFinal,
-      cargo: cargoFinal,
-      maquina: maquinaFinal,
+      nombre: r['Nombre']||'',
+      cargo: r['Cargo']||'',
+      maquina: r['Maquina']||'',
       horaInicio: parseHora(r['Hora inicio']),
       horaFinal: parseHora(r['Hora final']),
-      turno: turnoFinal,
+      turno: r['Turno']||'',
       siesa: String(r['Codigo Siesa']||r['SKU']||''),
       sku: String(r['SKU']||r['Codigo Siesa']||''),
       referencia: r['Referencia']||'',
