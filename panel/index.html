@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712p"></script>
-<script src="../shared/config.js?v=20260712p"></script>
-<script src="../shared/inventario_base.js?v=20260712p"></script>
-<script src="../shared/sku_maestro.js?v=20260712p"></script>
-<script src="../shared/pedidos_base.js?v=20260712p"></script>
-<script src="../shared/calculos.js?v=20260712p"></script>
+<script src="../shared/data.js?v=20260712q"></script>
+<script src="../shared/config.js?v=20260712q"></script>
+<script src="../shared/inventario_base.js?v=20260712q"></script>
+<script src="../shared/sku_maestro.js?v=20260712q"></script>
+<script src="../shared/pedidos_base.js?v=20260712q"></script>
+<script src="../shared/calculos.js?v=20260712q"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1753,9 +1753,9 @@ function Despachos({reports, okSet}){
               <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{p.fecha?fechaLarga(p.fecha):"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{p.pedido||"-"}</td>
-                <td style={{padding:"8px 10px",maxWidth:190,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.cliente||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.cliente||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{p.item||"-"}</td>
-                <td style={{padding:"8px 10px",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.resumen||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.resumen||"-"}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5}}>{p.estado||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(Number(p.pedida)||0).toLocaleString()}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--amber)"}}>{Math.round(Number(p.pendiente)||0).toLocaleString()}</td>
