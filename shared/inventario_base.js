@@ -125,7 +125,7 @@ window.INVENTARIO_BASE = {
   {
    "siesa": "5020264",
    "referencia": "BOLSA ABIERTA PEGA BUENO CERAM 25 KG",
-   "und": 7140
+   "und": 42300
   },
   {
    "siesa": "5010314",
@@ -606,6 +606,16 @@ window.INVENTARIO_BASE = {
    "siesa": "5020281",
    "referencia": "BOLSA VAL BRICO CERAMICO 40 KG",
    "und": 2
+  },
+  {
+   "siesa": "5020265",
+   "referencia": "BOLSA ABIERTA PEGA BUENO PORCEL 25 KG",
+   "und": 29700
+  },
+  {
+   "siesa": "5010399",
+   "referencia": "BOLSA AB ESTUCO BUENO MAX 25 KG",
+   "und": 20978
   }
  ],
  "ppRollos": [
