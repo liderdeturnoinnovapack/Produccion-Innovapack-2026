@@ -603,6 +603,16 @@ window.INVENTARIO_BASE = {
 ],
 "ppRollos": [
 {
+"siesa": "5991014",
+"desc": "LAMTRA81CMCAL3,0/3,3",
+"kg": 756.0
+},
+{
+"siesa": "5991033",
+"desc": "LAMBLA85/86CMCAL4,3",
+"kg": 1774.0
+},
+{
 "siesa": "5990115",
 "desc": "TUBBLA42CMCAL3,8",
 "kg": 495.0
