@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712v"></script>
-<script src="../shared/config.js?v=20260712v"></script>
-<script src="../shared/inventario_base.js?v=20260712v"></script>
-<script src="../shared/sku_maestro.js?v=20260712v"></script>
-<script src="../shared/pedidos_base.js?v=20260712v"></script>
-<script src="../shared/calculos.js?v=20260712v"></script>
+<script src="../shared/data.js?v=20260712w"></script>
+<script src="../shared/config.js?v=20260712w"></script>
+<script src="../shared/inventario_base.js?v=20260712w"></script>
+<script src="../shared/sku_maestro.js?v=20260712w"></script>
+<script src="../shared/pedidos_base.js?v=20260712w"></script>
+<script src="../shared/calculos.js?v=20260712w"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1732,41 +1732,213 @@ function PedidoForm({onClose, onSaved}){
   );
 }
 
+/* ===== FORMULARIO: REGISTRAR DESPACHO ===== */
+function DespachoForm({pedido, item, resumen, cliente, pendienteActual, onClose, onSaved}){
+  const hoy=new Date().toISOString().slice(0,10);
+  const [f,setF]=useState({fechaSalida:hoy, remision:"", cantDespachada:"", tipoEntrega:"cliente", transportadora:"", observaciones:""});
+  const [msg,setMsg]=useState("");
+  const dispMax=Math.round(pendienteActual||0);
+  function guardar(e){
+    e.preventDefault();
+    const cant=Number(f.cantDespachada);
+    if(!f.fechaSalida){ setMsg("La fecha de salida es obligatoria."); return; }
+    if(!f.remision.trim()){ setMsg("El N° de remisión es obligatorio."); return; }
+    if(!cant||cant<=0){ setMsg("La cantidad despachada debe ser mayor que 0."); return; }
+    if(cant>dispMax){ setMsg(`No puedes despachar más que el pendiente (${dispMax.toLocaleString()}).`); return; }
+    if(f.tipoEntrega==='transportadora'&&!f.transportadora.trim()){ setMsg("Indica el nombre de la transportadora."); return; }
+    registrarDespacho({
+      fechaSalida:f.fechaSalida, pedido, item, resumen, cliente,
+      remision:f.remision.trim(), cantDespachada:cant,
+      tipoEntrega:f.tipoEntrega, transportadora:f.transportadora.trim(),
+      observaciones:f.observaciones.trim()
+    });
+    onSaved&&onSaved();
+    onClose&&onClose();
+  }
+  const lab={fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4};
+  return(
+    <Modal title={"📦 Registrar despacho"} onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>
+        <b>{resumen||item}</b> — cliente: <b>{cliente||"—"}</b><br/>
+        Pendiente actual: <b style={{color:"var(--amber)"}}>{dispMax.toLocaleString()} und</b>. Puedes despachar parcial o total.
+      </div>
+      <form onSubmit={guardar} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div><div style={lab}>Fecha de salida *</div><input type="date" style={inputStyle} value={f.fechaSalida} onChange={e=>setF({...f,fechaSalida:e.target.value})}/></div>
+        <div><div style={lab}>N° Remisión (SIESA) *</div><input style={inputStyle} value={f.remision} onChange={e=>setF({...f,remision:e.target.value})} placeholder="Ej: REM-0001234"/></div>
+        <div>
+          <div style={lab}>Cant. a despachar * (máx. {dispMax.toLocaleString()})</div>
+          <input type="number" min="1" max={dispMax} style={inputStyle} value={f.cantDespachada} onChange={e=>setF({...f,cantDespachada:e.target.value})} placeholder={dispMax.toLocaleString()}/>
+        </div>
+        <div>
+          <div style={lab}>Tipo de entrega</div>
+          <select style={inputStyle} value={f.tipoEntrega} onChange={e=>setF({...f,tipoEntrega:e.target.value})}>
+            <option value="cliente">🏢 Cliente recoge</option>
+            <option value="transportadora">🚛 Transportadora</option>
+          </select>
+        </div>
+        {f.tipoEntrega==='transportadora' && (
+          <div style={{gridColumn:"1/-1"}}>
+            <div style={lab}>Transportadora *</div>
+            <input style={inputStyle} value={f.transportadora} onChange={e=>setF({...f,transportadora:e.target.value})} placeholder="Ej: Servientrega, TCC, Envia, Coordinadora…"/>
+          </div>
+        )}
+        <div style={{gridColumn:"1/-1"}}><div style={lab}>Observaciones (guía, notas…)</div><input style={inputStyle} value={f.observaciones} onChange={e=>setF({...f,observaciones:e.target.value})} placeholder="Opcional"/></div>
+        <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+          <span style={{fontSize:12,color:"var(--bad)"}}>{msg}</span>
+          <button type="submit" style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>✅ Confirmar despacho</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ===== LUPA: HISTORIAL DE DESPACHOS DE UN PEDIDO ===== */
+function HistorialDespachosPedido({pedido, item, resumen, cliente, onClose}){
+  const hist=despachosDePedido(pedido, item).sort((a,b)=>(b.fechaSalida||'').localeCompare(a.fechaSalida||''));
+  const total=hist.reduce((s,d)=>s+(Number(d.cantDespachada)||0),0);
+  const th={padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"};
+  return(
+    <Modal title={"🔎 Despachos del pedido "+pedido} onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>
+        <b>{resumen||item}</b> · cliente: <b>{cliente||"—"}</b> · Total despachado: <b style={{color:"var(--good)"}}>{total.toLocaleString()} und</b>
+      </div>
+      {hist.length===0
+        ? <div style={{padding:20,textAlign:"center",color:"var(--text-dim)"}}>Aún no hay despachos registrados para este pedido.</div>
+        : <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+              <thead><tr style={{background:"var(--panel-2)",borderBottom:"1px solid var(--line)"}}>
+                {["Fecha salida","Remisión","Cant. despachada","Tipo entrega","Transportadora","Observaciones"].map(h=><th key={h} style={th}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {hist.map((d,i)=>(
+                  <tr key={d.id||i} style={{borderTop:"1px solid var(--line)"}}>
+                    <td style={{padding:"8px 10px",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{fechaLarga(d.fechaSalida)||d.fechaSalida||"-"}</td>
+                    <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{d.remision||"-"}</td>
+                    <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--good)"}}>{Math.round(Number(d.cantDespachada)||0).toLocaleString()}</td>
+                    <td style={{padding:"8px 10px"}}>{d.tipoEntrega==='transportadora'?'🚛 Transportadora':'🏢 Cliente recoge'}</td>
+                    <td style={{padding:"8px 10px"}}>{d.transportadora||"-"}</td>
+                    <td style={{padding:"8px 10px",color:"var(--text-dim)"}}>{d.observaciones||"-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+      }
+    </Modal>
+  );
+}
+
+/* ===== HISTORIAL GENERAL DE DESPACHOS ===== */
+function HistorialDespachos(){
+  const [buscar,setBuscar]=useState("");
+  const [fTipo,setFTipo]=useState("Todos");
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
+  const sort=useSort('fechaSalida','desc');
+  const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
+  const desp=loadDespachos();
+  let list=desp;
+  if(fTipo!=="Todos") list=list.filter(d=>d.tipoEntrega===fTipo);
+  if(fDesde) list=list.filter(d=>(d.fechaSalida||'')>=fDesde);
+  if(fHasta) list=list.filter(d=>(d.fechaSalida||'')<=fHasta);
+  if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(d=>((d.pedido||'')+' '+(d.remision||'')+' '+(d.cliente||'')+' '+(d.resumen||'')+' '+(d.transportadora||'')).toLowerCase().includes(q)); }
+  const getV=(d,k)=> k==='fechaSalida'?(d.fechaSalida||'') : k==='pedido'?(d.pedido||'') : k==='remision'?(d.remision||'') : k==='cliente'?(d.cliente||'') : k==='resumen'?(d.resumen||'') : k==='cantDespachada'?(Number(d.cantDespachada)||0) : k==='tipoEntrega'?(d.tipoEntrega||'') : k==='transportadora'?(d.transportadora||'') : '';
+  list=aplicarOrden(list, sort, getV);
+  const totDespachado=list.reduce((s,d)=>s+(Number(d.cantDespachada)||0),0);
+  const nPedidos=new Set(list.map(d=>d.pedido)).size;
+  return(
+    <div style={{marginBottom:26}}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📋 Historial de despachos</div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>Todos los despachos registrados. Cada registro reduce el pendiente del pedido correspondiente.</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:18}}>
+        <InvCard label="Despachos" value={list.length.toLocaleString()} color="var(--accent)"/>
+        <InvCard label="Pedidos distintos" value={nPedidos.toLocaleString()} color="var(--brand-blue)"/>
+        <InvCard label="Unidades despachadas" value={Math.round(totDespachado).toLocaleString()} color="var(--good)"/>
+        <InvCard label="Transportadoras" value={list.filter(d=>d.tipoEntrega==='transportadora').length.toLocaleString()} color="var(--amber)" sub="registros con transportadora"/>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar pedido, remisión, cliente…"/>
+        <select style={{...selStyle,maxWidth:190}} value={fTipo} onChange={e=>setFTipo(e.target.value)}>
+          <option value="Todos">Todos los tipos</option>
+          <option value="cliente">🏢 Cliente recoge</option>
+          <option value="transportadora">🚛 Transportadora</option>
+        </select>
+        <input type="date" style={{...selStyle,maxWidth:150}} value={fDesde} onChange={e=>setFDesde(e.target.value)} title="Fecha salida desde"/>
+        <input type="date" style={{...selStyle,maxWidth:150}} value={fHasta} onChange={e=>setFHasta(e.target.value)} title="Fecha salida hasta"/>
+        {(fTipo!=="Todos"||fDesde||fHasta) && <button onClick={()=>{setFTipo("Todos");setFDesde("");setFHasta("");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar</button>}
+        <span style={{fontSize:11.5,color:"var(--text-dim)"}}>↕ toca encabezado para ordenar</span>
+      </div>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+            <ThSort label="Fecha salida" k="fechaSalida" sort={sort}/>
+            <ThSort label="N° Pedido" k="pedido" sort={sort}/>
+            <ThSort label="Remisión" k="remision" sort={sort}/>
+            <ThSort label="Cliente" k="cliente" sort={sort}/>
+            <ThSort label="Referencia" k="resumen" sort={sort}/>
+            <ThSort label="Cant. despachada" k="cantDespachada" sort={sort}/>
+            <ThSort label="Tipo entrega" k="tipoEntrega" sort={sort}/>
+            <ThSort label="Transportadora" k="transportadora" sort={sort}/>
+            <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>Observaciones</th>
+          </tr></thead>
+          <tbody>
+            {list.map((d,i)=>(
+              <tr key={d.id||i} style={{borderTop:"1px solid var(--line)"}}>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{fechaLarga(d.fechaSalida)||d.fechaSalida||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{d.pedido||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{d.remision||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{d.cliente||"-"}</td>
+                <td style={{padding:"8px 10px",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.resumen||"-"}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--good)"}}>{Math.round(Number(d.cantDespachada)||0).toLocaleString()}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{d.tipoEntrega==='transportadora'?'🚛 Transportadora':'🏢 Cliente recoge'}</td>
+                <td style={{padding:"8px 10px"}}>{d.transportadora||"-"}</td>
+                <td style={{padding:"8px 10px",color:"var(--text-dim)",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.observaciones||"-"}</td>
+              </tr>
+            ))}
+            {list.length===0 && <tr><td colSpan="9" style={{padding:20,textAlign:"center",color:"var(--text-dim)"}}>No hay despachos registrados aún.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ===== PEDIDOS Y DESPACHOS (vinculado a la Bodega de Inventario) ===== */
 function Despachos({reports, okSet}){
+  const [subTab,setSubTab]=useState('activos');
   const [buscar,setBuscar]=useState("");
   const [fCliente,setFCliente]=useState("Todos");
   const [fEstado,setFEstado]=useState("Todos");
-  const [fInv,setFInv]=useState("Todos");   // Todos / con / sin inventario
+  const [fInv,setFInv]=useState("Todos");
   const [fDesde,setFDesde]=useState("");
   const [fHasta,setFHasta]=useState("");
   const [showFilter,setShowFilter]=useState(false);
   const [showForm,setShowForm]=useState(false);
+  const [despachandoPed,setDespachandoPed]=useState(null);
+  const [lupaHist,setLupaHist]=useState(null);
   const [ver,setVer]=useState(0);
   const sort=useSort('fecha','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
-
-  const pedidos=loadPedidos(); ver; // ver fuerza re-lectura tras agregar
+  const pedidos=loadPedidos(); ver;
   const disp=inventarioDisponible(reports, okSet);
-
-  // Enriquecer + ESTADO AUTOMÁTICO (fecha de montaje + 35 días) + ASIGNACIÓN FIFO por referencia.
-  let all=pedidos.map((p,idx)=>({...p, _idx:idx, estado:estadoPedido(p.fecha), dias:diasMontaje(p.fecha)}));
-  const pool={}; Object.keys(disp).forEach(k=>{ pool[k]=disp[k].unidades; });
-  [...all].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||a._idx-b._idx).forEach(p=>{
-    const key=String(p.item).trim();
-    const pend=Number(p.pendiente)||0;
-    const avail=pool[key]!=null?pool[key]:0;
-    const asign=Math.max(0, Math.min(pend, avail));
-    p.dispAsignado=Math.round(asign);
-    if(pool[key]!=null) pool[key]=avail-asign;
-    p.dispTotal=Math.round(disp[key]?disp[key].unidades:0);
-    p.alcanza = asign>=pend && pend>0;
-    p.parcial = asign>0 && asign<pend;
+  let all=pedidos.map((p,idx)=>{
+    const yaDespachado=totalDespachado(p.pedido, p.item);
+    const pendReal=Math.max(0,(Number(p.pendiente)||0)-yaDespachado);
+    return {...p, _idx:idx, estado:estadoPedido(p.fecha), dias:diasMontaje(p.fecha), yaDespachado, pendReal};
   });
-  const clientes=["Todos",...new Set(all.map(p=>p.cliente).filter(Boolean))].sort();
-  const estados=["Todos",...new Set(all.map(p=>p.estado).filter(Boolean))].sort();
-
-  let list=all;
+  const todos=all;
+  const activos=all.filter(p=>p.pendReal>0);
+  const pool={}; Object.keys(disp).forEach(k=>{ pool[k]=disp[k].unidades; });
+  [...activos].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||a._idx-b._idx).forEach(p=>{
+    const key=String(p.item).trim(), avail=pool[key]!=null?pool[key]:0;
+    const asign=Math.max(0,Math.min(p.pendReal,avail));
+    p.dispAsignado=Math.round(asign); if(pool[key]!=null) pool[key]=avail-asign;
+    p.dispTotal=Math.round(disp[key]?disp[key].unidades:0);
+    p.alcanza=asign>=p.pendReal&&p.pendReal>0; p.parcial=asign>0&&asign<p.pendReal;
+  });
+  const clientes=["Todos",...new Set(activos.map(p=>p.cliente).filter(Boolean))].sort();
+  const estados=["Todos",...new Set(activos.map(p=>p.estado).filter(Boolean))].sort();
+  let list=activos;
   if(fCliente!=="Todos") list=list.filter(p=>p.cliente===fCliente);
   if(fEstado!=="Todos") list=list.filter(p=>p.estado===fEstado);
   if(fInv==="con") list=list.filter(p=>p.dispAsignado>0);
@@ -1774,100 +1946,102 @@ function Despachos({reports, okSet}){
   if(fDesde) list=list.filter(p=>(p.fecha||'')>=fDesde);
   if(fHasta) list=list.filter(p=>(p.fecha||'')<=fHasta);
   if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(p=>((p.cliente||'')+' '+(p.item||'')+' '+(p.resumen||'')+' '+(p.pedido||'')).toLowerCase().includes(q)); }
-  const getV=(p,k)=> k==='fecha'?(p.fecha||'') : k==='pedido'?(p.pedido||'') : k==='cliente'?(p.cliente||'') : k==='item'?(p.item||'') : k==='resumen'?(p.resumen||'') : k==='estado'?(p.estado||'') : k==='pedida'?(Number(p.pedida)||0) : k==='pendiente'?(Number(p.pendiente)||0) : k==='asignado'?(p.dispAsignado||0) : k==='cobertura'?(p.alcanza?2:p.parcial?1:0) : '';
-  list=aplicarOrden(list, sort, getV);
-
-  const totPend=list.reduce((s,p)=>s+(Number(p.pendiente)||0),0);
-  const totPed=list.reduce((s,p)=>s+(Number(p.pedida)||0),0);
-  const nClientes=new Set(list.map(p=>p.cliente)).size;
-  const conInv=list.filter(p=>p.alcanza).length;
-
-  const porEstado={}; list.forEach(p=>{const e=p.estado||'—'; porEstado[e]=(porEstado[e]||0)+1;});
+  const getV=(p,k)=> k==='fecha'?(p.fecha||''):k==='pedido'?(p.pedido||''):k==='cliente'?(p.cliente||''):k==='item'?(p.item||''):k==='resumen'?(p.resumen||''):k==='estado'?(p.estado||''):k==='pedida'?(Number(p.pedida)||0):k==='pendReal'?p.pendReal:k==='asignado'?(p.dispAsignado||0):k==='cobertura'?(p.alcanza?2:p.parcial?1:0):'';
+  list=aplicarOrden(list,sort,getV);
+  const totPend=list.reduce((s,p)=>s+p.pendReal,0), totPed=list.reduce((s,p)=>s+(Number(p.pedida)||0),0);
+  const nClientes=new Set(list.map(p=>p.cliente)).size, conInv=list.filter(p=>p.alcanza).length;
+  const nCerrados=todos.filter(p=>p.pendReal<=0).length;
+  const porEstado={}; list.forEach(p=>{const e=p.estado||'—';porEstado[e]=(porEstado[e]||0)+1;});
   const pieEstado=Object.entries(porEstado).map(([label,val])=>({label,val})).filter(d=>d.val>0);
-  const porCli={}; list.forEach(p=>{const c=p.cliente||'—'; porCli[c]=(porCli[c]||0)+(Number(p.pendiente)||0);});
-  const topCli=Object.entries(porCli).map(([label,val])=>({label:String(label).slice(0,20),val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,10);
-
+  const porCli={}; list.forEach(p=>{const c=p.cliente||'—';porCli[c]=(porCli[c]||0)+p.pendReal;});
+  const topCli=Object.entries(porCli).map(([l,v])=>({label:String(l).slice(0,20),val:Math.round(v)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,10);
   const activeF=[fCliente!=="Todos",fEstado!=="Todos",fInv!=="Todos",!!fDesde,!!fHasta].filter(Boolean).length;
-
+  const nDesp=loadDespachos().length; ver;
   return (
     <div style={{marginBottom:26}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:4}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <div style={{fontSize:15,fontWeight:700,fontFamily:"var(--head)"}}>🚚 Pedidos y Despachos</div>
-          <div style={{fontSize:12,color:"var(--text-dim)",marginTop:2,maxWidth:640}}>Pedidos de clientes vs. lo <b>disponible en la Bodega de Inventario</b> (producción confirmada en SIESA). El ✅ indica que hay inventario suficiente para el pendiente.</div>
+          <div style={{fontSize:12,color:"var(--text-dim)",marginTop:2}}>El pendiente se reduce al registrar despachos. Los pedidos completamente despachados pasan al <b>Historial</b>.</div>
         </div>
         <button onClick={()=>setShowForm(true)} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>➕ Agregar pedido</button>
       </div>
-
-      {/* 1) TARJETAS */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,margin:"14px 0 18px"}}>
-        <InvCard label="Pedidos" value={list.length.toLocaleString()} color="var(--accent)"/>
-        <InvCard label="Clientes" value={nClientes.toLocaleString()} color="var(--brand-blue)"/>
-        <InvCard label="Cant. pedida" value={Math.round(totPed).toLocaleString()} color="var(--good)"/>
-        <InvCard label="Cant. pendiente" value={Math.round(totPend).toLocaleString()} color="var(--amber)"/>
-        <InvCard label="Con inventario" value={conInv+" / "+list.length} color={conInv===list.length&&list.length>0?"var(--good)":"var(--amber)"} sub="Pendiente cubierto por bodega"/>
+      <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
+        {[['activos','📋 Activos ('+activos.length+')'],['historial','✅ Historial ('+nDesp+')']].map(([k,label])=>(
+          <button key={k} onClick={()=>setSubTab(k)} style={{background:subTab===k?"var(--card)":"transparent",color:subTab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subTab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subTab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+        ))}
       </div>
-
-      {/* 2) GRÁFICOS */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
-        <PieChart data={pieEstado} title="Pedidos por estado"/>
-        <BarChartDash data={topCli} title="Top 10 clientes por cant. pendiente" sub="Eje X: cliente" color="var(--amber)" labelKey="label" valueKey="val" unidad="und"/>
-      </div>
-
-      {/* 3) FILTROS + BUSCADOR */}
-      <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-        <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar cliente, item, N° pedido…"/>
-        <span style={{fontSize:11.5,color:"var(--text-dim)"}}>↕ Ordena tocando cualquier encabezado</span>
-        {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");setFInv("Todos");setFDesde("");setFHasta("");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
-        <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
-      </div>
-      {showFilter && (
-        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Cliente</div><select style={{...inputStyle,fontSize:13}} value={fCliente} onChange={e=>setFCliente(e.target.value)}>{clientes.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Estado (automático)</div><select style={{...inputStyle,fontSize:13}} value={fEstado} onChange={e=>setFEstado(e.target.value)}>{estados.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Inventario</div><select style={{...inputStyle,fontSize:13}} value={fInv} onChange={e=>setFInv(e.target.value)}><option value="Todos">Todos</option><option value="con">Con inventario asignado</option><option value="sin">Sin inventario</option></select></div>
-          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Montaje desde</div><input type="date" style={{...inputStyle,fontSize:13}} value={fDesde} onChange={e=>setFDesde(e.target.value)}/></div>
-          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Montaje hasta</div><input type="date" style={{...inputStyle,fontSize:13}} value={fHasta} onChange={e=>setFHasta(e.target.value)}/></div>
+      {subTab==='historial' && <HistorialDespachos key={"hd_"+ver}/>}
+      {subTab==='activos' && <>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:18}}>
+          <InvCard label="Pedidos activos" value={list.length.toLocaleString()} color="var(--accent)"/>
+          <InvCard label="Clientes" value={nClientes.toLocaleString()} color="var(--brand-blue)"/>
+          <InvCard label="Cant. pedida" value={Math.round(totPed).toLocaleString()} color="var(--good)"/>
+          <InvCard label="Pendiente real" value={Math.round(totPend).toLocaleString()} color="var(--amber)" sub="Descontados despachos ya hechos"/>
+          <InvCard label="Completados" value={nCerrados.toLocaleString()} color="var(--good)" sub="Pedidos 100% despachados"/>
         </div>
-      )}
-
-      {/* 4) LISTA */}
-      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
-          <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            <ThSort label="Fecha montaje" k="fecha" sort={sort}/>
-            <ThSort label="N° pedido" k="pedido" sort={sort}/>
-            <ThSort label="Cliente" k="cliente" sort={sort}/>
-            <ThSort label="Item" k="item" sort={sort}/>
-            <ThSort label="Referencia" k="resumen" sort={sort}/>
-            <ThSort label="Estado" k="estado" sort={sort}/>
-            <ThSort label="Pedida" k="pedida" sort={sort}/>
-            <ThSort label="Pendiente" k="pendiente" sort={sort}/>
-            <ThSort label="Asignado" k="asignado" sort={sort}/>
-            <ThSort label="Cobertura" k="cobertura" sort={sort}/>
-          </tr></thead>
-          <tbody>
-            {list.slice(0,500).map((p,i)=>(
-              <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{p.fecha?fechaLarga(p.fecha):"-"}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{p.pedido||"-"}</td>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.cliente||"-"}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{p.item||"-"}</td>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.resumen||"-"}</td>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5,fontWeight:600,color:/35/.test(p.estado)?"var(--bad)":"var(--good)"}} title={p.dias!=null?(p.dias+" días desde el montaje"):""}>{p.estado||"-"}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(Number(p.pedida)||0).toLocaleString()}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--amber)"}}>{Math.round(Number(p.pendiente)||0).toLocaleString()}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}} title={"Disponible total de la referencia: "+p.dispTotal.toLocaleString()+" und"}>{p.dispAsignado.toLocaleString()}</td>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontWeight:600}}>{p.alcanza?<span style={{color:"var(--good)"}}>✅ Completo</span>:(p.parcial?<span style={{color:"var(--amber)"}}>⚠️ Parcial</span>:<span style={{color:"var(--text-dim)"}}>— Sin inv.</span>)}</td>
-              </tr>
-            ))}
-            {list.length===0 && <tr><td colSpan="10" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>No hay pedidos con estos filtros. Usa “➕ Agregar pedido”.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      {list.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {list.length}.</div>}
-
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
+          <PieChart data={pieEstado} title="Activos por estado"/>
+          <BarChartDash data={topCli} title="Top 10 clientes por pendiente real" sub="Eje X: cliente" color="var(--amber)" labelKey="label" valueKey="val" unidad="und"/>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+          <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar cliente, item, N° pedido…"/>
+          <span style={{fontSize:11.5,color:"var(--text-dim)"}}>↕ toca encabezado para ordenar</span>
+          {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");setFInv("Todos");setFDesde("");setFHasta("");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+          <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
+        </div>
+        {showFilter && (
+          <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Cliente</div><select style={{...inputStyle,fontSize:13}} value={fCliente} onChange={e=>setFCliente(e.target.value)}>{clientes.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Estado</div><select style={{...inputStyle,fontSize:13}} value={fEstado} onChange={e=>setFEstado(e.target.value)}>{estados.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Inventario</div><select style={{...inputStyle,fontSize:13}} value={fInv} onChange={e=>setFInv(e.target.value)}><option value="Todos">Todos</option><option value="con">Con inventario asignado</option><option value="sin">Sin inventario</option></select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Montaje desde</div><input type="date" style={{...inputStyle,fontSize:13}} value={fDesde} onChange={e=>setFDesde(e.target.value)}/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Montaje hasta</div><input type="date" style={{...inputStyle,fontSize:13}} value={fHasta} onChange={e=>setFHasta(e.target.value)}/></div>
+          </div>
+        )}
+        <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+            <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
+              <ThSort label="Montaje" k="fecha" sort={sort}/>
+              <ThSort label="N° pedido" k="pedido" sort={sort}/>
+              <ThSort label="Cliente" k="cliente" sort={sort}/>
+              <ThSort label="Item" k="item" sort={sort}/>
+              <ThSort label="Referencia" k="resumen" sort={sort}/>
+              <ThSort label="Estado" k="estado" sort={sort}/>
+              <ThSort label="Pedida" k="pedida" sort={sort}/>
+              <ThSort label="Pendiente" k="pendReal" sort={sort}/>
+              <ThSort label="Disp. bodega" k="asignado" sort={sort}/>
+              <ThSort label="Cobertura" k="cobertura" sort={sort}/>
+              <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>Acciones</th>
+            </tr></thead>
+            <tbody>
+              {list.slice(0,500).map((p,i)=>(
+                <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{p.fecha?fechaLarga(p.fecha):"-"}</td>
+                  <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{p.pedido||"-"}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.cliente||"-"}</td>
+                  <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{p.item||"-"}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.resumen||"-"}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5,fontWeight:600,color:/35/.test(p.estado)?"var(--bad)":"var(--good)"}} title={p.dias!=null?(p.dias+" días desde el montaje"):""}>{p.estado||"-"}</td>
+                  <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(Number(p.pedida)||0).toLocaleString()}</td>
+                  <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--amber)"}}>{p.pendReal.toLocaleString()}</td>
+                  <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}} title={"Stock total ref.: "+p.dispTotal.toLocaleString()+" und"}>{p.dispAsignado.toLocaleString()}</td>
+                  <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontWeight:600}}>{p.alcanza?<span style={{color:"var(--good)"}}>✅ Completo</span>:(p.parcial?<span style={{color:"var(--amber)"}}>⚠️ Parcial</span>:<span style={{color:"var(--text-dim)"}}>— Sin inv.</span>)}</td>
+                  <td style={{padding:"8px 8px",whiteSpace:"nowrap"}}>
+                    <button title="Registrar despacho" onClick={()=>setDespachandoPed({pedido:p.pedido,item:p.item,resumen:p.resumen,cliente:p.cliente,pendienteActual:p.pendReal})} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer",marginRight:4}}>📦 Despachar</button>
+                    <button title="Ver historial de este pedido" onClick={()=>setLupaHist({pedido:p.pedido,item:p.item,resumen:p.resumen,cliente:p.cliente})} style={{background:"var(--panel-2)",color:"var(--text-dim)",border:"1px solid var(--line)",borderRadius:7,padding:"5px 10px",fontSize:12,cursor:"pointer"}}>🔎</button>
+                  </td>
+                </tr>
+              ))}
+              {list.length===0 && <tr><td colSpan="11" style={{padding:18,textAlign:"center",color:"var(--text-dim)"}}>No hay pedidos activos. Todos pueden estar completamente despachados — revisa "Historial".</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {list.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {list.length}.</div>}
+      </>}
       {showForm && <PedidoForm onClose={()=>setShowForm(false)} onSaved={()=>{ setShowForm(false); setVer(v=>v+1); }}/>}
+      {despachandoPed && <DespachoForm {...despachandoPed} onClose={()=>setDespachandoPed(null)} onSaved={()=>{ setDespachandoPed(null); setVer(v=>v+1); }}/>}
+      {lupaHist && <HistorialDespachosPedido {...lupaHist} onClose={()=>setLupaHist(null)}/>}
     </div>
   );
 }

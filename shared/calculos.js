@@ -193,7 +193,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -242,8 +242,30 @@ function loadPedidosExtra(){ try{ const r=localStorage.getItem('pedidos-extra');
 function savePedidosExtra(arr){ try{ localStorage.setItem('pedidos-extra', JSON.stringify(arr)); }catch(e){} postConfig_('pedidos_extra', arr); }
 function loadPedidos(){ return (window.PEDIDOS_BASE||[]).concat(loadPedidosExtra()); }
 function agregarPedido(p){ const arr=loadPedidosExtra(); arr.push(p); savePedidosExtra(arr); return arr; }
-/* Estado del pedido calculado automáticamente desde la FECHA DE MONTAJE:
-   0–35 días después del montaje → "☺ en promesa"; más de 35 días → "⚠️ +35 dias". */
+/* ===== DESPACHOS =====
+   Cada despacho vincula un N° de pedido + item con su remisión, cantidad despachada
+   y datos de envío. Al despachar parcialmente, el pendiente del pedido se reduce.
+   Estructura: {id, fecha, fechaSalida, pedido, item, remision, cantDespachada,
+                tipoEntrega ('cliente'|'transportadora'), transportadora, observaciones} */
+function _dId(){ return 'd_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+function loadDespachos(){ try{ const r=localStorage.getItem('despachos'); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function saveDespachos(arr){ try{ localStorage.setItem('despachos', JSON.stringify(arr)); }catch(e){} postConfig_('despachos', arr); }
+/* Registra un despacho y devuelve la lista actualizada. */
+function registrarDespacho(d){
+  const arr=loadDespachos();
+  arr.push({...d, id:_dId(), registradoEn:new Date().toISOString()});
+  saveDespachos(arr);
+  return arr;
+}
+/* Despachos de un pedido+item específico. */
+function despachosDePedido(numeroPedido, item){
+  return loadDespachos().filter(d=>d.pedido===String(numeroPedido).trim() && d.item===String(item).trim());
+}
+/* Total ya despachado para un pedido+item (para calcular el pendiente real). */
+function totalDespachado(numeroPedido, item){
+  return despachosDePedido(numeroPedido, item).reduce((s,d)=>s+(Number(d.cantDespachada)||0),0);
+}
+/* Estado: 0-35 dias = en promesa; mas de 35 dias = +35 dias. */
 function estadoPedido(fechaMontaje){
   if(!fechaMontaje) return 'Sin estado';
   var f=new Date(fechaMontaje); if(isNaN(f.getTime())) return 'Sin estado';
