@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712o"></script>
-<script src="../shared/config.js?v=20260712o"></script>
-<script src="../shared/inventario_base.js?v=20260712o"></script>
-<script src="../shared/sku_maestro.js?v=20260712o"></script>
-<script src="../shared/pedidos_base.js?v=20260712o"></script>
-<script src="../shared/calculos.js?v=20260712o"></script>
+<script src="../shared/data.js?v=20260712p"></script>
+<script src="../shared/config.js?v=20260712p"></script>
+<script src="../shared/inventario_base.js?v=20260712p"></script>
+<script src="../shared/sku_maestro.js?v=20260712p"></script>
+<script src="../shared/pedidos_base.js?v=20260712p"></script>
+<script src="../shared/calculos.js?v=20260712p"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1654,6 +1654,8 @@ function Despachos({reports, okSet}){
   const [buscar,setBuscar]=useState("");
   const [fCliente,setFCliente]=useState("Todos");
   const [fEstado,setFEstado]=useState("Todos");
+  const [fInv,setFInv]=useState("Todos");   // Todos / con / sin inventario
+  const [orden,setOrden]=useState("reciente"); // reciente / antiguo
   const [showFilter,setShowFilter]=useState(false);
   const [showForm,setShowForm]=useState(false);
   const [ver,setVer]=useState(0);
@@ -1664,15 +1666,29 @@ function Despachos({reports, okSet}){
   const clientes=["Todos",...new Set(pedidos.map(p=>p.cliente).filter(Boolean))].sort();
   const estados=["Todos",...new Set(pedidos.map(p=>p.estado).filter(Boolean))].sort();
 
-  let list=pedidos.map(p=>{
-    const d=disp[String(p.item).trim()]||{unidades:0,kg:0};
+  // Enriquecer + ASIGNACIÓN FIFO por referencia: el stock cubre primero los
+  // pedidos MÁS ANTIGUOS; el saldo pasa al siguiente pedido de la misma referencia.
+  let all=pedidos.map((p,idx)=>({...p, _idx:idx}));
+  const pool={}; Object.keys(disp).forEach(k=>{ pool[k]=disp[k].unidades; });
+  [...all].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||a._idx-b._idx).forEach(p=>{
+    const key=String(p.item).trim();
     const pend=Number(p.pendiente)||0;
-    return {...p, dispUnd:Math.round(d.unidades), alcanza: d.unidades>=pend && pend>0, parcial: d.unidades>0 && d.unidades<pend};
+    const avail=pool[key]!=null?pool[key]:0;
+    const asign=Math.max(0, Math.min(pend, avail));
+    p.dispAsignado=Math.round(asign);
+    if(pool[key]!=null) pool[key]=avail-asign;
+    p.dispTotal=Math.round(disp[key]?disp[key].unidades:0);
+    p.alcanza = asign>=pend && pend>0;
+    p.parcial = asign>0 && asign<pend;
   });
+
+  let list=all;
   if(fCliente!=="Todos") list=list.filter(p=>p.cliente===fCliente);
   if(fEstado!=="Todos") list=list.filter(p=>p.estado===fEstado);
+  if(fInv==="con") list=list.filter(p=>p.dispAsignado>0);
+  else if(fInv==="sin") list=list.filter(p=>p.dispAsignado<=0);
   if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(p=>((p.cliente||'')+' '+(p.item||'')+' '+(p.resumen||'')+' '+(p.pedido||'')).toLowerCase().includes(q)); }
-  list=list.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  list=list.sort((a,b)=> orden==="antiguo" ? ((a.fecha||'').localeCompare(b.fecha||'')||a._idx-b._idx) : ((b.fecha||'').localeCompare(a.fecha||'')||b._idx-a._idx));
 
   const totPend=list.reduce((s,p)=>s+(Number(p.pendiente)||0),0);
   const totPed=list.reduce((s,p)=>s+(Number(p.pedida)||0),0);
@@ -1684,7 +1700,7 @@ function Despachos({reports, okSet}){
   const porCli={}; list.forEach(p=>{const c=p.cliente||'—'; porCli[c]=(porCli[c]||0)+(Number(p.pendiente)||0);});
   const topCli=Object.entries(porCli).map(([label,val])=>({label:String(label).slice(0,20),val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,10);
 
-  const activeF=[fCliente!=="Todos",fEstado!=="Todos"].filter(Boolean).length;
+  const activeF=[fCliente!=="Todos",fEstado!=="Todos",fInv!=="Todos"].filter(Boolean).length;
 
   return (
     <div style={{marginBottom:26}}>
@@ -1714,13 +1730,15 @@ function Despachos({reports, okSet}){
       {/* 3) FILTROS + BUSCADOR */}
       <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
         <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar cliente, item, N° pedido…"/>
-        {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+        <select style={{...selStyle,maxWidth:190}} value={orden} onChange={e=>setOrden(e.target.value)}><option value="reciente">↓ Más reciente primero</option><option value="antiguo">↑ Más antiguo primero</option></select>
+        {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");setFInv("Todos");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
         <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
       </div>
       {showFilter && (
         <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Cliente</div><select style={{...inputStyle,fontSize:13}} value={fCliente} onChange={e=>setFCliente(e.target.value)}>{clientes.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Estado</div><select style={{...inputStyle,fontSize:13}} value={fEstado} onChange={e=>setFEstado(e.target.value)}>{estados.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Inventario</div><select style={{...inputStyle,fontSize:13}} value={fInv} onChange={e=>setFInv(e.target.value)}><option value="Todos">Todos</option><option value="con">Con inventario asignado</option><option value="sin">Sin inventario</option></select></div>
         </div>
       )}
 
@@ -1728,7 +1746,7 @@ function Despachos({reports, okSet}){
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Fecha","N° pedido","Cliente","Item","Referencia","Estado","Pedida","Pendiente","Disp. bodega","Cobertura"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            {["Fecha","N° pedido","Cliente","Item","Referencia","Estado","Pedida","Pendiente","Asignado","Cobertura"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
           </tr></thead>
           <tbody>
             {list.slice(0,500).map((p,i)=>(
@@ -1741,7 +1759,7 @@ function Despachos({reports, okSet}){
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5}}>{p.estado||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(Number(p.pedida)||0).toLocaleString()}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--amber)"}}>{Math.round(Number(p.pendiente)||0).toLocaleString()}</td>
-                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}}>{p.dispUnd.toLocaleString()}</td>
+                <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}} title={"Disponible total de la referencia: "+p.dispTotal.toLocaleString()+" und"}>{p.dispAsignado.toLocaleString()}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontWeight:600}}>{p.alcanza?<span style={{color:"var(--good)"}}>✅ Completo</span>:(p.parcial?<span style={{color:"var(--amber)"}}>⚠️ Parcial</span>:<span style={{color:"var(--text-dim)"}}>— Sin inv.</span>)}</td>
               </tr>
             ))}
