@@ -242,6 +242,22 @@ function loadPedidosExtra(){ try{ const r=localStorage.getItem('pedidos-extra');
 function savePedidosExtra(arr){ try{ localStorage.setItem('pedidos-extra', JSON.stringify(arr)); }catch(e){} postConfig_('pedidos_extra', arr); }
 function loadPedidos(){ return (window.PEDIDOS_BASE||[]).concat(loadPedidosExtra()); }
 function agregarPedido(p){ const arr=loadPedidosExtra(); arr.push(p); savePedidosExtra(arr); return arr; }
+/* Estado del pedido calculado automáticamente desde la FECHA DE MONTAJE:
+   0–35 días después del montaje → "☺ en promesa"; más de 35 días → "⚠️ +35 dias". */
+function estadoPedido(fechaMontaje){
+  if(!fechaMontaje) return 'Sin estado';
+  var f=new Date(fechaMontaje); if(isNaN(f.getTime())) return 'Sin estado';
+  var hoy=new Date(); hoy.setHours(0,0,0,0); f.setHours(0,0,0,0);
+  var dias=Math.floor((hoy.getTime()-f.getTime())/86400000);
+  return dias>35 ? '⚠️ +35 dias' : '☺ en promesa';
+}
+/* Días transcurridos desde el montaje (para mostrar). */
+function diasMontaje(fechaMontaje){
+  if(!fechaMontaje) return null;
+  var f=new Date(fechaMontaje); if(isNaN(f.getTime())) return null;
+  var hoy=new Date(); hoy.setHours(0,0,0,0); f.setHours(0,0,0,0);
+  return Math.floor((hoy.getTime()-f.getTime())/86400000);
+}
 /* ===== CONSUMO DE LÁMINA (extrusión produce, impresión consume) =====
    Consumo = Kg producidos + merma del proceso. Se casa por TIPO+MEDIDA. */
 function _parseMedidaRef(ref){ var m=String(ref||'').match(/(\d+(?:[.,]\d+)?)\s*cm/i); return m?Math.round(parseFloat(m[1].replace(',','.'))):0; }

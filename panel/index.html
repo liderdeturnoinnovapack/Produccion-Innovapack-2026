@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712u"></script>
-<script src="../shared/config.js?v=20260712u"></script>
-<script src="../shared/inventario_base.js?v=20260712u"></script>
-<script src="../shared/sku_maestro.js?v=20260712u"></script>
-<script src="../shared/pedidos_base.js?v=20260712u"></script>
-<script src="../shared/calculos.js?v=20260712u"></script>
+<script src="../shared/data.js?v=20260712v"></script>
+<script src="../shared/config.js?v=20260712v"></script>
+<script src="../shared/inventario_base.js?v=20260712v"></script>
+<script src="../shared/sku_maestro.js?v=20260712v"></script>
+<script src="../shared/pedidos_base.js?v=20260712v"></script>
+<script src="../shared/calculos.js?v=20260712v"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -515,6 +515,35 @@ function OperariosTab({reports}){
   );
 }
 
+/* ===== ORDENAMIENTO POR ENCABEZADO (flecha) — reutilizable en todos los cuadros ===== */
+function useSort(defKey, defDir){
+  const [key,setKey]=useState(defKey||null);
+  const [dir,setDir]=useState(defDir||'desc');
+  const on=(k)=>{ if(key===k){ setDir(d=>d==='asc'?'desc':'asc'); } else { setKey(k); setDir('asc'); } };
+  return {key,dir,on};
+}
+function aplicarOrden(rows, sort, getVal){
+  if(!sort || !sort.key) return rows;
+  const arr=[...rows].sort((a,b)=>{
+    let A=getVal(a,sort.key), B=getVal(b,sort.key);
+    const nA=(A===''||A==null), nB=(B===''||B==null);
+    if(nA&&nB) return 0; if(nA) return 1; if(nB) return -1;
+    if(typeof A==='number' && typeof B==='number') return A-B;
+    return String(A).localeCompare(String(B),'es',{numeric:true,sensitivity:'base'});
+  });
+  return sort.dir==='desc' ? arr.reverse() : arr;
+}
+/* Encabezado ordenable: clic alterna asc/desc y muestra la flecha. */
+function ThSort({label, k, sort, extra}){
+  const active=sort.key===k;
+  return (
+    <th onClick={()=>sort.on(k)} title="Clic para ordenar"
+      style={{padding:"9px 10px",color:active?"var(--accent)":"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",cursor:"pointer",userSelect:"none",position:"sticky",top:0,background:"var(--panel-2)",...(extra||{})}}>
+      {label} <span style={{opacity:active?1:0.35,fontSize:10,marginLeft:2}}>{active?(sort.dir==='asc'?'▲':'▼'):'↕'}</span>
+    </th>
+  );
+}
+
 /* ================== PESTAÑA GENERAL ==================
    Los filtros de aquí afectan TODO: fichas de encabezado, gráficas y tabla. */
 function GeneralTab({reports}){
@@ -528,6 +557,7 @@ function GeneralTab({reports}){
   const [showHistFilter,setShowHistFilter]=useState(false);
   const [hMaquina,setHMaquina]=useState(""); const [hOperario,setHOperario]=useState(""); const [hTurno,setHTurno]=useState("");
   const [hDesde,setHDesde]=useState(""); const [hHasta,setHHasta]=useState("");
+  const sortH=useSort('fecha','desc');
   const metas=loadMetas();
 
   const maquinas=["",...new Set(reports.map(r=>r.maquina).filter(Boolean))].sort();
@@ -781,10 +811,22 @@ function GeneralTab({reports}){
         <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid rgba(0,0,0,0.07)",borderRadius:14,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
           <table style={{transform:"rotateX(180deg)",width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
             <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-              {["Fecha","F.Turno","Nombre","Máquina","Turno","Siesa","Referencia","Prod.","Merma","T.M.","% Util.","Rend. Real","% Rend."].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+              <ThSort label="Fecha" k="fecha" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="F.Turno" k="fturno" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Nombre" k="nombre" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Máquina" k="maquina" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Turno" k="turno" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Siesa" k="siesa" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Referencia" k="referencia" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Prod." k="prod" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Merma" k="merma" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="T.M." k="tm" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="% Util." k="util" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Rend. Real" k="rend" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="% Rend." k="rendpct" sort={sortH} extra={{position:"static"}}/>
             </tr></thead>
             <tbody>
-              {frHist.map(r=>{
+              {aplicarOrden(frHist, sortH, (r,k)=> k==='fecha'?(getFechaISO(r)||'') : k==='fturno'?(getFechaISO(r)||'') : k==='nombre'?(r.nombre||'') : k==='maquina'?(r.maquina||'') : k==='turno'?(r.turno||'') : k==='siesa'?String(r.siesa||'') : k==='referencia'?(r.referencia||'') : k==='prod'?(Number(r.produccion)||0) : k==='merma'?sumNumeros(r.mermasCantidad) : k==='tm'?sumNumeros(r.tiemposMuertosMinutos) : k==='util'?((calcUtilizacion(r)||{}).utilizacion||0) : k==='rend'?((calcRendimiento(r,metas)||{}).rendReal||0) : k==='rendpct'?((calcRendimiento(r,metas)||{}).pct||0) : '').map(r=>{
                 const u=calcUtilizacion(r), rd=calcRendimiento(r,metas);
                 return(
                   <tr key={r.id||r.ts+r.consecutivo} style={{borderTop:"1px solid var(--line)"}}>
@@ -840,6 +882,7 @@ function BodegaView({reports,titulo,showFiltros}){
   const [fHasta,setFHasta]=useState("");
   const [showFilter,setShowFilter]=useState(false);
   const [showHist,setShowHist]=useState(false);
+  const sortH=useSort('fecha','desc');
 
   const getCategoria=r=>clasificarReporte(r).categoria;
   const getSector=r=>clasificarReporte(r).sector;
@@ -911,10 +954,20 @@ function BodegaView({reports,titulo,showFiltros}){
         <div style={{transform:"rotateX(180deg)",overflowX:"auto",border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
           <table style={{transform:"rotateX(180deg)",width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
             <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-              {["Fecha","Nombre","Máquina","Turno","Referencia","Prod.","Tipo","Sector","Merma","Motivo Merma","T.M."].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
+              <ThSort label="Fecha" k="fecha" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Nombre" k="nombre" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Máquina" k="maquina" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Turno" k="turno" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Referencia" k="referencia" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Prod." k="prod" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Tipo" k="tipo" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Sector" k="sector" sort={sortH} extra={{position:"static"}}/>
+              <ThSort label="Merma" k="merma" sort={sortH} extra={{position:"static"}}/>
+              <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>Motivo Merma</th>
+              <ThSort label="T.M." k="tm" sort={sortH} extra={{position:"static"}}/>
             </tr></thead>
             <tbody>
-              {f.map(r=>{const c=clasificarReporte(r);return(
+              {aplicarOrden(f, sortH, (r,k)=> k==='fecha'?(getFechaISO(r)||'') : k==='nombre'?(r.nombre||'') : k==='maquina'?(r.maquina||'') : k==='turno'?(r.turno||'') : k==='referencia'?(r.referencia||'') : k==='prod'?(Number(r.produccion)||0) : k==='tipo'?(getCategoria(r)||'') : k==='sector'?(getSector(r)||'') : k==='merma'?sumNumeros(r.mermasCantidad) : k==='tm'?sumNumeros(r.tiemposMuertosMinutos) : '').map(r=>{const c=clasificarReporte(r);return(
                 <tr key={r.id||r.ts+r.consecutivo} style={{borderTop:"1px solid var(--line)"}}>
                   <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
                   <td style={{padding:"8px 10px"}}>{r.nombre}</td>
@@ -1177,6 +1230,7 @@ function InventarioRollos({reports}){
   const [fMaq,setFMaq]=useState(""); const [fTipo,setFTipo]=useState("");
   const [fMedida,setFMedida]=useState(""); const [fColor,setFColor]=useState("");
   const [buscar,setBuscar]=useState("");
+  const sort=useSort('peso','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   const tipoColor=t=>TIPO_COLORS[t]||"#64748B";
 
@@ -1199,6 +1253,8 @@ function InventarioRollos({reports}){
     const q=buscar.trim().toLowerCase();
     rollos=rollos.filter(r=>String(r.numero).toLowerCase().includes(q)||String(r.codigo).toLowerCase().includes(q)||String(r.referencia||"").toLowerCase().includes(q));
   }
+  const getVR=(r,k)=> k==='numero'?(r.numero||'') : k==='tipo'?(r.tipo||'') : k==='color'?(r.color||'') : k==='maquina'?(r.maquina||'') : k==='medida'?(parseFloat(r.medida)||0) : k==='calibre'?String(r.calibre||'') : k==='peso'?(Number(r.peso)||0) : k==='codigo'?String(r.codigo||'') : k==='referencia'?(r.referencia||'') : k==='fecha'?(getFechaISO(r)||'') : k==='turno'?(r.turno||'') : k==='operario'?(r.operario||'') : '';
+  rollos=aplicarOrden(rollos, sort, getVR);
   const totalKg=rollos.reduce((s,r)=>s+(Number(r.peso)||0),0);
   const hayFiltro=fMaq||fTipo||fMedida||fColor||buscar.trim();
 
@@ -1240,7 +1296,18 @@ function InventarioRollos({reports}){
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:440,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["# Rollo","Tipo","Color","Máquina","Medida (cm)","Calibre","Peso (kg)","Código SISA","Referencia","Fecha turno","Turno","Operario"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            <ThSort label="# Rollo" k="numero" sort={sort}/>
+            <ThSort label="Tipo" k="tipo" sort={sort}/>
+            <ThSort label="Color" k="color" sort={sort}/>
+            <ThSort label="Máquina" k="maquina" sort={sort}/>
+            <ThSort label="Medida (cm)" k="medida" sort={sort}/>
+            <ThSort label="Calibre" k="calibre" sort={sort}/>
+            <ThSort label="Peso (kg)" k="peso" sort={sort}/>
+            <ThSort label="Código SISA" k="codigo" sort={sort}/>
+            <ThSort label="Referencia" k="referencia" sort={sort}/>
+            <ThSort label="Fecha turno" k="fecha" sort={sort}/>
+            <ThSort label="Turno" k="turno" sort={sort}/>
+            <ThSort label="Operario" k="operario" sort={sort}/>
           </tr></thead>
           <tbody>
             {rollos.slice(0,500).map((r,i)=>(
@@ -1519,24 +1586,30 @@ function BodegaInventario({reports, okSet}){
   const [buscar,setBuscar]=useState("");
   const [fCategoria,setFCategoria]=useState("Todas");
   const [fSector,setFSector]=useState("Todos");
+  const [fCliente,setFCliente]=useState("Todos");
   const [showFilter,setShowFilter]=useState(false);
   const [traza,setTraza]=useState(null);
+  const sort=useSort('unidades','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   // Inventario físico del corte + producción confirmada posterior al corte.
   const invAll=inventarioBodegaPT(reports, okSet);
   const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
   const sectores=["Todos",...new Set(invAll.map(x=>x.sector).filter(s=>s&&s!=="-"))].sort();
+  const clientesInv=["Todos",...new Set(invAll.map(x=>clienteDe(x.siesa)).filter(Boolean))].sort();
   // Filtros (afectan tarjetas, gráficos y lista)
   let inv=invAll;
   if(fCategoria!=="Todas") inv=inv.filter(x=>x.categoria===fCategoria);
   if(fSector!=="Todos") inv=inv.filter(x=>(x.sector||"-")===fSector);
-  if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
+  if(fCliente!=="Todos") inv=inv.filter(x=>clienteDe(x.siesa)===fCliente);
+  if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")+" "+(clienteDe(x.siesa)||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
   const totalUnd=inv.reduce((s,x)=>s+x.unidades,0);
   const totalKg=inv.reduce((s,x)=>s+x.kg,0);
   const nCat=new Set(inv.map(x=>x.categoria).filter(c=>c&&c!=="-")).size;
   const pendientes=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
-  const activeF=[fCategoria!=="Todas",fSector!=="Todos"].filter(Boolean).length;
-  const clearF=()=>{setFCategoria("Todas");setFSector("Todos");};
+  const activeF=[fCategoria!=="Todas",fSector!=="Todos",fCliente!=="Todos"].filter(Boolean).length;
+  const clearF=()=>{setFCategoria("Todas");setFSector("Todos");setFCliente("Todos");};
+  const getV=(x,k)=> k==='siesa'?(x.siesa||'') : k==='referencia'?(x.referencia||'') : k==='cliente'?(clienteDe(x.siesa)||'') : k==='categoria'?(x.categoria||'') : k==='sector'?(x.sector||'') : k==='unidades'?(x.unidades||0) : k==='kg'?(x.kg||0) : k==='reportes'?(x.reportes||0) : k==='ultima'?(x.ultima||'') : '';
+  const invOrden=aplicarOrden(inv, sort, getV);
   // Datos de gráficos
   const kgPorCat={}; inv.forEach(x=>{ const c=x.categoria||"—"; kgPorCat[c]=(kgPorCat[c]||0)+x.kg; });
   const pieCat=Object.entries(kgPorCat).map(([label,val])=>({label,val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
@@ -1568,9 +1641,10 @@ function BodegaInventario({reports, okSet}){
         <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
       </div>
       {showFilter && (
-        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Categoría / Tipo</div><select style={{...inputStyle,fontSize:13}} value={fCategoria} onChange={e=>setFCategoria(e.target.value)}>{categorias.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Sector</div><select style={{...inputStyle,fontSize:13}} value={fSector} onChange={e=>setFSector(e.target.value)}>{sectores.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Cliente</div><select style={{...inputStyle,fontSize:13}} value={fCliente} onChange={e=>setFCliente(e.target.value)}>{clientesInv.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
         </div>
       )}
 
@@ -1578,10 +1652,20 @@ function BodegaInventario({reports, okSet}){
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["#","Código","Referencia","Cliente","Categoría","Sector","Existencia (und)","Peso (kg)","Reportes","Últ. ingreso","Trazabilidad"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>#</th>
+            <ThSort label="Código" k="siesa" sort={sort}/>
+            <ThSort label="Referencia" k="referencia" sort={sort}/>
+            <ThSort label="Cliente" k="cliente" sort={sort}/>
+            <ThSort label="Categoría" k="categoria" sort={sort}/>
+            <ThSort label="Sector" k="sector" sort={sort}/>
+            <ThSort label="Existencia (und)" k="unidades" sort={sort}/>
+            <ThSort label="Peso (kg)" k="kg" sort={sort}/>
+            <ThSort label="Reportes" k="reportes" sort={sort}/>
+            <ThSort label="Últ. ingreso" k="ultima" sort={sort}/>
+            <th style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>Trazabilidad</th>
           </tr></thead>
           <tbody>
-            {inv.slice(0,500).map((x,i)=>{
+            {invOrden.slice(0,500).map((x,i)=>{
               const dd=diasDesde(x.ultima);
               const ddTxt=x.ultima?(dd===0?"hoy":dd===1?"ayer":"hace "+dd+"d"):"-";
               return (
@@ -1621,21 +1705,21 @@ function PedidoForm({onClose, onSaved}){
   function guardar(e){
     e.preventDefault();
     if(!f.pedido||!f.cliente||!f.item||f.pedida===""){ setMsg("N° pedido, cliente, item y cantidad pedida son obligatorios."); return; }
-    const p={fecha:f.fecha, pedido:f.pedido.trim(), cliente:f.cliente.trim(), item:String(f.item).trim(), resumen:(f.resumen||"").trim(), estado:f.estado||"Sin estado", pedida:Number(f.pedida)||0, pendiente:(f.pendiente!==""?Number(f.pendiente):Number(f.pedida))||0};
+    const p={fecha:f.fecha, pedido:f.pedido.trim(), cliente:f.cliente.trim(), item:String(f.item).trim(), resumen:(f.resumen||"").trim(), pedida:Number(f.pedida)||0, pendiente:(f.pendiente!==""?Number(f.pendiente):Number(f.pedida))||0};
     agregarPedido(p);
     onSaved&&onSaved();
   }
   const lab={fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4};
   return (
     <Modal title="➕ Agregar pedido" onClose={onClose}>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Misma estructura del cuadro de pedidos. Al escribir el código Item se autocompleta la referencia y el cliente sugerido. Se guarda para todo el equipo.</div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Misma estructura del cuadro de pedidos. Al escribir el código Item se autocompleta la referencia y el cliente sugerido. El <b>estado se calcula automáticamente</b> desde la fecha de montaje (+35 días). Se guarda para todo el equipo.</div>
       <form onSubmit={guardar} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        <div><div style={lab}>Fecha</div><input type="date" style={inputStyle} value={f.fecha} onChange={e=>setF({...f,fecha:e.target.value})}/></div>
+        <div><div style={lab}>Fecha de montaje</div><input type="date" style={inputStyle} value={f.fecha} onChange={e=>setF({...f,fecha:e.target.value})}/>
+          <div style={{fontSize:11,marginTop:4,color:/35/.test(estadoPedido(f.fecha))?"var(--bad)":"var(--good)"}}>Estado: <b>{estadoPedido(f.fecha)}</b></div></div>
         <div><div style={lab}>N° pedido *</div><input style={inputStyle} value={f.pedido} onChange={e=>setF({...f,pedido:e.target.value})} placeholder="Ej: PEV-00003100"/></div>
         <div style={{gridColumn:"1/-1"}}><div style={lab}>Cliente (razón social) *</div><input style={inputStyle} value={f.cliente} onChange={e=>setF({...f,cliente:e.target.value})} placeholder="Nombre del cliente"/></div>
         <div><div style={lab}>Item (código SIESA) *</div><input list="catalogo-items" style={inputStyle} value={f.item} onChange={e=>pickItem(e.target.value)} placeholder="Ej: 5010351"/>
           <datalist id="catalogo-items">{cat.slice(0,900).map(c=><option key={c.siesa} value={c.siesa}>{c.referencia}</option>)}</datalist></div>
-        <div><div style={lab}>Estado promesa</div><select style={inputStyle} value={f.estado} onChange={e=>setF({...f,estado:e.target.value})}><option>☺ en promesa</option><option>⚠️+35 dias</option><option>Sin estado</option></select></div>
         <div style={{gridColumn:"1/-1"}}><div style={lab}>Item resumen (referencia)</div><input style={inputStyle} value={f.resumen} onChange={e=>setF({...f,resumen:e.target.value})} placeholder="Se autocompleta con el código"/></div>
         <div><div style={lab}>Cant. pedida *</div><input type="number" step="any" style={inputStyle} value={f.pedida} onChange={e=>setF({...f,pedida:e.target.value})} placeholder="Ej: 10000"/></div>
         <div><div style={lab}>Cant. pendiente</div><input type="number" step="any" style={inputStyle} value={f.pendiente} onChange={e=>setF({...f,pendiente:e.target.value})} placeholder="Vacío = igual a pedida"/></div>
@@ -1654,20 +1738,19 @@ function Despachos({reports, okSet}){
   const [fCliente,setFCliente]=useState("Todos");
   const [fEstado,setFEstado]=useState("Todos");
   const [fInv,setFInv]=useState("Todos");   // Todos / con / sin inventario
-  const [orden,setOrden]=useState("reciente"); // reciente / antiguo
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
   const [showFilter,setShowFilter]=useState(false);
   const [showForm,setShowForm]=useState(false);
   const [ver,setVer]=useState(0);
+  const sort=useSort('fecha','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
 
   const pedidos=loadPedidos(); ver; // ver fuerza re-lectura tras agregar
   const disp=inventarioDisponible(reports, okSet);
-  const clientes=["Todos",...new Set(pedidos.map(p=>p.cliente).filter(Boolean))].sort();
-  const estados=["Todos",...new Set(pedidos.map(p=>p.estado).filter(Boolean))].sort();
 
-  // Enriquecer + ASIGNACIÓN FIFO por referencia: el stock cubre primero los
-  // pedidos MÁS ANTIGUOS; el saldo pasa al siguiente pedido de la misma referencia.
-  let all=pedidos.map((p,idx)=>({...p, _idx:idx}));
+  // Enriquecer + ESTADO AUTOMÁTICO (fecha de montaje + 35 días) + ASIGNACIÓN FIFO por referencia.
+  let all=pedidos.map((p,idx)=>({...p, _idx:idx, estado:estadoPedido(p.fecha), dias:diasMontaje(p.fecha)}));
   const pool={}; Object.keys(disp).forEach(k=>{ pool[k]=disp[k].unidades; });
   [...all].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||a._idx-b._idx).forEach(p=>{
     const key=String(p.item).trim();
@@ -1680,14 +1763,19 @@ function Despachos({reports, okSet}){
     p.alcanza = asign>=pend && pend>0;
     p.parcial = asign>0 && asign<pend;
   });
+  const clientes=["Todos",...new Set(all.map(p=>p.cliente).filter(Boolean))].sort();
+  const estados=["Todos",...new Set(all.map(p=>p.estado).filter(Boolean))].sort();
 
   let list=all;
   if(fCliente!=="Todos") list=list.filter(p=>p.cliente===fCliente);
   if(fEstado!=="Todos") list=list.filter(p=>p.estado===fEstado);
   if(fInv==="con") list=list.filter(p=>p.dispAsignado>0);
   else if(fInv==="sin") list=list.filter(p=>p.dispAsignado<=0);
+  if(fDesde) list=list.filter(p=>(p.fecha||'')>=fDesde);
+  if(fHasta) list=list.filter(p=>(p.fecha||'')<=fHasta);
   if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(p=>((p.cliente||'')+' '+(p.item||'')+' '+(p.resumen||'')+' '+(p.pedido||'')).toLowerCase().includes(q)); }
-  list=list.sort((a,b)=> orden==="antiguo" ? ((a.fecha||'').localeCompare(b.fecha||'')||a._idx-b._idx) : ((b.fecha||'').localeCompare(a.fecha||'')||b._idx-a._idx));
+  const getV=(p,k)=> k==='fecha'?(p.fecha||'') : k==='pedido'?(p.pedido||'') : k==='cliente'?(p.cliente||'') : k==='item'?(p.item||'') : k==='resumen'?(p.resumen||'') : k==='estado'?(p.estado||'') : k==='pedida'?(Number(p.pedida)||0) : k==='pendiente'?(Number(p.pendiente)||0) : k==='asignado'?(p.dispAsignado||0) : k==='cobertura'?(p.alcanza?2:p.parcial?1:0) : '';
+  list=aplicarOrden(list, sort, getV);
 
   const totPend=list.reduce((s,p)=>s+(Number(p.pendiente)||0),0);
   const totPed=list.reduce((s,p)=>s+(Number(p.pedida)||0),0);
@@ -1699,7 +1787,7 @@ function Despachos({reports, okSet}){
   const porCli={}; list.forEach(p=>{const c=p.cliente||'—'; porCli[c]=(porCli[c]||0)+(Number(p.pendiente)||0);});
   const topCli=Object.entries(porCli).map(([label,val])=>({label:String(label).slice(0,20),val:Math.round(val)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,10);
 
-  const activeF=[fCliente!=="Todos",fEstado!=="Todos",fInv!=="Todos"].filter(Boolean).length;
+  const activeF=[fCliente!=="Todos",fEstado!=="Todos",fInv!=="Todos",!!fDesde,!!fHasta].filter(Boolean).length;
 
   return (
     <div style={{marginBottom:26}}>
@@ -1729,15 +1817,17 @@ function Despachos({reports, okSet}){
       {/* 3) FILTROS + BUSCADOR */}
       <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
         <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar cliente, item, N° pedido…"/>
-        <select style={{...selStyle,maxWidth:190}} value={orden} onChange={e=>setOrden(e.target.value)}><option value="reciente">↓ Más reciente primero</option><option value="antiguo">↑ Más antiguo primero</option></select>
-        {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");setFInv("Todos");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
+        <span style={{fontSize:11.5,color:"var(--text-dim)"}}>↕ Ordena tocando cualquier encabezado</span>
+        {activeF>0 && <button onClick={()=>{setFCliente("Todos");setFEstado("Todos");setFInv("Todos");setFDesde("");setFHasta("");}} style={{background:"#FEE2E2",color:"var(--bad)",border:"none",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar ({activeF})</button>}
         <button onClick={()=>setShowFilter(!showFilter)} style={{background:showFilter||activeF>0?"var(--accent)":"var(--panel-2)",color:showFilter||activeF>0?"#fff":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showFilter?"▲ Ocultar":"▼ Filtrar"}{activeF>0?` (${activeF})`:""}</button>
       </div>
       {showFilter && (
-        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Cliente</div><select style={{...inputStyle,fontSize:13}} value={fCliente} onChange={e=>setFCliente(e.target.value)}>{clientes.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Estado</div><select style={{...inputStyle,fontSize:13}} value={fEstado} onChange={e=>setFEstado(e.target.value)}>{estados.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Estado (automático)</div><select style={{...inputStyle,fontSize:13}} value={fEstado} onChange={e=>setFEstado(e.target.value)}>{estados.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
           <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Inventario</div><select style={{...inputStyle,fontSize:13}} value={fInv} onChange={e=>setFInv(e.target.value)}><option value="Todos">Todos</option><option value="con">Con inventario asignado</option><option value="sin">Sin inventario</option></select></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Montaje desde</div><input type="date" style={{...inputStyle,fontSize:13}} value={fDesde} onChange={e=>setFDesde(e.target.value)}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Montaje hasta</div><input type="date" style={{...inputStyle,fontSize:13}} value={fHasta} onChange={e=>setFHasta(e.target.value)}/></div>
         </div>
       )}
 
@@ -1745,7 +1835,16 @@ function Despachos({reports, okSet}){
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:520,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Fecha","N° pedido","Cliente","Item","Referencia","Estado","Pedida","Pendiente","Asignado","Cobertura"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            <ThSort label="Fecha montaje" k="fecha" sort={sort}/>
+            <ThSort label="N° pedido" k="pedido" sort={sort}/>
+            <ThSort label="Cliente" k="cliente" sort={sort}/>
+            <ThSort label="Item" k="item" sort={sort}/>
+            <ThSort label="Referencia" k="resumen" sort={sort}/>
+            <ThSort label="Estado" k="estado" sort={sort}/>
+            <ThSort label="Pedida" k="pedida" sort={sort}/>
+            <ThSort label="Pendiente" k="pendiente" sort={sort}/>
+            <ThSort label="Asignado" k="asignado" sort={sort}/>
+            <ThSort label="Cobertura" k="cobertura" sort={sort}/>
           </tr></thead>
           <tbody>
             {list.slice(0,500).map((p,i)=>(
@@ -1755,7 +1854,7 @@ function Despachos({reports, okSet}){
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.cliente||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12}}>{p.item||"-"}</td>
                 <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>{p.resumen||"-"}</td>
-                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5}}>{p.estado||"-"}</td>
+                <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontSize:11.5,fontWeight:600,color:/35/.test(p.estado)?"var(--bad)":"var(--good)"}} title={p.dias!=null?(p.dias+" días desde el montaje"):""}>{p.estado||"-"}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600}}>{Math.round(Number(p.pedida)||0).toLocaleString()}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--amber)"}}>{Math.round(Number(p.pendiente)||0).toLocaleString()}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}} title={"Disponible total de la referencia: "+p.dispTotal.toLocaleString()+" und"}>{p.dispAsignado.toLocaleString()}</td>
@@ -1776,9 +1875,17 @@ function Despachos({reports, okSet}){
 /* ===== CONSUMO DE LÁMINA (extrusión produce → impresión consume) ===== */
 function ConsumosLamina({reports}){
   const [buscar,setBuscar]=useState("");
+  const [fMaterial,setFMaterial]=useState("Todos");
+  const [soloDef,setSoloDef]=useState(false);
+  const sort=useSort('saldo','desc');
   const bal=balanceLamina(reports);
+  const materiales=["Todos",...new Set(bal.map(x=>x.material).filter(Boolean))].sort();
   let list=bal;
+  if(fMaterial!=="Todos") list=list.filter(x=>x.material===fMaterial);
+  if(soloDef) list=list.filter(x=>x.saldo<0);
   if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(x=>(x.material+" "+x.medida+" "+x.color).toLowerCase().includes(q)); }
+  const getV=(x,k)=> k==='material'?(x.material||'') : k==='medida'?(Number(x.medida)||0) : k==='color'?(x.color||'') : k==='inicial'?x.inicial : k==='producido'?x.producido : k==='consumido'?x.consumido : k==='saldo'?x.saldo : '';
+  list=aplicarOrden(list, sort, getV);
   const totIni=bal.reduce((s,x)=>s+x.inicial,0);
   const totProd=bal.reduce((s,x)=>s+x.producido,0);
   const totCons=bal.reduce((s,x)=>s+x.consumido,0);
@@ -1803,11 +1910,21 @@ function ConsumosLamina({reports}){
         <BarChartDash data={barSaldo} title="Saldo de lámina por familia (top)" sub="Eje X: tipo+medida" color="var(--good)" labelKey="label" valueKey="val" unidad="kg"/>
       </div>
       {/* 3) LISTA */}
-      <input style={{...selStyle,maxWidth:320,marginBottom:10}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar tipo o medida…"/>
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+        <input style={{...selStyle,maxWidth:280}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar tipo o medida…"/>
+        <select style={{...selStyle,maxWidth:170}} value={fMaterial} onChange={e=>setFMaterial(e.target.value)}>{materiales.map(m=><option key={m} value={m}>{m==="Todos"?"Todos los tipos":m}</option>)}</select>
+        <button onClick={()=>setSoloDef(!soloDef)} style={{background:soloDef?"var(--bad)":"var(--panel-2)",color:soloDef?"#fff":"var(--text-dim)",border:"1px solid var(--line)",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{soloDef?"● Solo en déficit":"○ Solo en déficit"}</button>
+      </div>
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:460,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
           <thead><tr style={{background:"var(--panel-2)",textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-            {["Tipo","Medida","Color","Inicial (kg)","Producido (kg)","Consumido (kg)","Saldo (kg)"].map(h=><th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+            <ThSort label="Tipo" k="material" sort={sort}/>
+            <ThSort label="Medida" k="medida" sort={sort}/>
+            <ThSort label="Color" k="color" sort={sort}/>
+            <ThSort label="Inicial (kg)" k="inicial" sort={sort}/>
+            <ThSort label="Producido (kg)" k="producido" sort={sort}/>
+            <ThSort label="Consumido (kg)" k="consumido" sort={sort}/>
+            <ThSort label="Saldo (kg)" k="saldo" sort={sort}/>
           </tr></thead>
           <tbody>
             {list.map((x,i)=>(
