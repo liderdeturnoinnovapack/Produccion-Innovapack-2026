@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712r"></script>
-<script src="../shared/config.js?v=20260712r"></script>
-<script src="../shared/inventario_base.js?v=20260712r"></script>
-<script src="../shared/sku_maestro.js?v=20260712r"></script>
-<script src="../shared/pedidos_base.js?v=20260712r"></script>
-<script src="../shared/calculos.js?v=20260712r"></script>
+<script src="../shared/data.js?v=20260712s"></script>
+<script src="../shared/config.js?v=20260712s"></script>
+<script src="../shared/inventario_base.js?v=20260712s"></script>
+<script src="../shared/sku_maestro.js?v=20260712s"></script>
+<script src="../shared/pedidos_base.js?v=20260712s"></script>
+<script src="../shared/calculos.js?v=20260712s"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1868,7 +1868,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
   function marcarTodosSiesa(ids){ const n=new Set(siesaOk); (ids||[]).forEach(i=>{ if(i) n.add(i); }); setSiesaOk(n); saveReportesSiesa([...n]); }
 
   return(
-    <div style={{maxWidth:1240,margin:"0 auto",padding:"28px 28px 60px"}}>
+    <div style={{maxWidth:1680,margin:"0 auto",padding:"28px 32px 60px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",flexWrap:"wrap"}}>
           {[['general','📊 General'],['inv','🏬 Bodega Inventario'],['despachos','🚚 Pedidos y Despachos'],['bodegas','📦 Producción por bodega']].map(([k,label])=>(
