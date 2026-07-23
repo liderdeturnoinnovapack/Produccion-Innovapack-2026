@@ -292,19 +292,43 @@ function balanceLamina(reports){
   return Object.keys(pool).map(function(k){ var x=pool[k]; x.disponible=x.inicial+x.producido; x.saldo=x.disponible-x.consumido; return x; }).sort(function(a,b){return b.saldo-a.saldo;});
 }
 
-/* Inventario CONFIRMADO (en SIESA) disponible por código, en unidades y kg.
-   reports = lista completa; okSet = set de ids de reportes con ingreso a SIESA. */
-function inventarioDisponible(reports, okSet){
-  const map={};
-  (reports||[]).forEach(r=>{
+/* Inventario de PRODUCTO TERMINADO en bodega = inventario físico del corte (17/07,
+   TODO lo real a esa fecha) + producción confirmada en SIESA POSTERIOR al corte.
+   Agrupado por referencia. Fuente de la Bodega de Inventario y de la disponibilidad
+   en Despachos. Así aparecen también las referencias que solo están en el corte. */
+function inventarioBodegaPT(reports, okSet){
+  var corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
+  var P=loadPesos(), cls=loadClasificacion(), map={};
+  function ens(siesa, ref){
+    var k=String(siesa||'').trim(); if(!k) return null;
+    if(!map[k]){ var c=cls[k]||{}; map[k]={siesa:k, referencia:ref||'', categoria:c.categoria||'-', sector:c.sector||'-', unidades:0, kg:0, reportes:0, ultima:'', desdeCorte:false}; }
+    else if(ref && !map[k].referencia) map[k].referencia=ref;
+    return map[k];
+  }
+  // Base: inventario físico del corte (todo lo real al corte, ya conciliado)
+  ((window.INVENTARIO_BASE||{}).pt||[]).forEach(function(x){
+    var g=ens(x.siesa, x.referencia); if(!g) return;
+    var enKg=/l[aá]mina|rollo|termo/i.test(g.categoria||'');
+    var pu=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:x.referencia},P)||0;
+    if(enKg){ g.kg+=Number(x.und)||0; } else { g.unidades+=Number(x.und)||0; g.kg+=(Number(x.und)||0)*pu; }
+    g.desdeCorte=true; if(!g.ultima) g.ultima=corte;
+  });
+  // + producción confirmada POSTERIOR al corte (lo previo ya está en el corte)
+  (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;
     if(okSet && !okSet.has(reporteId(r))) return;
-    const key=String(r.siesa||r.sku||'').trim(); if(!key) return;
-    if(!map[key]) map[key]={unidades:0,kg:0};
-    const unidad=String(r.unidad||'').toLowerCase();
-    const prod=Number(r.produccion)||0;
-    if(unidad.indexOf('kg')===0) map[key].kg+=prod; else { map[key].unidades+=prod; map[key].kg+=produccionKg(r); }
+    var iso=getFechaISO(r); if(!iso || iso<=corte) return;
+    var g=ens(r.siesa||r.sku, r.referencia); if(!g) return;
+    var unidad=String(r.unidad||'').toLowerCase(), prod=Number(r.produccion)||0;
+    if(unidad.indexOf('kg')===0) g.kg+=prod; else { g.unidades+=prod; g.kg+=produccionKg(r); }
+    g.reportes++; if(iso>g.ultima) g.ultima=iso;
   });
+  return Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){return b.unidades-a.unidades;});
+}
+/* Mapa {siesa:{unidades,kg}} de disponibilidad (para Despachos). */
+function inventarioDisponible(reports, okSet){
+  var map={};
+  inventarioBodegaPT(reports, okSet).forEach(function(x){ map[x.siesa]={unidades:x.unidades, kg:x.kg}; });
   return map;
 }
 

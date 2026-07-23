@@ -6,6 +6,56 @@ window.INVENTARIO_BASE = {
 "fechaCorte": "2026-07-17",
 "pt": [
 {
+"siesa": "5010330",
+"referencia": "BOLSA AGUA FUENTE PURA 6 LT CON VAL",
+"und": 21780
+},
+{
+"siesa": "5010354",
+"referencia": "BOLSA AGUA DE LA MONTAÑA 6LT SIN VAL",
+"und": 10450
+},
+{
+"siesa": "5020228",
+"referencia": "BOLSA VALV PEGO PROFESIONAL RECUPER 25KG",
+"und": 7520
+},
+{
+"siesa": "5020013",
+"referencia": "BOLSA VALV PEGOPERFECTO VERDE 40KG",
+"und": 6870
+},
+{
+"siesa": "5020226",
+"referencia": "BOLSA VALV PEGO SPLENDOR 40KG",
+"und": 3805
+},
+{
+"siesa": "5020009",
+"referencia": "BOLSA VALV PEGO MAESTRO 25KG",
+"und": 2630
+},
+{
+"siesa": "5020148",
+"referencia": "BOLSA VALV PEGO PISO SOBRE PISO 25KG",
+"und": 2590
+},
+{
+"siesa": "5020108",
+"referencia": "BOLSA VALVMASTIC INTERIOR PANEL-TEC 25KG",
+"und": 2100
+},
+{
+"siesa": "5020259",
+"referencia": "BOLSA VALV CERAMIKOL 40 KG",
+"und": 2050
+},
+{
+"siesa": "5020051",
+"referencia": "BOLSA VALV PORCELANICO INTERIOR 40KG",
+"und": 1341
+},
+{
 "siesa": "5020264",
 "referencia": "BOLSA ABIERTA PEGA BUENO CERAM 25 KG",
 "und": 49400

@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712s"></script>
-<script src="../shared/config.js?v=20260712s"></script>
-<script src="../shared/inventario_base.js?v=20260712s"></script>
-<script src="../shared/sku_maestro.js?v=20260712s"></script>
-<script src="../shared/pedidos_base.js?v=20260712s"></script>
-<script src="../shared/calculos.js?v=20260712s"></script>
+<script src="../shared/data.js?v=20260712t"></script>
+<script src="../shared/config.js?v=20260712t"></script>
+<script src="../shared/inventario_base.js?v=20260712t"></script>
+<script src="../shared/sku_maestro.js?v=20260712t"></script>
+<script src="../shared/pedidos_base.js?v=20260712t"></script>
+<script src="../shared/calculos.js?v=20260712t"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1522,9 +1522,8 @@ function BodegaInventario({reports, okSet}){
   const [showFilter,setShowFilter]=useState(false);
   const [traza,setTraza]=useState(null);
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
-  // Solo Producto Terminado CON ingreso a SIESA confirmado.
-  const confirmados=reports.filter(r=>requiereSiesa(r) && okSet.has(reporteId(r)));
-  const invAll=inventarioPT(confirmados);
+  // Inventario físico del corte + producción confirmada posterior al corte.
+  const invAll=inventarioBodegaPT(reports, okSet);
   const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
   const sectores=["Todos",...new Set(invAll.map(x=>x.sector).filter(s=>s&&s!=="-"))].sort();
   // Filtros (afectan tarjetas, gráficos y lista)
@@ -1545,7 +1544,7 @@ function BodegaInventario({reports, okSet}){
   return (
     <div style={{marginBottom:26}}>
       <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>🏬 Bodega de Inventario <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(confirmado en SIESA · listo para despacho)</span></div>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:16}}>Solo entra la producción de <b>producto terminado</b> con <b>✓ ingreso a SIESA</b>. Antesala de <b>Despachos</b>, separada de Producto Terminado y en Proceso. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:16}}>Inventario físico del <b>corte (17/07)</b> + producción confirmada en SIESA <b>posterior al corte</b>. Antesala de <b>Despachos</b>. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
 
       {/* 1) TARJETAS */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:18}}>
@@ -1605,7 +1604,7 @@ function BodegaInventario({reports, okSet}){
         </table>
       </div>
       {inv.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {inv.length.toLocaleString()}. Usa el buscador para acotar.</div>}
-      {traza && <TrazabilidadModal siesa={traza} reports={confirmados} onClose={()=>setTraza(null)}/>}
+      {traza && <TrazabilidadModal siesa={traza} reports={reports} onClose={()=>setTraza(null)}/>}
     </div>
   );
 }
