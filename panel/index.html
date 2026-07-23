@@ -57,12 +57,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712z"></script>
-<script src="../shared/config.js?v=20260712z"></script>
-<script src="../shared/inventario_base.js?v=20260712z"></script>
-<script src="../shared/sku_maestro.js?v=20260712z"></script>
-<script src="../shared/pedidos_base.js?v=20260712z"></script>
-<script src="../shared/calculos.js?v=20260712z"></script>
+<script src="../shared/data.js?v=20260712z1"></script>
+<script src="../shared/config.js?v=20260712z1"></script>
+<script src="../shared/inventario_base.js?v=20260712z1"></script>
+<script src="../shared/sku_maestro.js?v=20260712z1"></script>
+<script src="../shared/pedidos_base.js?v=20260712z1"></script>
+<script src="../shared/calculos.js?v=20260712z1"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1516,12 +1516,92 @@ function InventarioPT({reports}){
   );
 }
 
+/* ===== DETALLE DE REPORTE (info completa para ingresar a SIESA) ===== */
+function DetalleReporteModal({r, onClose}){
+  const fila=(label,val,mono)=>(
+    val&&val!=='-'&&val!==''?
+    <div style={{display:"flex",gap:8,padding:"7px 0",borderBottom:"1px solid var(--line)",alignItems:"flex-start"}}>
+      <span style={{minWidth:160,fontSize:11.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",flexShrink:0}}>{label}</span>
+      <span style={{fontSize:13,fontFamily:mono?"var(--mono)":"inherit",wordBreak:"break-word"}}>{val}</span>
+    </div>:null
+  );
+  const pesos=loadPesos();
+  const prodKg=produccionKg(r);
+  const mKg=mermaKg(r);
+  const pu=pesoUnidad(r,pesos);
+  return(
+    <Modal title={"📋 Reporte · "+(r.consecutivo||r.maquina||"")} onClose={onClose}>
+      <div style={{fontSize:11.5,color:"var(--text-dim)",marginBottom:14,padding:"8px 12px",background:"rgba(234,179,8,0.08)",borderRadius:8,border:"1px solid rgba(234,179,8,0.2)"}}>
+        ⏳ Pendiente de ingreso a SIESA. Usa esta información para cargarlo y luego márcalo con ✓.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+        {[
+          {label:"Producción",val:(r.produccion||0).toLocaleString()+" "+(r.unidad||""),color:"var(--good)"},
+          {label:"Peso estimado",val:prodKg>0?"≈ "+Math.round(prodKg).toLocaleString()+" kg":"-",color:"var(--good)"},
+          {label:"Merma",val:mKg>0?"≈ "+Math.round(mKg).toLocaleString()+" kg":(r.mermasCantidad||"-"),color:"var(--bad)"},
+        ].map(x=>(
+          <div key={x.label} style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+            <div style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>{x.label}</div>
+            <div style={{fontSize:18,fontWeight:700,fontFamily:"var(--mono)",color:x.color}}>{x.val}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{overflowY:"auto",maxHeight:"55vh"}}>
+        {fila("Consecutivo",r.consecutivo,true)}
+        {fila("Código SIESA",r.siesa,true)}
+        {fila("SKU",r.sku,true)}
+        {fila("Referencia",r.referencia)}
+        {fila("Fecha reporte",r.fecha)}
+        {fila("Fecha turno",fechaLarga(getFechaISO(r))||r.fechaTurno)}
+        {fila("Turno",r.turno)}
+        {fila("Máquina",r.maquina)}
+        {fila("Operario",r.nombre)}
+        {fila("Cargo",r.cargo)}
+        {fila("Hora inicio",r.horaInicio)}
+        {fila("Hora final",r.horaFinal)}
+        {fila("Unidad",r.unidad)}
+        {fila("Peso/unidad",pu>0?pu+" kg":null)}
+        {fila("Merma cantidad",r.mermasCantidad)}
+        {fila("Merma motivo",r.mermasMotivo)}
+        {fila("Tiempos muertos",r.tiemposMuertosMinutos)}
+        {fila("Motivo T. muerto",r.tiemposMuertosMotivo)}
+        {fila("Medida",r.extraMedida)}
+        {fila("Calibre",r.extraCalibre)}
+        {fila("Sentido",r.extraSentido)}
+        {fila("Rollo inicial",r.extraRolloInicial,true)}
+        {fila("Rollo final",r.extraRolloFinal,true)}
+        {fila("Rollos totales",r.extraRollosTotales,true)}
+        {fila("Rollos producidos",r.extraRollosProducidos,true)}
+        {fila("Paquete inicial",r.extraPaqueteInicial,true)}
+        {fila("Paquete final",r.extraPaqueteFinal,true)}
+        {fila("Unidades/paquete",r.extraUnidadesPorPaquete,true)}
+        {fila("Saldo",r.extraSaldo,true)}
+        {r.extraRollos&&r.extraRollos!=='-'&&(
+          <div style={{padding:"7px 0",borderBottom:"1px solid var(--line)"}}>
+            <div style={{fontSize:11.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:6}}>Detalle rollos madre</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {String(r.extraRollos).split("//").map((s,i)=>(
+                <span key={i} style={{background:"var(--panel-2)",borderRadius:6,padding:"3px 10px",fontFamily:"var(--mono)",fontSize:11.5}}>{s.trim()}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {fila("Bodega",r.bodega)}
+        {fila("Categoría",r.categoria)}
+        {fila("Sector",r.sector)}
+        {fila("Observaciones",r.observaciones)}
+      </div>
+    </Modal>
+  );
+}
+
 /* ===== FASE B: PENDIENTES DE INGRESO A SIESA (prioridad, en la parte superior) =====
    Reportes de PRODUCTO TERMINADO que aún no se han confirmado en SIESA. Quedan en
    standby hasta marcarlos; al marcarlos pasan a la Bodega de Inventario. */
 function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
+  const [detalle,setDetalle]=useState(null); // reporte seleccionado para ver info completa
   const totalPend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
   const q=buscar.trim().toLowerCase();
   let pend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r)));
@@ -1555,7 +1635,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
           <div style={{overflowX:"auto",overflowY:"auto",maxHeight:320,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel-2)"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
               <thead><tr style={{textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Consecutivo"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Consecutivo","Info"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {pend.slice(0,400).map((r,i)=>{
@@ -1568,6 +1648,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
                       <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
                       <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.produccion} {r.unidad}</td>
                       <td style={{padding:"7px 10px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
+                      <td style={{padding:"7px 8px"}}><button onClick={()=>setDetalle(r)} title="Ver información completa del reporte" style={{background:"var(--panel-2)",color:"var(--accent)",border:"1px solid var(--line)",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>🔎 Ver</button></td>
                     </tr>
                   );
                 })}
@@ -1577,6 +1658,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
           {pend.length>400 && <div style={{fontSize:11,color:"var(--text-dim)",marginTop:6}}>Mostrando 400 de {pend.length}. Usa el buscador para acotar.</div>}
         </div>
       )}
+      {detalle && <DetalleReporteModal r={detalle} onClose={()=>setDetalle(null)}/>}
     </div>
   );
 }
