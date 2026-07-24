@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723b"></script>
+<script src="../shared/calculos.js?v=20260723c"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1529,6 +1529,20 @@ function DetalleReporteModal({r, lam, onClose}){
   const prodKg=produccionKg(r);
   const mKg=mermaKg(r);
   const pu=pesoUnidad(r,pesos);
+  // ⏱️ Tiempos por proceso (estimado según metas editables). Base kg = peso estimado + merma.
+  const metasT=loadMetas();
+  const metaDe=(maq)=>((metasT[maq]||{}).meta)||0;
+  const kgBase=(prodKg||0)+(mKg||0);
+  const unidadRep=String(r.unidad||'').toLowerCase();
+  const undSell=unidadRep.indexOf('kg')===0 ? (pu>0?(Number(r.produccion)||0)/pu:0) : (Number(r.produccion)||0);
+  const fmtHoras=(h)=>{ if(!(h>0)) return "-"; let hh=Math.floor(h), mm=Math.round((h-hh)*60); if(mm===60){hh++;mm=0;} return h.toFixed(1)+" h ("+(hh>0?hh+"h ":"")+mm+"m)"; };
+  const procesos=[];
+  const mExt=metaDe("Extrusora 1")||metaDe("Extrusora 2");
+  if(mExt>0 && kgBase>0) procesos.push({proc:"Extrusión",cant:kgBase,unidad:"kg",meta:mExt,metaU:"kg/h",horas:kgBase/mExt});
+  if(lam && lam.tieneImpresion){ const mI=metaDe("Impresora"); if(mI>0 && kgBase>0) procesos.push({proc:"Impresión",cant:kgBase,unidad:"kg",meta:mI,metaU:"kg/h",horas:kgBase/mI}); }
+  if(lam && lam.tieneDoblado){ const mD=metaDe("Refiladora"); if(mD>0 && kgBase>0) procesos.push({proc:"Doblado",cant:kgBase,unidad:"kg",meta:mD,metaU:"kg/h",horas:kgBase/mD}); }
+  if((window.MAQUINAS_UND||[]).indexOf(r.maquina)>=0){ const mS=metaDe(r.maquina); if(mS>0 && undSell>0) procesos.push({proc:"Sellado",cant:undSell,unidad:"und",meta:mS,metaU:"und/h",horas:undSell/mS}); }
+  const totalH=procesos.reduce((s,p)=>s+p.horas,0);
   return(
     <Modal title={"📋 "+String(r.siesa||'')+" · "+(r.referencia||'').slice(0,40)} onClose={onClose}>
       <div style={{fontSize:11.5,color:"var(--text-dim)",marginBottom:14,padding:"8px 12px",background:"rgba(234,179,8,0.08)",borderRadius:8,border:"1px solid rgba(234,179,8,0.2)"}}>
@@ -1610,6 +1624,31 @@ function DetalleReporteModal({r, lam, onClose}){
         {fila("Sector",r.sector)}
         {fila("Observaciones",r.observaciones)}
       </div>
+      {procesos.length>0 && (
+        <div style={{marginTop:14,padding:"12px 14px",background:"rgba(124,179,66,0.08)",border:"1px solid rgba(124,179,66,0.3)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>⏱️ Tiempos por proceso (estimado según metas)</div>
+          <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>Base en kg = peso estimado + merma (<b>{Math.round(kgBase).toLocaleString()} kg</b>). Sellado por unidades. Metas editables del panel.</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{textAlign:"left",color:"var(--text-dim)"}}>
+              {["Proceso","Cantidad","Meta","Tiempo estimado"].map(h=><th key={h} style={{padding:"4px 6px",fontWeight:600,fontSize:10.5,textTransform:"uppercase"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {procesos.map(p=>(
+                <tr key={p.proc} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"6px 6px",fontWeight:600}}>{p.proc}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)"}}>{Math.round(p.cant).toLocaleString()} {p.unidad}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{p.meta.toLocaleString()} {p.metaU}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--accent)"}}>{fmtHoras(p.horas)}</td>
+                </tr>
+              ))}
+              <tr style={{borderTop:"2px solid var(--line)"}}>
+                <td style={{padding:"6px 6px",fontWeight:700}} colSpan="3">Total estimado</td>
+                <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--good)"}}>{fmtHoras(totalH)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </Modal>
   );
 }

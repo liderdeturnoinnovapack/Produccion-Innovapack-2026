@@ -431,7 +431,8 @@ function laminaConsumoInfo(reports){
       byReport[reporteId(r)] = {
         medida: medida, baseKg: baseKg, poolKg: poolKg,
         consumoKg: cons, disponibleKg: dispAntes, saldoKg: dispAntes - cons,
-        nImpresion: a.nImp||0, tieneLamina: tiene
+        nImpresion: a.nImp||0, tieneImpresion: (a.impKg||0) > 0, tieneDoblado: (a.dobKg||0) > 0,
+        tieneLamina: tiene
       };
       acum += cons;
     });
