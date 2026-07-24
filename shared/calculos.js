@@ -207,7 +207,7 @@ var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas',
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
   try{
-    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor }) });
+    await fetch(window.__CONFIG_URL, { method:"POST", body: JSON.stringify({ tipo:"config", clave: clave, valor: valor, usuario: window.__AUTH_USER||'', pass: window.__AUTH_PASS||'' }) });
   }catch(e){}
 }
 
@@ -617,11 +617,13 @@ function calcRendimiento(report, metasOverride){
 }
 
 /* ---------------------- Google Sheets ----------------------------- */
-/* La URL se pasa por parámetro. El endpoint nuevo no exige PIN en la URL;
-   la protección es el PinGate local del panel. */
+/* Lectura de reportes. Envía usuario/clave (window.__AUTH_*) porque el servidor
+   exige un usuario válido (Fase A: usuarios + roles). */
 async function loadReports(url, pin){
   try{
-    const resp = await fetch(url);
+    const sep = url.indexOf("?")>=0 ? "&" : "?";
+    const q = "usuario="+encodeURIComponent(window.__AUTH_USER||'')+"&pass="+encodeURIComponent(window.__AUTH_PASS||'');
+    const resp = await fetch(url + sep + q);
     const data = await resp.json();
     if(!Array.isArray(data)) return [];
     var arr = data.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
@@ -643,9 +645,36 @@ async function loadReports(url, pin){
   }catch(e){ return []; }
 }
 
-/* Validación de PIN local (ya no llama al servidor). */
-async function validarPin(url, pin){
-  return pin === "072026";
+/* ===== LOGIN / REGISTRO / PERMISOS (Fase A: usuarios + roles) ===== */
+/* Login contra la hoja Usuarios (validado en el Apps Script). {ok,nombre,rol}. */
+async function validarLogin(url, usuario, pass){
+  try{
+    const sep = url.indexOf("?")>=0 ? "&" : "?";
+    const q = "tipo=login&usuario="+encodeURIComponent(usuario||'')+"&pass="+encodeURIComponent(pass||'');
+    const resp = await fetch(url + sep + q);
+    const data = await resp.json();
+    return (data && data.ok) ? {ok:true, nombre:data.nombre||'', rol:String(data.rol||'').toLowerCase()} : {ok:false};
+  }catch(e){ return {ok:false, error:'red'}; }
+}
+
+/* Autoregistro por área (código + cupo, validados en el servidor). {ok,nombre,rol} o {ok:false,error}. */
+async function registrarUsuario(url, area, codigo, nombre, usuario, pass){
+  try{
+    const resp = await fetch(url, { method:"POST", body: JSON.stringify({ tipo:"registro", area:area, codigo:codigo, nombre:nombre, usuario:usuario, pass:pass }) });
+    const data = await resp.json();
+    if(data && data.ok) return {ok:true, nombre:data.nombre||'', rol:String(data.rol||'').toLowerCase()};
+    return {ok:false, error:(data&&data.error)||'No se pudo registrar.'};
+  }catch(e){ return {ok:false, error:'Error de red.'}; }
+}
+
+/* Permisos por rol. Flags de visualización (ver*) y de edición (edit*). */
+function permisosDe(rol){
+  rol = String(rol||'').toLowerCase();
+  if(rol==='admin')          return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:true,  editInv:true,  editDespachos:true,  editSiesa:true };
+  if(rol==='logistico')      return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:true,  editDespachos:true,  editSiesa:false };
+  if(rol==='administrativo') return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
+  if(rol==='gerencia')       return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
+  return { verGeneral:false, verInv:false, verDespachos:false, verBodegas:false, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
 }
 
 /* Guarda un reporte enviando SOLO datos crudos + una foto de clasificación

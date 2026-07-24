@@ -3,34 +3,44 @@
    ----------------------------------------------------------------------------
    Copia versionada del script desplegado como Web App (doGet/doPost).
    NO se ejecuta desde el repo; vive en el editor de Apps Script (Google).
-   Este archivo es el respaldo/fuente de verdad para control de versiones.
 
    Endpoints:
-   - doGet  ?tipo=config        -> devuelve la hoja Config (clave/valor JSON)
-   - doGet  (por defecto)       -> devuelve todos los reportes (todas las hojas
-                                   de maquina, excepto las especiales)
-   - doPost {tipo:"config",...} -> guarda/actualiza una clave de config
-   - doPost {tipo:"audit",...}  -> registra una fila de auditoria
-   - doPost (por defecto)       -> guarda un reporte en la hoja de su maquina
+   - doGet  ?tipo=login&usuario=&pass=  -> valida usuario -> {ok,nombre,rol}
+   - doGet  ?tipo=config                -> devuelve la hoja Config (abierta)
+   - doGet  (por defecto)               -> reportes; EXIGE usuario valido
+   - doPost {tipo:"registro",...}       -> autoregistro por area (codigo + cupo)
+   - doPost {tipo:"config",...}         -> guarda config; permiso segun rol/clave
+   - doPost {tipo:"audit",...}          -> registra una fila de auditoria
+   - doPost (por defecto)               -> guarda un reporte (operarios, abierto)
 
-   Funciones de mantenimiento (ejecutar a mano desde el editor):
-   - REPARAR_AHORA()  -> realinea filas que se guardaron corridas (bug de
-                         columnas: un timestamp de 13 digitos caia en "Fecha").
-   - REPARAR_SIESA()  -> recupera codigos (Codigo Siesa/SKU/Consecutivo) que
-                         quedaron con formato de fecha y fija la columna como
-                         texto plano.
+   Mantenimiento (ejecutar a mano desde el editor):
+   - configurarUsuarios()        -> crea la hoja Usuarios con los 2 admin
+   - REPARAR_AHORA()             -> realinea filas de reporte corridas
+   - REPARAR_SIESA()             -> recupera codigos que quedaron como fecha
 
-   Notas de diseno:
-   - guardarReporte_ escribe cada campo buscando SU columna por nombre de
-     encabezado (inmune al orden de columnas y a columnas de mas/menos).
-   - Las columnas de codigos se guardan como TEXTO para que Sheets no convierta
-     los codigos numericos (~5.000.000) en fechas del ano 15699.
+   SEGURIDAD (leer):
+   - La clave de admin va como PLACEHOLDER aqui. Ponla real en el editor antes
+     de ejecutar configurarUsuarios() y NO la subas al repo publico.
+   - Los codigos de area son un filtro simple de registro (adivinables). Para
+     mas seguridad cambialos por valores no obvios.
    ========================================================================== */
 
 var SS = SpreadsheetApp.getActiveSpreadsheet();
 var HOJAS_ESPECIALES = ['Config', 'Usuarios', 'Auditoria'];
 
-// Orden camelCase que manda el frontend (se usa SOLO para reparar filas viejas dañadas).
+/* ===== USUARIOS Y ROLES ===== */
+var ROLES_AUTOREGISTRO = ['logistico', 'administrativo', 'gerencia'];
+var CUPO_POR_AREA = 3;
+// Codigos de registro por area (cambialos para mas seguridad).
+var CODIGOS_AREA = {
+  logistico:      'logistica2026',
+  administrativo: 'administracion2026',
+  gerencia:       'gerencia2026'
+};
+// Claves de config que un LOGISTICO puede escribir (operativo). El resto = solo admin.
+var CONFIG_LOGISTICO = ['ajustes_inventario', 'despachos', 'pedidos_extra'];
+
+/* Columnas de un reporte (orden camelCase que manda el frontend) — para reparar. */
 var REPORTE_COLS = [
   'ts','fecha','fechaTurno','nombre','cargo','maquina','horaInicio','horaFinal','turno',
   'siesa','sku','referencia','unidad','produccion','mermasCantidad','mermasMotivo',
@@ -40,8 +50,7 @@ var REPORTE_COLS = [
   'extraRollos','consecutivo','observaciones','bodega','categoria','sector'
 ];
 
-// Encabezado en ESPAÑOL (el que ya usan tus hojas y el que lee el panel).
-// Solo se usa para crear hojas NUEVAS, para que nazcan consistentes.
+// Encabezado en ESPANOL (el que usan las hojas por maquina y lee el panel).
 var HEADER_ES = [
   'Fecha','Nombre','Cargo','Maquina','Hora inicio','Hora final','Turno',
   'Codigo Siesa','SKU','Referencia','Unidad','Produccion','Merma Cantidad','Merma Motivo',
@@ -51,7 +60,7 @@ var HEADER_ES = [
   'Fecha Turno','Consecutivo','Observaciones','Bodega','Categoria','Sector'
 ];
 
-// Mapa: encabezado de la hoja -> clave que manda el frontend (con/sin tilde).
+// Mapa: encabezado de la hoja -> clave que manda el frontend.
 var HEADER_MAP = {
   'Fecha':'fecha', 'Nombre':'nombre', 'Cargo':'cargo',
   'Maquina':'maquina', 'Máquina':'maquina',
@@ -71,30 +80,115 @@ var HEADER_MAP = {
   'Bodega':'bodega', 'Categoria':'categoria', 'Categoría':'categoria', 'Sector':'sector'
 };
 
-// Columnas que deben guardarse SIEMPRE como texto (evita que Sheets convierta
-// los códigos numéricos ~5.000.000 en fechas del año 15699).
+// Columnas que se guardan SIEMPRE como texto (evita que Sheets vuelva fecha un codigo).
 var COLS_TEXTO = ['Codigo Siesa','Código Siesa','SKU','Consecutivo'];
 
-/* ================= FUNCIONES DE MANTENIMIENTO (ejecutar a mano) ================= */
+/* ================= MANTENIMIENTO (ejecutar a mano) ================= */
 
-// Recupera filas guardadas corridas (Fecha con timestamp de 13 dígitos).
-function REPARAR_AHORA() {
-  var n = repararReportesCorruptos_();
-  Logger.log('Filas reparadas: ' + n);
-  return n;
+// Semilla de usuarios. Ejecutar UNA vez desde el editor.
+// IMPORTANTE: reemplaza 'CAMBIAR_EN_EDITOR' por la clave real de admin (ej. 072026)
+// antes de ejecutar. No subas la clave real al repo.
+function configurarUsuarios() {
+  var CLAVE_ADMIN = 'CAMBIAR_EN_EDITOR';
+  var sh = SS.getSheetByName('Usuarios');
+  if (!sh) sh = SS.insertSheet('Usuarios');
+  sh.clear();
+  sh.getRange(1, 1, 1, 5).setNumberFormat('@'); // usuario/pass como texto
+  sh.appendRow(['usuario', 'pass', 'nombre', 'rol', 'activo']);
+  sh.appendRow(['gabriel.unda', CLAVE_ADMIN, 'Gabriel Unda', 'admin', 'SI']);
+  sh.appendRow(['jose.cortes', CLAVE_ADMIN, 'Jose Cortes', 'admin', 'SI']);
+  sh.getRange(1, 1, sh.getLastRow(), 2).setNumberFormat('@');
+  Logger.log('Hoja Usuarios lista (2 admin). Los demas se autoregistran por area.');
+  return 'OK';
 }
 
-// Recupera códigos que quedaron como FECHA y fija las columnas de códigos como texto.
-function REPARAR_SIESA() {
-  var n = repararSiesaFechas_();
-  Logger.log('Columnas de códigos reparadas: ' + n);
-  return n;
+function REPARAR_AHORA() { var n = repararReportesCorruptos_(); Logger.log('Filas reparadas: ' + n); return n; }
+function REPARAR_SIESA() { var n = repararSiesaFechas_(); Logger.log('Columnas de codigos reparadas: ' + n); return n; }
+
+/* -------------------------- USUARIOS -------------------------- */
+function leerUsuarios_() {
+  var sh = SS.getSheetByName('Usuarios');
+  if (!sh) return [];
+  var datos = sh.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < datos.length; i++) {
+    var u = String(datos[i][0]).trim();
+    if (!u) continue;
+    out.push({
+      usuario: u,
+      pass: String(datos[i][1]),
+      nombre: String(datos[i][2] || ''),
+      rol: String(datos[i][3] || '').trim().toLowerCase(),
+      activo: String(datos[i][4] || '').trim().toUpperCase() !== 'NO'
+    });
+  }
+  return out;
+}
+
+// Valida usuario+clave -> {ok, nombre, rol} o {ok:false}.
+function validarLogin_(usuario, pass) {
+  var u = String(usuario || '').trim().toLowerCase();
+  var p = String(pass == null ? '' : pass);
+  var lista = leerUsuarios_();
+  for (var i = 0; i < lista.length; i++) {
+    if (lista[i].usuario.toLowerCase() === u && lista[i].pass === p && lista[i].activo) {
+      return { ok: true, nombre: lista[i].nombre, rol: lista[i].rol };
+    }
+  }
+  return { ok: false };
+}
+
+function esAdmin_(usuario, pass) {
+  var v = validarLogin_(usuario, pass);
+  return v.ok && v.rol === 'admin';
+}
+
+// Permiso de escritura de config segun rol y clave.
+function puedeGuardarConfig_(clave, usuario, pass) {
+  var v = validarLogin_(usuario, pass);
+  if (!v.ok) return false;
+  if (v.rol === 'admin') return true;
+  if (v.rol === 'logistico') return CONFIG_LOGISTICO.indexOf(String(clave)) !== -1;
+  return false; // administrativo / gerencia: no escriben config
+}
+
+// Autoregistro por area (codigo + cupo). Devuelve {ok,nombre,rol} o {ok:false,error}.
+function registrarUsuario_(area, codigo, nombre, usuario, pass) {
+  area = String(area || '').trim().toLowerCase();
+  if (ROLES_AUTOREGISTRO.indexOf(area) === -1) return { ok: false, error: 'Área no válida.' };
+  if (String(codigo || '') !== CODIGOS_AREA[area]) return { ok: false, error: 'Código de área incorrecto.' };
+  usuario = String(usuario || '').trim();
+  nombre = String(nombre || '').trim();
+  if (!usuario || !pass || !nombre) return { ok: false, error: 'Completa nombre, usuario y clave.' };
+  var lista = leerUsuarios_();
+  var enArea = 0;
+  for (var i = 0; i < lista.length; i++) {
+    if (lista[i].usuario.toLowerCase() === usuario.toLowerCase()) return { ok: false, error: 'Ese usuario ya existe.' };
+    if (lista[i].rol === area) enArea++;
+  }
+  if (enArea >= CUPO_POR_AREA) return { ok: false, error: 'El área ' + area + ' ya tiene sus ' + CUPO_POR_AREA + ' cupos.' };
+  var sh = SS.getSheetByName('Usuarios');
+  if (!sh) { sh = SS.insertSheet('Usuarios'); sh.appendRow(['usuario', 'pass', 'nombre', 'rol', 'activo']); }
+  var r = sh.getLastRow() + 1;
+  sh.getRange(r, 1, 1, 2).setNumberFormat('@');
+  sh.appendRow([usuario, String(pass), nombre, area, 'SI']);
+  registrarAuditoria_(usuario, 'registro', 'Alta autoregistro rol=' + area);
+  return { ok: true, nombre: nombre, rol: area };
 }
 
 /* ---------------------------- GET ---------------------------- */
 function doGet(e) {
   var p = (e && e.parameter) || {};
-  if (p.tipo === 'config') return json_(leerConfig_());
+
+  if (p.tipo === 'login') {
+    var v = validarLogin_(p.usuario, p.pass);
+    if (v.ok) registrarAuditoria_(p.usuario, 'login', 'rol=' + v.rol);
+    return json_(v);
+  }
+  if (p.tipo === 'config') return json_(leerConfig_()); // abierta (form + panel)
+
+  // Lectura de reportes: exige usuario valido.
+  if (!validarLogin_(p.usuario, p.pass).ok) return json_({ error: 'no_autorizado' });
   return json_(leerReportes_());
 }
 
@@ -103,15 +197,22 @@ function doPost(e) {
   var body = {};
   try { body = JSON.parse(e.postData.contents); } catch (err) { body = {}; }
 
+  if (body.tipo === 'registro') {
+    return json_(registrarUsuario_(body.area, body.codigo, body.nombre, body.usuario, body.pass));
+  }
   if (body.tipo === 'config') {
+    if (!puedeGuardarConfig_(body.clave, body.usuario, body.pass)) {
+      return json_({ status: 'error', message: 'Sin permiso para editar esta configuración.' });
+    }
     guardarConfig_(body.clave, body.valor);
+    registrarAuditoria_(body.usuario || '(?)', 'config', 'clave=' + body.clave);
     return json_({ status: 'ok' });
   }
   if (body.tipo === 'audit') {
     registrarAuditoria_(body.usuario || '(anónimo)', body.evento || 'evento', body.detalle || '');
     return json_({ status: 'ok' });
   }
-  guardarReporte_(body);
+  guardarReporte_(body); // operarios, abierto
   return json_({ status: 'ok' });
 }
 
@@ -158,7 +259,7 @@ function guardarConfig_(clave, valor) {
 
 /* -------------------------- REPORTES ------------------------- */
 // Escribe la fila alineando cada campo con SU columna por nombre de encabezado
-// y fuerza texto en las columnas de códigos. Inmune al orden de columnas.
+// y fuerza texto en las columnas de codigos. Inmune al orden de columnas.
 function guardarReporte_(payload) {
   var maquina = String(payload.maquina || 'Sin máquina').trim() || 'Sin máquina';
   payload.ts = new Date().getTime();
@@ -177,7 +278,6 @@ function guardarReporte_(payload) {
   });
   sh.appendRow(fila);
 
-  // Forzar TEXTO en las columnas de códigos de la fila recién agregada.
   var r = sh.getLastRow();
   for (var i = 0; i < cab.length; i++) {
     if (COLS_TEXTO.indexOf(cab[i]) !== -1) {
@@ -208,10 +308,7 @@ function leerReportes_() {
   return out;
 }
 
-/* ---------------- REPARACIÓN 1: filas corridas ----------------
-   Detecta filas cuya columna "Fecha" es un timestamp de 13 dígitos (firma del
-   bug), reconstruye los datos (venían en orden REPORTE_COLS) y los reescribe
-   alineados al encabezado en español. NO borra datos: los realinea. */
+/* ---------------- REPARACIÓN 1: filas corridas ---------------- */
 function repararReportesCorruptos_() {
   var hojas = SS.getSheets();
   var reparadas = 0;
@@ -221,11 +318,11 @@ function repararReportesCorruptos_() {
     var last = sh.getLastRow(), lastCol = sh.getLastColumn();
     if (last < 2) continue;
     var cab = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h).trim(); });
-    if (cab.indexOf('Fecha') !== 0) continue; // solo hojas con encabezado español
+    if (cab.indexOf('Fecha') !== 0) continue;
     var vals = sh.getRange(2, 1, last - 1, lastCol).getValues();
     for (var i = 0; i < vals.length; i++) {
       var raw = vals[i];
-      if (!/^\d{12,}$/.test(String(raw[0]).trim())) continue; // no está corrupta
+      if (!/^\d{12,}$/.test(String(raw[0]).trim())) continue;
       var payload = {};
       for (var c = 0; c < REPORTE_COLS.length; c++) payload[REPORTE_COLS[c]] = raw[c];
       var fila = cab.map(function (h) {
@@ -240,9 +337,7 @@ function repararReportesCorruptos_() {
   return reparadas;
 }
 
-/* ---------------- REPARACIÓN 2: códigos como fecha ----------------
-   Recupera los códigos (Codigo Siesa/SKU/Consecutivo) que quedaron con formato
-   de fecha, revela el número subyacente y fija la columna como texto plano. */
+/* ---------------- REPARACIÓN 2: códigos como fecha ---------------- */
 function repararSiesaFechas_() {
   var hojas = SS.getSheets();
   var arregladas = 0;
@@ -261,10 +356,10 @@ function repararSiesaFechas_() {
         if (Object.prototype.toString.call(vals[i][0]) === '[object Date]') { hayFecha = true; break; }
       }
       if (!hayFecha) continue;
-      rng.setNumberFormat('0');        // revela el número subyacente (el código real)
+      rng.setNumberFormat('0');
       SpreadsheetApp.flush();
       var disp = rng.getDisplayValues();
-      rng.setNumberFormat('@');        // texto plano definitivo
+      rng.setNumberFormat('@');
       rng.setValues(disp.map(function (row) { return [String(row[0]).trim()]; }));
       SpreadsheetApp.flush();
       arregladas++;

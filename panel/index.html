@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723e"></script>
+<script src="../shared/calculos.js?v=20260723f"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -108,22 +108,63 @@ function Modal({title,onClose,children}){
   );
 }
 
-function PinGate({onUnlock}){
-  const [pin,setPin]=useState(""); const [err,setErr]=useState(""); const [checking,setChecking]=useState(false);
-  async function check(e){
-    e.preventDefault(); setErr(""); setChecking(true);
-    /* Validación local — no depende del servidor */
-    const ok = (pin === "072026");
-    setChecking(false);
-    if(ok) onUnlock(pin); else setErr("PIN incorrecto.");
+/* Acceso al panel: login (usuario+clave) o autoregistro por área (código + cupo).
+   Valida contra la hoja Usuarios vía Apps Script. Reemplaza el PIN local. */
+function LoginGate({onLogin}){
+  const [modo,setModo]=useState("login");
+  const [usuario,setUsuario]=useState(""); const [pass,setPass]=useState("");
+  const [area,setArea]=useState("logistico"); const [codigo,setCodigo]=useState(""); const [nombre,setNombre]=useState("");
+  const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+  const inp={...inputStyle,marginBottom:10};
+
+  async function entrar(e){
+    e.preventDefault(); setErr(""); setBusy(true);
+    const r=await validarLogin(SHEETS_URL_READ, usuario.trim(), pass);
+    setBusy(false);
+    if(r.ok) onLogin({usuario:usuario.trim(), pass, nombre:r.nombre, rol:r.rol});
+    else setErr("Usuario o clave incorrectos.");
   }
+  async function registrar(e){
+    e.preventDefault(); setErr(""); setBusy(true);
+    const r=await registrarUsuario(SHEETS_URL_READ, area, codigo.trim(), nombre.trim(), usuario.trim(), pass);
+    setBusy(false);
+    if(r.ok) onLogin({usuario:usuario.trim(), pass, nombre:r.nombre, rol:r.rol});
+    else setErr(r.error||"No se pudo registrar.");
+  }
+
   return (
-    <form onSubmit={check} style={{maxWidth:320,margin:"80px auto",textAlign:"center"}}>
-      <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:14,textTransform:"uppercase",letterSpacing:"0.05em",fontFamily:"var(--mono)"}}>Panel privado</div>
-      <input style={{...inputStyle,textAlign:"center",letterSpacing:"0.3em",fontSize:18}} value={pin} onChange={e=>setPin(e.target.value)} placeholder="PIN" type="password" autoFocus/>
-      {err && <div style={{color:"var(--bad)",fontSize:13,marginTop:10}}>{err}</div>}
-      <button type="submit" disabled={checking} style={{marginTop:16,background:"var(--accent)",color:"var(--accent-text)",border:"none",borderRadius:8,padding:"11px 24px",fontWeight:700,cursor:checking?"default":"pointer",opacity:checking?0.7:1}}>{checking?"Verificando…":"Entrar"}</button>
-    </form>
+    <div style={{maxWidth:360,margin:"70px auto",background:"var(--card)",border:"1px solid var(--line)",borderRadius:14,padding:"26px 24px",boxShadow:"0 2px 10px rgba(0,0,0,0.06)"}}>
+      <div style={{fontSize:13,color:"var(--text-dim)",marginBottom:16,textTransform:"uppercase",letterSpacing:"0.05em",fontFamily:"var(--head)",fontWeight:700,textAlign:"center"}}>Panel de Producción · Acceso</div>
+      <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:9,padding:3,marginBottom:18}}>
+        {[['login','Iniciar sesión'],['registro','Registrarme']].map(([k,l])=>(
+          <button key={k} onClick={()=>{setModo(k);setErr("");}} style={{flex:1,background:modo===k?"var(--card)":"transparent",color:modo===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:7,padding:"7px 0",fontWeight:modo===k?700:500,fontSize:13,cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      {modo==='login' ? (
+        <form onSubmit={entrar}>
+          <input style={inp} value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Usuario" autoFocus/>
+          <input style={inp} type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Clave"/>
+          {err && <div style={{color:"var(--bad)",fontSize:12.5,marginBottom:10}}>{err}</div>}
+          <button type="submit" disabled={busy} style={{width:"100%",background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:700,cursor:busy?"default":"pointer",opacity:busy?0.7:1}}>{busy?"Verificando…":"Entrar"}</button>
+        </form>
+      ) : (
+        <form onSubmit={registrar}>
+          <div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:5}}>Área</div>
+          <select style={inp} value={area} onChange={e=>setArea(e.target.value)}>
+            <option value="logistico">Logístico</option>
+            <option value="administrativo">Administrativo</option>
+            <option value="gerencia">Gerencia</option>
+          </select>
+          <input style={inp} value={codigo} onChange={e=>setCodigo(e.target.value)} placeholder="Código de área"/>
+          <input style={inp} value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre"/>
+          <input style={inp} value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Usuario (para entrar)"/>
+          <input style={inp} type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Clave"/>
+          {err && <div style={{color:"var(--bad)",fontSize:12.5,marginBottom:10}}>{err}</div>}
+          <button type="submit" disabled={busy} style={{width:"100%",background:"var(--brand-green)",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:700,cursor:busy?"default":"pointer",opacity:busy?0.7:1}}>{busy?"Registrando…":"Registrarme y entrar"}</button>
+          <div style={{fontSize:11,color:"var(--text-dim)",marginTop:10,textAlign:"center"}}>Máximo 3 usuarios por área. Admin es fijo.</div>
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -1654,7 +1695,7 @@ function DetalleReporteModal({r, lam, onClose}){
 /* ===== FASE B: PENDIENTES DE INGRESO A SIESA (prioridad, en la parte superior) =====
    Reportes de PRODUCTO TERMINADO que aún no se han confirmado en SIESA. Quedan en
    standby hasta marcarlos; al marcarlos pasan a la Bodega de Inventario. */
-function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
+function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
   const [detalle,setDetalle]=useState(null); // reporte seleccionado para ver info completa
@@ -1687,7 +1728,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
         <div style={{padding:"0 16px 14px"}}>
           <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
             <input style={{...inputStyle,fontSize:12,padding:"7px 10px",maxWidth:280}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia, código, máquina…"/>
-            <button onClick={()=>onMarcarTodos(idsVisibles)} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ Marcar {q?`los ${pend.length} visibles`:"todos"} como ingresados</button>
+            {puedeEditar && <button onClick={()=>onMarcarTodos(idsVisibles)} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ Marcar {q?`los ${pend.length} visibles`:"todos"} como ingresados</button>}
           </div>
           <div style={{overflowX:"auto",overflowY:"auto",maxHeight:320,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel-2)"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
@@ -1699,7 +1740,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
                   const id=reporteId(r);
                   return (
                     <tr key={id||i} onClick={()=>setDetalle(r)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}} title="Clic para ver información completa del reporte">
-                      <td style={{padding:"7px 10px",textAlign:"center"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={false} onChange={()=>onToggle(id)} title="Marcar ingreso a SIESA" style={{width:16,height:16,cursor:"pointer",accentColor:"var(--good)"}}/></td>
+                      <td style={{padding:"7px 10px",textAlign:"center"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={false} disabled={!puedeEditar} onChange={()=>puedeEditar&&onToggle(id)} title={puedeEditar?"Marcar ingreso a SIESA":"Solo el admin puede marcar SIESA"} style={{width:16,height:16,cursor:puedeEditar?"pointer":"not-allowed",accentColor:"var(--good)",opacity:puedeEditar?1:0.4}}/></td>
                       <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
                       <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
                       <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
@@ -1836,7 +1877,7 @@ function HistorialAjustes({onVer}){
 }
 
 /* ===== FASE C: BODEGA DE INVENTARIO (solo lo confirmado en SIESA, antesala de Despachos) ===== */
-function BodegaInventario({reports, okSet}){
+function BodegaInventario({reports, okSet, puedeEditar}){
   const [subTab,setSubTab]=useState('inv');
   const [buscar,setBuscar]=useState("");
   const [fCategoria,setFCategoria]=useState("Todas");
@@ -1950,7 +1991,9 @@ function BodegaInventario({reports, okSet}){
                 <td style={{padding:"8px 10px",fontSize:12,fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{ddTxt}</td>
                 <td style={{padding:"8px 10px",color:"var(--accent)",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>🔎 ver</td>
                 <td style={{padding:"8px 8px",whiteSpace:"nowrap"}}>
-                  <button title="Registrar salida / ajuste de inventario" onClick={e=>{e.stopPropagation();setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.unidades});}} style={{background:"rgba(220,38,38,0.1)",color:"var(--bad)",border:"1px solid rgba(220,38,38,0.2)",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✂️</button>
+                  {puedeEditar
+                    ? <button title="Registrar salida / ajuste de inventario" onClick={e=>{e.stopPropagation();setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.unidades});}} style={{background:"rgba(220,38,38,0.1)",color:"var(--bad)",border:"1px solid rgba(220,38,38,0.2)",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✂️</button>
+                    : <span style={{color:"var(--text-dim)"}}>—</span>}
                 </td>
               </tr>
             );})}
@@ -2177,7 +2220,7 @@ function HistorialDespachos(){
 }
 
 /* ===== PEDIDOS Y DESPACHOS (vinculado a la Bodega de Inventario) ===== */
-function Despachos({reports, okSet}){
+function Despachos({reports, okSet, puedeEditar}){
   const [subTab,setSubTab]=useState('activos');
   const [buscar,setBuscar]=useState("");
   const [fCliente,setFCliente]=useState("Todos");
@@ -2237,7 +2280,7 @@ function Despachos({reports, okSet}){
           <div style={{fontSize:15,fontWeight:700,fontFamily:"var(--head)"}}>🚚 Pedidos y Despachos</div>
           <div style={{fontSize:12,color:"var(--text-dim)",marginTop:2}}>El pendiente se reduce al registrar despachos. Los pedidos completamente despachados pasan al <b>Historial</b>.</div>
         </div>
-        <button onClick={()=>setShowForm(true)} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>➕ Agregar pedido</button>
+        {puedeEditar && <button onClick={()=>setShowForm(true)} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>➕ Agregar pedido</button>}
       </div>
       <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
         {[['activos','📋 Activos ('+activos.length+')'],['historial','✅ Historial ('+nDesp+')']].map(([k,label])=>(
@@ -2301,7 +2344,7 @@ function Despachos({reports, okSet}){
                   <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontWeight:600,color:"var(--good)"}} title={"Stock total ref.: "+p.dispTotal.toLocaleString()+" und"}>{p.dispAsignado.toLocaleString()}</td>
                   <td style={{padding:"8px 10px",whiteSpace:"nowrap",fontWeight:600}}>{p.alcanza?<span style={{color:"var(--good)"}}>✅ Completo</span>:(p.parcial?<span style={{color:"var(--amber)"}}>⚠️ Parcial</span>:<span style={{color:"var(--text-dim)"}}>— Sin inv.</span>)}</td>
                   <td style={{padding:"8px 8px",whiteSpace:"nowrap"}}>
-                    <button title="Registrar despacho" onClick={()=>setDespachandoPed({pedido:p.pedido,item:p.item,resumen:p.resumen,cliente:p.cliente,pendienteActual:p.pendReal})} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer",marginRight:4}}>📦 Despachar</button>
+                    {puedeEditar && <button title="Registrar despacho" onClick={()=>setDespachandoPed({pedido:p.pedido,item:p.item,resumen:p.resumen,cliente:p.cliente,pendienteActual:p.pendReal})} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer",marginRight:4}}>📦 Despachar</button>}
                     <button title="Ver historial de este pedido" onClick={()=>setLupaHist({pedido:p.pedido,item:p.item,resumen:p.resumen,cliente:p.cliente})} style={{background:"var(--panel-2)",color:"var(--text-dim)",border:"1px solid var(--line)",borderRadius:7,padding:"5px 10px",fontSize:12,cursor:"pointer"}}>🔎</button>
                   </td>
                 </tr>
@@ -2419,8 +2462,15 @@ function LastUpdated({ts}){
   return <span style={{fontSize:11.5,color:"var(--text-dim)",whiteSpace:"nowrap"}}>🕒 Actualizado {txt}</span>;
 }
 
-function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
-  const [tab,setTab]=useState('general');
+function PanelView({rol,catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
+  const perm = permisosDe(rol);
+  const TABS = [
+    ['general','📊 General', perm.verGeneral],
+    ['inv','🏬 Bodega Inventario', perm.verInv],
+    ['despachos','🚚 Pedidos y Despachos', perm.verDespachos],
+    ['bodegas','📦 Producción por bodega', perm.verBodegas]
+  ].filter(function(t){ return t[2]; });
+  const [tab,setTab]=useState((TABS[0] && TABS[0][0]) || 'general');
   const [subBodega,setSubBodega]=useState('pt'); // sub-pestaña dentro de "Producción por bodega"
   const [subInv,setSubInv]=useState('pt'); // sub-pestaña dentro de "Bodega de Inventario"
   const [showMetas,setShowMetas]=useState(false);
@@ -2434,7 +2484,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
     <div style={{maxWidth:1680,margin:"0 auto",padding:"28px 32px 60px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",flexWrap:"wrap"}}>
-          {[['general','📊 General'],['inv','🏬 Bodega Inventario'],['despachos','🚚 Pedidos y Despachos'],['bodegas','📦 Producción por bodega']].map(([k,label])=>(
+          {TABS.map(([k,label])=>(
             <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?"var(--card)":"transparent",color:tab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:tab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:tab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
@@ -2448,7 +2498,7 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
       {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
 
       {/* Fase B: reportes en standby hasta ingreso a SIESA — solo en el panel de Producción por bodega */}
-      {tab==='bodegas' && <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa}/>}
+      {tab==='bodegas' && <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa}/>}
 
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='inv' && <>
@@ -2457,16 +2507,16 @@ function PanelView({catalog,setCatalog,machines,setMachines,reports,refreshRepor
             <button key={k} onClick={()=>setSubInv(k)} style={{background:subInv===k?"var(--card)":"transparent",color:subInv===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subInv===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subInv===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
-        {subInv==='pt' && <div className="fade-in" key={"ipt_"+metasVer}><BodegaInventario reports={reports} okSet={siesaOk}/></div>}
+        {subInv==='pt' && <div className="fade-in" key={"ipt_"+metasVer}><BodegaInventario reports={reports} okSet={siesaOk} puedeEditar={perm.editInv}/></div>}
         {subInv==='pp' && <div className="fade-in" key={"ipp_"+metasVer}><ConsumosLamina reports={reports}/></div>}
       </>}
-      {tab==='despachos' && <Despachos reports={reports} okSet={siesaOk}/>}
+      {tab==='despachos' && <Despachos reports={reports} okSet={siesaOk} puedeEditar={perm.editDespachos}/>}
       {tab==='general' && <>
         <GeneralTab key={metasVer} reports={reports}/>
-        <div style={{marginTop:24}}>
+        {perm.editAdmin && <div style={{marginTop:24}}>
           <div style={{fontWeight:700,fontSize:15,marginBottom:12,fontFamily:"var(--head)"}}>Administración</div>
           <CatalogEditor catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} onEditMetas={()=>setShowMetas(true)}/>
-        </div>
+        </div>}
       </>}
       {tab==='bodegas' && <>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
@@ -2496,23 +2546,28 @@ function App(){
   const [catalog,setCatalog]=useState(loadCatalog());
   const [machines,setMachines]=useState(loadMachines());
   const [reports,setReports]=useState([]);
-  const [unlocked,setUnlocked]=useState(false);
+  const [user,setUser]=useState(null);   // {usuario,pass,nombre,rol}
   const [loading,setLoading]=useState(false);
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-panel')||'light';}catch(e){return 'light';}});
   const [lastUpdated,setLastUpdated]=useState(null);
+  const unlocked=!!user;
   useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-panel',theme);}catch(e){}},[theme]);
 
   async function refreshReports(){
     setLoading(true);
     const cfg=await loadConfigRemoto(SHEETS_URL_READ); // config compartida desde el Sheet
-    await migrarConfigInicial(cfg);                    // sube lo local si el Sheet aún no lo tiene
+    if(window.__AUTH_ROL==='admin') await migrarConfigInicial(cfg); // solo admin sube config al Sheet
     setCatalog(loadCatalog()); setMachines(loadMachines());
-    const data=await loadReports(SHEETS_URL_READ, window.__AUTH_PIN); // lectura con PIN
+    const data=await loadReports(SHEETS_URL_READ); // lectura con usuario/clave (window.__AUTH_*)
     setReports(data);
     setLastUpdated(Date.now());
     setLoading(false);
   }
   useEffect(()=>{ if(unlocked) refreshReports(); },[unlocked]);
+
+  function onLogin(u){ window.__AUTH_USER=u.usuario; window.__AUTH_PASS=u.pass; window.__AUTH_ROL=u.rol; setUser(u); }
+  function salir(){ window.__AUTH_USER=null; window.__AUTH_PASS=null; window.__AUTH_ROL=null; setUser(null); setReports([]); }
+  const rolLabel={admin:'Admin',logistico:'Logístico',administrativo:'Administrativo',gerencia:'Gerencia'};
 
   return(
     <div id="app-root">
@@ -2520,12 +2575,14 @@ function App(){
         <Logo/>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
           {unlocked && loading && <span style={{fontSize:12,color:"var(--text-dim)"}}>Cargando…</span>}
+          {unlocked && <span style={{fontSize:12.5,color:"var(--text-dim)",whiteSpace:"nowrap"}}>👤 {user.nombre||user.usuario} · <b style={{color:"var(--text)"}}>{rolLabel[user.rol]||user.rol}</b></span>}
+          {unlocked && <button onClick={salir} style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,color:"var(--text)"}}>Salir</button>}
           <ThemeToggle theme={theme} setTheme={setTheme}/>
         </div>
       </header>
       {unlocked
-        ? <PanelView catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
-        : <PinGate onUnlock={(p)=>{ window.__AUTH_PIN=p; setUnlocked(true); }}/>}
+        ? <PanelView rol={user.rol} catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
+        : <LoginGate onLogin={onLogin}/>}
     </div>
   );
 }
