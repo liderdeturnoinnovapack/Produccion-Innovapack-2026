@@ -380,7 +380,7 @@ function balanceLamina(reports){
 function laminaConsumoInfo(reports){
   var agg = {}; // siesa -> agregados de lámina
   function ens(s){
-    if(!agg[s]) agg[s] = {impKg:0, impMerma:0, dobKg:0, dobMerma:0, corteKg:0, medidaImp:0, medidaDob:0, termKg:0, nImp:0};
+    if(!agg[s]) agg[s] = {impKg:0, impMerma:0, dobKg:0, dobMerma:0, corteKg:0, medidaImp:0, medidaDob:0, termKg:0, nImp:0, refAny:''};
     return agg[s];
   }
   function medNum(v){ var n = parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n)&&n>0 ? n : 0; }
@@ -398,10 +398,12 @@ function laminaConsumoInfo(reports){
       var a = ens(s);
       a.impKg += produccionKg(r); a.impMerma += mermaKg(r); a.nImp++;
       var md = medNum(r.extraMedida); if(md && !a.medidaImp) a.medidaImp = md;   // prioriza impresión
+      if(!a.refAny) a.refAny = r.referencia||'';
     } else if(/refiladora/i.test(maq) && tipoProceso(r) === 'Lámina Doblada'){
       var a2 = ens(s);
       a2.dobKg += produccionKg(r); a2.dobMerma += mermaKg(r);
       var md2 = medNum(r.extraMedida); if(md2 && !a2.medidaDob) a2.medidaDob = md2; // fallback
+      if(!a2.refAny) a2.refAny = r.referencia||'';
     }
     if(requiereSiesa(r)) ens(s).termKg += produccionKg(r);
   });
@@ -422,6 +424,9 @@ function laminaConsumoInfo(reports){
     var termKg = a.termKg||0;
     var tasa   = termKg > 0 ? baseKg / termKg : 0;
     var medida = a.medidaImp || a.medidaDob || 0;
+    var mm = skuMaestro(s);
+    var tipoRaw = (mm && mm.mat) ? mm.mat : (a.refAny ? _materialDeRef(a.refAny, '') : '');
+    var tipo = tipoRaw === 'Lamina' ? 'Lámina' : (tipoRaw || '');
     var tiene  = baseKg > 0 || poolKg > 0;
     var arr = finishedBySiesa[s].slice().sort(function(x,y){ return (x.ts||0) - (y.ts||0); });
     var acum = 0;
@@ -429,7 +434,7 @@ function laminaConsumoInfo(reports){
       var cons = produccionKg(r) * tasa;
       var dispAntes = poolKg - acum;
       byReport[reporteId(r)] = {
-        medida: medida, baseKg: baseKg, poolKg: poolKg,
+        medida: medida, tipo: tipo, baseKg: baseKg, poolKg: poolKg,
         consumoKg: cons, disponibleKg: dispAntes, saldoKg: dispAntes - cons,
         nImpresion: a.nImp||0, tieneImpresion: (a.impKg||0) > 0, tieneDoblado: (a.dobKg||0) > 0,
         tieneLamina: tiene
