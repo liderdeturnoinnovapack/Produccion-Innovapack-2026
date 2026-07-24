@@ -1560,6 +1560,31 @@ function DetalleReporteModal({r, lam, onClose}){
           </div>
         ))}
       </div>
+      {procesos.length>0 && (
+        <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(124,179,66,0.08)",border:"1px solid rgba(124,179,66,0.3)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>⏱️ Tiempos por proceso (estimado según metas)</div>
+          <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>Base en kg = peso estimado + merma (<b>{Math.round(kgBase).toLocaleString()} kg</b>). Sellado por unidades. Metas editables del panel.</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{textAlign:"left",color:"var(--text-dim)"}}>
+              {["Proceso","Cantidad","Meta","Tiempo estimado"].map(h=><th key={h} style={{padding:"4px 6px",fontWeight:600,fontSize:10.5,textTransform:"uppercase"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {procesos.map(p=>(
+                <tr key={p.proc} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"6px 6px",fontWeight:600}}>{p.proc}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)"}}>{Math.round(p.cant).toLocaleString()} {p.unidad}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{p.meta.toLocaleString()} {p.metaU}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--accent)"}}>{fmtHoras(p.horas)}</td>
+                </tr>
+              ))}
+              <tr style={{borderTop:"2px solid var(--line)"}}>
+                <td style={{padding:"6px 6px",fontWeight:700}} colSpan="3">Total estimado</td>
+                <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--good)"}}>{fmtHoras(totalH)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
       {lam && lam.tieneLamina && (
         <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(0,145,199,0.06)",border:"1px solid rgba(0,145,199,0.25)",borderRadius:10}}>
           <div style={{fontSize:12,fontWeight:700,marginBottom:10,fontFamily:"var(--head)"}}>🧵 Lámina consumida (impresión / doblada)</div>
@@ -1624,31 +1649,6 @@ function DetalleReporteModal({r, lam, onClose}){
         {fila("Sector",r.sector)}
         {fila("Observaciones",r.observaciones)}
       </div>
-      {procesos.length>0 && (
-        <div style={{marginTop:14,padding:"12px 14px",background:"rgba(124,179,66,0.08)",border:"1px solid rgba(124,179,66,0.3)",borderRadius:10}}>
-          <div style={{fontSize:12,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>⏱️ Tiempos por proceso (estimado según metas)</div>
-          <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>Base en kg = peso estimado + merma (<b>{Math.round(kgBase).toLocaleString()} kg</b>). Sellado por unidades. Metas editables del panel.</div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{textAlign:"left",color:"var(--text-dim)"}}>
-              {["Proceso","Cantidad","Meta","Tiempo estimado"].map(h=><th key={h} style={{padding:"4px 6px",fontWeight:600,fontSize:10.5,textTransform:"uppercase"}}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {procesos.map(p=>(
-                <tr key={p.proc} style={{borderTop:"1px solid var(--line)"}}>
-                  <td style={{padding:"6px 6px",fontWeight:600}}>{p.proc}</td>
-                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)"}}>{Math.round(p.cant).toLocaleString()} {p.unidad}</td>
-                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{p.meta.toLocaleString()} {p.metaU}</td>
-                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--accent)"}}>{fmtHoras(p.horas)}</td>
-                </tr>
-              ))}
-              <tr style={{borderTop:"2px solid var(--line)"}}>
-                <td style={{padding:"6px 6px",fontWeight:700}} colSpan="3">Total estimado</td>
-                <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--good)"}}>{fmtHoras(totalH)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
     </Modal>
   );
 }
