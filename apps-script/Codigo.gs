@@ -89,15 +89,19 @@ var COLS_TEXTO = ['Codigo Siesa','Código Siesa','SKU','Consecutivo'];
 // IMPORTANTE: reemplaza 'CAMBIAR_EN_EDITOR' por la clave real de admin (ej. 072026)
 // antes de ejecutar. No subas la clave real al repo.
 function configurarUsuarios() {
+  // IMPORTANTE: pon la clave real ENTRE COMILLAS (ej. '072026'). Con comillas se
+  // conserva el cero inicial; sin comillas quedaria como numero (72026).
   var CLAVE_ADMIN = 'CAMBIAR_EN_EDITOR';
   var sh = SS.getSheetByName('Usuarios');
   if (!sh) sh = SS.insertSheet('Usuarios');
   sh.clear();
-  sh.getRange(1, 1, 1, 5).setNumberFormat('@'); // usuario/pass como texto
-  sh.appendRow(['usuario', 'pass', 'nombre', 'rol', 'activo']);
-  sh.appendRow(['gabriel.unda', CLAVE_ADMIN, 'Gabriel Unda', 'admin', 'SI']);
-  sh.appendRow(['jose.cortes', CLAVE_ADMIN, 'Jose Cortes', 'admin', 'SI']);
-  sh.getRange(1, 1, sh.getLastRow(), 2).setNumberFormat('@');
+  sh.getRange(1, 1, 5, 5).setNumberFormat('@'); // texto (preserva ceros a la izquierda)
+  var filas = [
+    ['usuario', 'pass', 'nombre', 'rol', 'activo'],
+    ['gabriel.unda', String(CLAVE_ADMIN), 'Gabriel Unda', 'admin', 'SI'],
+    ['jose.cortes', String(CLAVE_ADMIN), 'Jose Cortes', 'admin', 'SI']
+  ];
+  sh.getRange(1, 1, filas.length, 5).setValues(filas);
   Logger.log('Hoja Usuarios lista (2 admin). Los demas se autoregistran por area.');
   return 'OK';
 }
@@ -170,8 +174,8 @@ function registrarUsuario_(area, codigo, nombre, usuario, pass) {
   var sh = SS.getSheetByName('Usuarios');
   if (!sh) { sh = SS.insertSheet('Usuarios'); sh.appendRow(['usuario', 'pass', 'nombre', 'rol', 'activo']); }
   var r = sh.getLastRow() + 1;
-  sh.getRange(r, 1, 1, 2).setNumberFormat('@');
-  sh.appendRow([usuario, String(pass), nombre, area, 'SI']);
+  sh.getRange(r, 1, 1, 5).setNumberFormat('@'); // texto (preserva ceros a la izquierda)
+  sh.getRange(r, 1, 1, 5).setValues([[usuario, String(pass), nombre, area, 'SI']]);
   registrarAuditoria_(usuario, 'registro', 'Alta autoregistro rol=' + area);
   return { ok: true, nombre: nombre, rol: area };
 }
