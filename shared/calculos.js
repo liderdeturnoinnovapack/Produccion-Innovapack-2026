@@ -427,6 +427,7 @@ function laminaConsumoInfo(reports){
     var mm = skuMaestro(s);
     var tipoRaw = (mm && mm.mat) ? mm.mat : (a.refAny ? _materialDeRef(a.refAny, '') : '');
     var tipo = tipoRaw === 'Lamina' ? 'Lámina' : (tipoRaw || '');
+    var color = (mm && mm.col) ? mm.col : (a.refAny ? colorProceso({referencia:a.refAny}) : '');
     var tiene  = baseKg > 0 || poolKg > 0;
     var arr = finishedBySiesa[s].slice().sort(function(x,y){ return (x.ts||0) - (y.ts||0); });
     var acum = 0;
@@ -434,7 +435,7 @@ function laminaConsumoInfo(reports){
       var cons = produccionKg(r) * tasa;
       var dispAntes = poolKg - acum;
       byReport[reporteId(r)] = {
-        medida: medida, tipo: tipo, baseKg: baseKg, poolKg: poolKg,
+        medida: medida, tipo: tipo, color: color, baseKg: baseKg, poolKg: poolKg,
         consumoKg: cons, disponibleKg: dispAntes, saldoKg: dispAntes - cons,
         nImpresion: a.nImp||0, tieneImpresion: (a.impKg||0) > 0, tieneDoblado: (a.dobKg||0) > 0,
         tieneLamina: tiene
