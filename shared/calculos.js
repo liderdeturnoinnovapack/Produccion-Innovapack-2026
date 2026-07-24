@@ -358,6 +358,88 @@ function balanceLamina(reports){
   return Object.keys(pool).map(function(k){ var x=pool[k]; x.disponible=x.inicial+x.producido; x.saldo=x.disponible-x.consumido; return x; }).sort(function(a,b){return b.saldo-a.saldo;});
 }
 
+/* ===== CONSUMO DE LÁMINA POR REPORTE (para el ingreso a SIESA) =====
+   Vincula cada reporte de PRODUCTO TERMINADO con la lámina impresa/doblada que
+   consumió, cruzando por CÓDIGO SIESA (el reporte de impresión/refilado lleva el
+   mismo código que el producto terminado).
+
+   Base de consumo de la referencia = kg impresión + merma impresión + kg doblada
+   + merma doblada. El consumo se REPARTE proporcional a la producción de cada
+   reporte de terminado (tasa = base / kg total terminado de esa referencia), para
+   que si hay varios reportes de la misma lámina, ninguno se "coma" todo el consumo.
+
+   Inventario intermedio (pool) = base + inventario impreso del corte (17/07). Se
+   lleva un saldo corrido por fecha: cada reporte muestra lo disponible ANTES y lo
+   que quedaría DESPUÉS de consumir su parte.
+
+   MEDIDA: se prioriza SIEMPRE la del reporte de IMPRESIÓN (la lámina original, ej.
+   63 cm), no la doblada (que ya es la mitad) ni la receta.
+
+   Devuelve { byReport: { <reporteId>: {medida, baseKg, poolKg, consumoKg,
+   disponibleKg, saldoKg, nImpresion, tieneLamina} }, byRef: {<siesa>: agg} }. */
+function laminaConsumoInfo(reports){
+  var agg = {}; // siesa -> agregados de lámina
+  function ens(s){
+    if(!agg[s]) agg[s] = {impKg:0, impMerma:0, dobKg:0, dobMerma:0, corteKg:0, medidaImp:0, medidaDob:0, termKg:0, nImp:0};
+    return agg[s];
+  }
+  function medNum(v){ var n = parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n)&&n>0 ? n : 0; }
+
+  // Inventario impreso del corte (17/07): entra al pool intermedio.
+  ((window.INVENTARIO_BASE||{}).ppImpresas||[]).forEach(function(x){
+    var s = String(x.siesa||'').trim(); if(!s) return;
+    ens(s).corteKg += Number(x.kg)||0;
+  });
+
+  (reports||[]).forEach(function(r){
+    var s = String(r.siesa||r.sku||'').trim(); if(!s) return;
+    var maq = String(r.maquina||'');
+    if(/impresora/i.test(maq)){
+      var a = ens(s);
+      a.impKg += produccionKg(r); a.impMerma += mermaKg(r); a.nImp++;
+      var md = medNum(r.extraMedida); if(md && !a.medidaImp) a.medidaImp = md;   // prioriza impresión
+    } else if(/refiladora/i.test(maq) && tipoProceso(r) === 'Lámina Doblada'){
+      var a2 = ens(s);
+      a2.dobKg += produccionKg(r); a2.dobMerma += mermaKg(r);
+      var md2 = medNum(r.extraMedida); if(md2 && !a2.medidaDob) a2.medidaDob = md2; // fallback
+    }
+    if(requiereSiesa(r)) ens(s).termKg += produccionKg(r);
+  });
+
+  // Ledger por reporte de terminado (saldo corrido por fecha).
+  var finishedBySiesa = {};
+  (reports||[]).forEach(function(r){
+    if(!requiereSiesa(r)) return;
+    var s = String(r.siesa||r.sku||'').trim(); if(!s) return;
+    (finishedBySiesa[s] = finishedBySiesa[s] || []).push(r);
+  });
+
+  var byReport = {};
+  Object.keys(finishedBySiesa).forEach(function(s){
+    var a = agg[s] || {};
+    var baseKg = (a.impKg||0) + (a.impMerma||0) + (a.dobKg||0) + (a.dobMerma||0);
+    var poolKg = baseKg + (a.corteKg||0);
+    var termKg = a.termKg||0;
+    var tasa   = termKg > 0 ? baseKg / termKg : 0;
+    var medida = a.medidaImp || a.medidaDob || 0;
+    var tiene  = baseKg > 0 || poolKg > 0;
+    var arr = finishedBySiesa[s].slice().sort(function(x,y){ return (x.ts||0) - (y.ts||0); });
+    var acum = 0;
+    arr.forEach(function(r){
+      var cons = produccionKg(r) * tasa;
+      var dispAntes = poolKg - acum;
+      byReport[reporteId(r)] = {
+        medida: medida, baseKg: baseKg, poolKg: poolKg,
+        consumoKg: cons, disponibleKg: dispAntes, saldoKg: dispAntes - cons,
+        nImpresion: a.nImp||0, tieneLamina: tiene
+      };
+      acum += cons;
+    });
+  });
+
+  return { byReport: byReport, byRef: agg };
+}
+
 /* Inventario de PRODUCTO TERMINADO en bodega = inventario físico del corte (17/07,
    TODO lo real a esa fecha) + producción confirmada en SIESA POSTERIOR al corte.
    Agrupado por referencia. Fuente de la Bodega de Inventario y de la disponibilidad

@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723a"></script>
+<script src="../shared/calculos.js?v=20260723b"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1517,7 +1517,7 @@ function InventarioPT({reports}){
 }
 
 /* ===== DETALLE DE REPORTE (info completa para ingresar a SIESA) ===== */
-function DetalleReporteModal({r, onClose}){
+function DetalleReporteModal({r, lam, onClose}){
   const fila=(label,val,mono)=>(
     val&&val!=='-'&&val!==''?
     <div style={{display:"flex",gap:8,padding:"7px 0",borderBottom:"1px solid var(--line)",alignItems:"flex-start"}}>
@@ -1546,6 +1546,25 @@ function DetalleReporteModal({r, onClose}){
           </div>
         ))}
       </div>
+      {lam && lam.tieneLamina && (
+        <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(0,145,199,0.06)",border:"1px solid rgba(0,145,199,0.25)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:10,fontFamily:"var(--head)"}}>🧵 Lámina consumida (impresión / doblada)</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+            {[
+              {label:"Medida lámina",val:lam.medida>0?lam.medida+" cm":"-",color:"var(--brand-blue)"},
+              {label:"Consumo de este reporte",val:lam.consumoKg>0?"≈ "+Math.round(lam.consumoKg).toLocaleString()+" kg":"-",color:"var(--amber)"},
+              {label:"Disponible (referencia)",val:"≈ "+Math.round(lam.disponibleKg).toLocaleString()+" kg",color:"var(--good)"},
+              {label:"Saldo tras este reporte",val:"≈ "+Math.round(lam.saldoKg).toLocaleString()+" kg",color:lam.saldoKg<-0.5?"var(--bad)":"var(--text)"},
+            ].map(x=>(
+              <div key={x.label} style={{background:"var(--card)",borderRadius:8,padding:"9px 10px",textAlign:"center"}}>
+                <div style={{fontSize:10,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>{x.label}</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:"var(--mono)",color:x.color}}>{x.val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:10.5,color:"var(--text-dim)",marginTop:8}}>Base = kg impresión + merma, repartida proporcional a la producción de esta referencia ({lam.nImpresion} reporte(s) de impresión). Medida tomada del reporte de impresión.</div>
+        </div>
+      )}
       <div style={{overflowY:"auto",maxHeight:"55vh"}}>
         {fila("Código SIESA",r.siesa,true)}
         {fila("Referencia",r.referencia)}
@@ -1602,6 +1621,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
   const [detalle,setDetalle]=useState(null); // reporte seleccionado para ver info completa
+  const lamInfo = laminaConsumoInfo(reports); // consumo de lámina impresa/doblada por reporte
   const totalPend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
   const q=buscar.trim().toLowerCase();
   let pend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r)));
@@ -1635,7 +1655,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
           <div style={{overflowX:"auto",overflowY:"auto",maxHeight:320,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel-2)"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
               <thead><tr style={{textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Consecutivo"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Lámina (kg)","Consecutivo"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {pend.slice(0,400).map((r,i)=>{
@@ -1647,6 +1667,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
                       <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
                       <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
                       <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.produccion} {r.unidad}</td>
+                      <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",color:(lamInfo.byReport[id]&&lamInfo.byReport[id].saldoKg<-0.5)?"var(--bad)":"inherit"}} title={lamInfo.byReport[id]&&lamInfo.byReport[id].tieneLamina?("Medida "+(lamInfo.byReport[id].medida||"?")+" cm · disponible ≈ "+Math.round(lamInfo.byReport[id].disponibleKg)+" kg · saldo ≈ "+Math.round(lamInfo.byReport[id].saldoKg)+" kg"):""}>{lamInfo.byReport[id]&&lamInfo.byReport[id].tieneLamina?("≈ "+Math.round(lamInfo.byReport[id].consumoKg).toLocaleString()):"—"}</td>
                       <td style={{padding:"7px 10px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
                     </tr>
                   );
@@ -1657,7 +1678,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos}){
           {pend.length>400 && <div style={{fontSize:11,color:"var(--text-dim)",marginTop:6}}>Mostrando 400 de {pend.length}. Usa el buscador para acotar.</div>}
         </div>
       )}
-      {detalle && <DetalleReporteModal r={detalle} onClose={()=>setDetalle(null)}/>}
+      {detalle && <DetalleReporteModal r={detalle} lam={lamInfo.byReport[reporteId(detalle)]} onClose={()=>setDetalle(null)}/>}
     </div>
   );
 }
