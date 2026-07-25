@@ -264,10 +264,10 @@ function registrarAjuste(a){
   saveAjustes(arr);
   return arr;
 }
-/* Total ajustado (restado) para un siesa específico. */
+/* Ajuste NETO restado para un siesa (salida resta, entrada suma). */
 function totalAjustado(siesa){
   return loadAjustes().filter(function(a){ return String(a.siesa).trim()===String(siesa).trim(); })
-    .reduce(function(s,a){ return s+(Number(a.cantidad)||0); }, 0);
+    .reduce(function(s,a){ var c=Number(a.cantidad)||0; return s + (a.sentido==='entrada' ? -c : c); }, 0);
 }
 
 /* ===== DESPACHOS =====
@@ -468,13 +468,14 @@ function inventarioBodegaPT(reports, okSet){
     if(enKg){ g.kg+=Number(x.und)||0; } else { g.unidades+=Number(x.und)||0; g.kg+=(Number(x.und)||0)*pu; }
     g.desdeCorte=true; if(!g.ultima) g.ultima=corte;
   });
-  // Descontar ajustes de salida (eliminaciones manuales con causa)
+  // Ajustes manuales (solo admin): 'salida' resta, 'entrada' suma. Sin sentido = salida (compat).
   loadAjustes().forEach(function(a){
     var g=map[String(a.siesa||'').trim()]; if(!g) return;
     var cant=Number(a.cantidad)||0;
+    var signo=(a.sentido==='entrada')?1:-1;
     var pu2=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0;
-    g.unidades=Math.max(0, g.unidades-cant);
-    g.kg=Math.max(0, g.kg-cant*pu2);
+    g.unidades=Math.max(0, g.unidades+signo*cant);
+    g.kg=Math.max(0, g.kg+signo*cant*pu2);
   });  // + producción confirmada POSTERIOR al corte (lo previo ya está en el corte)
   (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;
@@ -671,7 +672,7 @@ async function registrarUsuario(url, area, codigo, nombre, usuario, pass){
 function permisosDe(rol){
   rol = String(rol||'').toLowerCase();
   if(rol==='admin')          return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:true,  editInv:true,  editDespachos:true,  editSiesa:true };
-  if(rol==='logistico')      return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:true,  editDespachos:true,  editSiesa:false };
+  if(rol==='logistico')      return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:true,  editSiesa:false };
   if(rol==='administrativo') return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
   if(rol==='gerencia')       return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
   return { verGeneral:false, verInv:false, verDespachos:false, verBodegas:false, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };

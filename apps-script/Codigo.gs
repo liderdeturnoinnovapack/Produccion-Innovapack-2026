@@ -38,7 +38,8 @@ var CODIGOS_AREA = {
   gerencia:       'gerencia2026'
 };
 // Claves de config que un LOGISTICO puede escribir (operativo). El resto = solo admin.
-var CONFIG_LOGISTICO = ['ajustes_inventario', 'despachos', 'pedidos_extra'];
+// (ajustes_inventario NO va aqui: los ajustes de inventario son solo admin.)
+var CONFIG_LOGISTICO = ['despachos', 'pedidos_extra'];
 
 /* Columnas de un reporte (orden camelCase que manda el frontend) — para reparar. */
 var REPORTE_COLS = [

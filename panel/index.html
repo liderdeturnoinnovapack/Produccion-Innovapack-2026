@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723f"></script>
+<script src="../shared/calculos.js?v=20260723g"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1766,38 +1766,52 @@ const MOTIVOS_AJUSTE=[
   'Devolución a cliente','Producto dañado / no conforme',
   'Ajuste de inventario','Traslado interno','Otro'
 ];
+const MOTIVOS_ENTRADA=[
+  'Producción no ingresada (corte)','Corrección de conteo (a la alza)',
+  'Reintegro / devolución a bodega','Ajuste de inventario','Otro'
+];
 function AjusteForm({siesa, referencia, disponible, onClose, onSaved}){
   const hoy=new Date().toISOString().slice(0,10);
-  const [f,setF]=useState({fecha:hoy, cantidad:'', motivo:MOTIVOS_AJUSTE[0], motivoOtro:'', observaciones:''});
+  const [f,setF]=useState({fecha:hoy, sentido:'salida', cantidad:'', motivo:MOTIVOS_AJUSTE[0], motivoOtro:'', observaciones:''});
   const [msg,setMsg]=useState('');
   const maxDisp=Math.round(disponible||0);
+  const esEntrada=f.sentido==='entrada';
+  const motivos=esEntrada?MOTIVOS_ENTRADA:MOTIVOS_AJUSTE;
+  function cambiarSentido(s){ setF(p=>({...p, sentido:s, motivo:(s==='entrada'?MOTIVOS_ENTRADA:MOTIVOS_AJUSTE)[0], motivoOtro:''})); setMsg(''); }
   function guardar(e){
     e.preventDefault();
     const cant=Number(f.cantidad);
     if(!cant||cant<=0){ setMsg('La cantidad debe ser mayor que 0.'); return; }
-    if(cant>maxDisp){ setMsg('No puedes restar más que el disponible ('+maxDisp.toLocaleString()+' und).'); return; }
+    if(!esEntrada && cant>maxDisp){ setMsg('No puedes restar más que el disponible ('+maxDisp.toLocaleString()+' und).'); return; }
     const motivoFinal=f.motivo==='Otro'?(f.motivoOtro.trim()||'Otro'):f.motivo;
     if(f.motivo==='Otro'&&!f.motivoOtro.trim()){ setMsg('Describe el motivo.'); return; }
-    registrarAjuste({fecha:f.fecha, siesa:String(siesa), referencia, cantidad:cant, motivo:motivoFinal, observaciones:f.observaciones.trim()});
+    registrarAjuste({fecha:f.fecha, sentido:f.sentido, siesa:String(siesa), referencia, cantidad:cant, motivo:motivoFinal, observaciones:f.observaciones.trim()});
     onSaved&&onSaved(); onClose&&onClose();
   }
   const lab={fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
   return(
-    <Modal title={'✂️ Ajuste de salida · '+((referencia||'').slice(0,40))} onClose={onClose}>
-      <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:14}}>
+    <Modal title={'⚖️ Ajuste de inventario · '+((referencia||'').slice(0,40))} onClose={onClose}>
+      <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:12}}>
         Código: <b style={{fontFamily:'var(--mono)'}}>{siesa}</b> · Disponible actual: <b style={{color:'var(--amber)'}}>{maxDisp.toLocaleString()} und</b><br/>
-        Esta operación <b>resta unidades permanentemente</b> del inventario y queda registrada con causa.
+        {esEntrada
+          ? <span>La <b style={{color:'var(--good)'}}>Entrada (+)</b> suma unidades (mal conteo a la alza o producción no ingresada por el corte).</span>
+          : <span>La <b style={{color:'var(--bad)'}}>Salida (−)</b> resta unidades del inventario.</span>} Queda registrada con causa (solo admin).
+      </div>
+      <div style={{display:'flex',gap:1,background:'var(--panel-2)',borderRadius:9,padding:3,marginBottom:14}}>
+        {[['salida','Salida (−)'],['entrada','Entrada (+)']].map(([k,l])=>(
+          <button type="button" key={k} onClick={()=>cambiarSentido(k)} style={{flex:1,background:f.sentido===k?'var(--card)':'transparent',color:f.sentido===k?(k==='entrada'?'var(--good)':'var(--bad)'):'var(--text-dim)',border:'none',borderRadius:7,padding:'8px 0',fontWeight:f.sentido===k?700:500,fontSize:13,cursor:'pointer'}}>{l}</button>
+        ))}
       </div>
       <form onSubmit={guardar} style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         <div><div style={lab}>Fecha del ajuste</div><input type="date" style={inputStyle} value={f.fecha} onChange={e=>setF({...f,fecha:e.target.value})}/></div>
         <div>
-          <div style={lab}>Cantidad a restar * (máx. {maxDisp.toLocaleString()})</div>
-          <input type="number" min="1" max={maxDisp} style={inputStyle} value={f.cantidad} onChange={e=>setF({...f,cantidad:e.target.value})} placeholder={maxDisp.toLocaleString()}/>
+          <div style={lab}>{esEntrada?'Cantidad a sumar *':'Cantidad a restar * (máx. '+maxDisp.toLocaleString()+')'}</div>
+          <input type="number" min="1" max={esEntrada?undefined:maxDisp} style={inputStyle} value={f.cantidad} onChange={e=>setF({...f,cantidad:e.target.value})} placeholder={esEntrada?'0':maxDisp.toLocaleString()}/>
         </div>
         <div style={{gridColumn:'1/-1'}}>
           <div style={lab}>Motivo *</div>
           <select style={inputStyle} value={f.motivo} onChange={e=>setF({...f,motivo:e.target.value})}>
-            {MOTIVOS_AJUSTE.map(m=><option key={m} value={m}>{m}</option>)}
+            {motivos.map(m=><option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         {f.motivo==='Otro' && (
@@ -1806,7 +1820,7 @@ function AjusteForm({siesa, referencia, disponible, onClose, onSaved}){
         <div style={{gridColumn:'1/-1'}}><div style={lab}>Observaciones (opcional)</div><input style={inputStyle} value={f.observaciones} onChange={e=>setF({...f,observaciones:e.target.value})} placeholder="Detalles adicionales"/></div>
         <div style={{gridColumn:'1/-1',display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}>
           <span style={{fontSize:12,color:'var(--bad)'}}>{msg}</span>
-          <button type="submit" style={{background:'var(--bad)',color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',fontWeight:700,cursor:'pointer'}}>✂️ Confirmar ajuste</button>
+          <button type="submit" style={{background:esEntrada?'var(--good)':'var(--bad)',color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',fontWeight:700,cursor:'pointer'}}>{esEntrada?'➕ Confirmar entrada':'✂️ Confirmar salida'}</button>
         </div>
       </form>
     </Modal>
@@ -1830,13 +1844,15 @@ function HistorialAjustes({onVer}){
   if(buscar.trim()){ const q=buscar.trim().toLowerCase(); list=list.filter(a=>((a.siesa||'')+' '+(a.referencia||'')+' '+(a.motivo||'')).toLowerCase().includes(q)); }
   const getV=(a,k)=> k==='fecha'?(a.fecha||'') : k==='siesa'?String(a.siesa||'') : k==='referencia'?(a.referencia||'') : k==='cantidad'?(Number(a.cantidad)||0) : k==='motivo'?(a.motivo||'') : '';
   list=aplicarOrden(list, sort, getV);
-  const totRest=list.reduce((s,a)=>s+(Number(a.cantidad)||0),0);
+  const totSalida=list.filter(a=>a.sentido!=='entrada').reduce((s,a)=>s+(Number(a.cantidad)||0),0);
+  const totEntrada=list.filter(a=>a.sentido==='entrada').reduce((s,a)=>s+(Number(a.cantidad)||0),0);
   return(
     <div style={{marginBottom:20}}>
       <div style={{fontSize:13,fontWeight:700,marginBottom:12,fontFamily:'var(--head)'}}>📋 Historial de ajustes de inventario</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:14}}>
         <InvCard label="Ajustes registrados" value={list.length.toLocaleString()} color="var(--accent)"/>
-        <InvCard label="Unidades restadas" value={Math.round(totRest).toLocaleString()} color="var(--bad)"/>
+        <InvCard label="Salidas (−)" value={Math.round(totSalida).toLocaleString()} color="var(--bad)"/>
+        <InvCard label="Entradas (+)" value={Math.round(totEntrada).toLocaleString()} color="var(--good)"/>
         <InvCard label="Referencias afectadas" value={new Set(list.map(a=>a.siesa)).size.toLocaleString()} color="var(--amber)"/>
       </div>
       <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
@@ -1853,7 +1869,7 @@ function HistorialAjustes({onVer}){
             <ThSort label="Fecha" k="fecha" sort={sort}/>
             <ThSort label="Código" k="siesa" sort={sort}/>
             <ThSort label="Referencia" k="referencia" sort={sort}/>
-            <ThSort label="Cant. restada" k="cantidad" sort={sort}/>
+            <ThSort label="Ajuste" k="cantidad" sort={sort}/>
             <ThSort label="Motivo" k="motivo" sort={sort}/>
             <th style={{padding:'9px 10px',color:'var(--th-text)',fontWeight:700,whiteSpace:'nowrap',position:'sticky',top:0,background:'var(--panel-2)'}}>Observaciones</th>
           </tr></thead>
@@ -1863,7 +1879,7 @@ function HistorialAjustes({onVer}){
                 <td style={{padding:'8px 10px',fontFamily:'var(--mono)',whiteSpace:'nowrap'}}>{fechaLarga(a.fecha)||a.fecha||'-'}</td>
                 <td style={{padding:'8px 10px',fontFamily:'var(--mono)',fontSize:12}}>{a.siesa||'-'}</td>
                 <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>{a.referencia||'-'}</td>
-                <td style={{padding:'8px 10px',fontFamily:'var(--mono)',fontWeight:700,color:'var(--bad)'}}>-{Math.round(Number(a.cantidad)||0).toLocaleString()}</td>
+                <td style={{padding:'8px 10px',fontFamily:'var(--mono)',fontWeight:700,color:a.sentido==='entrada'?'var(--good)':'var(--bad)'}}>{a.sentido==='entrada'?'+':'−'}{Math.round(Number(a.cantidad)||0).toLocaleString()}</td>
                 <td style={{padding:'8px 10px'}}><span style={{background:'rgba(220,38,38,0.1)',color:'var(--bad)',borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:600}}>{a.motivo||'-'}</span></td>
                 <td style={{padding:'8px 10px',color:'var(--text-dim)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.observaciones||'-'}</td>
               </tr>
