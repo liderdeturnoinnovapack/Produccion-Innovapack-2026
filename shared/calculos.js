@@ -202,7 +202,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -676,6 +676,58 @@ function permisosDe(rol){
   if(rol==='administrativo') return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
   if(rol==='gerencia')       return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
   return { verGeneral:false, verInv:false, verDespachos:false, verBodegas:false, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
+}
+
+/* ===== VISTAS DEL PANEL + PERMISOS POR USUARIO (override sobre el rol) =====
+   Cada "vista" es una pestaña (o sub-pestaña) del panel. El admin puede recortar,
+   por usuario, qué vistas ve (solo VISUALIZACIÓN; la edición sigue atada al rol).
+   Se guarda en la config compartida (clave permisos_usuario). */
+var VISTAS_PANEL = [
+  { k:'general',   label:'General' },
+  { k:'inv_pt',    label:'Inventario · Producto Terminado' },
+  { k:'inv_pp',    label:'Inventario · Producto en Proceso' },
+  { k:'despachos', label:'Pedidos y Despachos' },
+  { k:'bodegas',   label:'Producción por bodega' }
+];
+
+/* Vistas por defecto de un rol (derivadas de permisosDe). */
+function vistasDeRol(rol){
+  var p = permisosDe(rol), v = [];
+  if(p.verGeneral) v.push('general');
+  if(p.verInv){ v.push('inv_pt'); v.push('inv_pp'); }
+  if(p.verDespachos) v.push('despachos');
+  if(p.verBodegas) v.push('bodegas');
+  return v;
+}
+
+/* Vistas efectivas de un usuario: si tiene override guardado, se usa tal cual;
+   si no, las de su rol. El admin NUNCA se restringe (evita auto-bloqueo). */
+function vistasEfectivas(rol, usuario, overrides){
+  rol = String(rol||'').toLowerCase();
+  if(rol==='admin') return vistasDeRol('admin');
+  overrides = overrides || {};
+  var ov = overrides[String(usuario||'').trim().toLowerCase()];
+  if(ov && ov.length){
+    var valid = VISTAS_PANEL.map(function(x){ return x.k; });
+    var r = ov.filter(function(k){ return valid.indexOf(k)!==-1; });
+    if(r.length) return r;
+  }
+  return vistasDeRol(rol);
+}
+
+/* Overrides de permisos por usuario (compartidos vía config). Forma: {usuario:[vistas]}. */
+function loadPermisosUsuario(){ try{ var r=localStorage.getItem('permisos-usuario'); return r?JSON.parse(r):{}; }catch(e){ return {}; } }
+function savePermisosUsuario(obj){ try{ localStorage.setItem('permisos-usuario', JSON.stringify(obj||{})); }catch(e){} postConfig_('permisos_usuario', obj||{}); }
+
+/* Lista de usuarios (SOLO admin) para la herramienta de permisos. [{usuario,nombre,rol,activo}]. */
+async function listarUsuarios(url){
+  try{
+    const sep = url.indexOf("?")>=0 ? "&" : "?";
+    const q = "tipo=usuarios&usuario="+encodeURIComponent(window.__AUTH_USER||'')+"&pass="+encodeURIComponent(window.__AUTH_PASS||'');
+    const resp = await fetch(url + sep + q);
+    const data = await resp.json();
+    return (data && data.ok && Array.isArray(data.usuarios)) ? data.usuarios : [];
+  }catch(e){ return []; }
 }
 
 /* Guarda un reporte enviando SOLO datos crudos + una foto de clasificación

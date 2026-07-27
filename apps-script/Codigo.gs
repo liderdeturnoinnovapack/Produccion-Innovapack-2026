@@ -7,6 +7,7 @@
    Endpoints:
    - doGet  ?tipo=login&usuario=&pass=  -> valida usuario -> {ok,nombre,rol}
    - doGet  ?tipo=config                -> devuelve la hoja Config (abierta)
+   - doGet  ?tipo=usuarios&usuario=&pass= -> lista de usuarios (SOLO admin, sin pass)
    - doGet  (por defecto)               -> reportes; EXIGE usuario valido
    - doPost {tipo:"registro",...}       -> autoregistro por area (codigo + cupo)
    - doPost {tipo:"config",...}         -> guarda config; permiso segun rol/clave
@@ -191,6 +192,16 @@ function doGet(e) {
     return json_(v);
   }
   if (p.tipo === 'config') return json_(leerConfig_()); // abierta (form + panel)
+
+  // Lista de usuarios (SOLO admin) para la herramienta "Permisos por usuario".
+  // Nunca devuelve la clave (pass), solo usuario/nombre/rol/activo.
+  if (p.tipo === 'usuarios') {
+    if (!esAdmin_(p.usuario, p.pass)) return json_({ ok: false, error: 'no_autorizado' });
+    var us = leerUsuarios_().map(function (u) {
+      return { usuario: u.usuario, nombre: u.nombre, rol: u.rol, activo: u.activo };
+    });
+    return json_({ ok: true, usuarios: us });
+  }
 
   // Lectura de reportes: exige usuario valido.
   if (!validarLogin_(p.usuario, p.pass).ok) return json_({ error: 'no_autorizado' });

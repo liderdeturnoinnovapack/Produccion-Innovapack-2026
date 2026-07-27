@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723g"></script>
+<script src="../shared/calculos.js?v=20260723h"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1072,10 +1072,120 @@ const CATEGORIAS=["Bolsa abierta","Bolsa valvulada","Bolsa de agua","Flow Pack",
 const SECTORES=["Construcción","Agua potable","Alimentos","Industrial","Mascotas"];
 const BODEGAS=["Producto Terminado","Producto en Proceso"];
 
+/* Herramienta admin: define, por usuario, qué VISTAS (pestañas) del panel puede ver.
+   "Personalizado" apagado = usa las vistas por defecto de su rol. Solo cambia lo que VE
+   (la edición sigue según el rol). La lista de usuarios llega del servidor (tipo=usuarios,
+   solo admin). Los admin siempre ven todo (no se pueden restringir). */
+function PermisosUsuarioModal({onClose}){
+  const [users,setUsers]=useState(null);                  // null = cargando
+  const [map,setMap]=useState(()=>loadPermisosUsuario());  // {usuario:[vistas]}
+  const [custom,setCustom]=useState({});                   // {usuario:true} => vistas personalizadas
+  const [saving,setSaving]=useState(false);
+  const [msg,setMsg]=useState("");
+  const rolLabel={admin:'Admin',logistico:'Logístico',administrativo:'Administrativo',gerencia:'Gerencia'};
+
+  useEffect(()=>{
+    let alive=true;
+    listarUsuarios(SHEETS_URL_READ).then(function(list){
+      if(!alive) return;
+      list=list||[];
+      setUsers(list);
+      const c={};
+      list.forEach(function(u){ const k=String(u.usuario).toLowerCase(); if(map[k]&&map[k].length) c[k]=true; });
+      setCustom(c);
+    });
+    return function(){ alive=false; };
+  },[]);
+
+  function vistasChecked(u){
+    const k=String(u.usuario).toLowerCase();
+    return custom[k] ? (map[k]||[]) : vistasDeRol(u.rol);
+  }
+  function toggleCustom(u,on){
+    const k=String(u.usuario).toLowerCase();
+    setCustom(function(p){ return {...p,[k]:on}; });
+    setMap(function(p){
+      const n={...p};
+      if(on){ if(!(n[k]&&n[k].length)) n[k]=vistasDeRol(u.rol).slice(); }
+      else { delete n[k]; }
+      return n;
+    });
+  }
+  function toggleVista(u,vk){
+    const k=String(u.usuario).toLowerCase();
+    setMap(function(p){
+      const cur=(p[k]||vistasDeRol(u.rol)).slice();
+      const i=cur.indexOf(vk);
+      if(i>=0) cur.splice(i,1); else cur.push(vk);
+      return {...p,[k]:cur};
+    });
+  }
+  function guardar(){
+    if(!users||!users.length) return;
+    setSaving(true); setMsg("");
+    const out={};
+    Object.keys(map).forEach(function(k){ if(custom[k] && map[k] && map[k].length) out[k]=map[k]; });
+    savePermisosUsuario(out);
+    setMap(out);
+    setSaving(false);
+    setMsg("✓ Guardado. Cada usuario lo verá al recargar o en ~1 minuto.");
+  }
+  const chip=(active)=>({display:"inline-flex",alignItems:"center",gap:6,padding:"5px 11px",borderRadius:20,border:"1px solid var(--line)",fontSize:12,cursor:"pointer",background:active?"var(--accent)":"var(--panel-2)",color:active?"#fff":"var(--text-dim)",fontWeight:active?600:500,userSelect:"none"});
+
+  return(
+    <Modal title="👥 Permisos por usuario" onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>
+        Elige qué <b>pestañas</b> ve cada usuario. Con <b>Personalizado</b> apagado, usa las de su rol.
+        Esto solo cambia lo que <b>ve</b> (la edición sigue según su rol). Los <b>admin</b> siempre ven todo.
+      </div>
+      {users===null && <div style={{fontSize:13,color:"var(--text-dim)",padding:"14px 0"}}>Cargando usuarios…</div>}
+      {users && users.length===0 && <div style={{fontSize:13,color:"var(--bad)",padding:"14px 0"}}>No se pudieron cargar los usuarios. Verifica que actualizaste el Apps Script (endpoint tipo=usuarios) y que entraste como admin.</div>}
+      {users && users.map(function(u){
+        const k=String(u.usuario).toLowerCase();
+        const esAdmin=String(u.rol).toLowerCase()==='admin';
+        const on=!!custom[k];
+        const checked=vistasChecked(u);
+        return (
+          <div key={u.usuario} style={{padding:"12px 0",borderBottom:"1px solid var(--line)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div>
+                <div style={{fontSize:13.5,fontWeight:600}}>{u.nombre||u.usuario} {!u.activo && <span style={{color:"var(--bad)",fontSize:11}}>(inactivo)</span>}</div>
+                <div style={{fontSize:11,color:"var(--text-dim)",fontFamily:"var(--mono)"}}>{u.usuario} · {rolLabel[String(u.rol).toLowerCase()]||u.rol}</div>
+              </div>
+              {esAdmin
+                ? <span style={{fontSize:12,color:"var(--good)",fontWeight:600}}>Acceso total</span>
+                : <label style={{display:"flex",alignItems:"center",gap:7,fontSize:12,cursor:"pointer",color:"var(--text)"}}>
+                    <input type="checkbox" checked={on} onChange={e=>toggleCustom(u,e.target.checked)} style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer"}}/>
+                    Personalizado
+                  </label>}
+            </div>
+            {!esAdmin && on && (
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                {VISTAS_PANEL.map(function(v){
+                  const act=checked.indexOf(v.k)!==-1;
+                  return <span key={v.k} onClick={()=>toggleVista(u,v.k)} style={chip(act)}>{act?"✓":"+"} {v.label}</span>;
+                })}
+              </div>
+            )}
+            {!esAdmin && !on && (
+              <div style={{fontSize:11.5,color:"var(--text-dim)",marginTop:6}}>Según su rol: {vistasDeRol(u.rol).map(function(vk){ const f=VISTAS_PANEL.filter(function(x){return x.k===vk;})[0]; return f?f.label:vk; }).join(" · ")||"sin vistas"}</div>
+            )}
+          </div>
+        );
+      })}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:16,gap:12}}>
+        <span style={{fontSize:12,color:"var(--good)"}}>{msg}</span>
+        <button onClick={guardar} disabled={saving||!users||!users.length} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:(saving||!users||!users.length)?"default":"pointer",opacity:(saving||!users||!users.length)?0.6:1}}>{saving?"Guardando…":"Guardar cambios"}</button>
+      </div>
+    </Modal>
+  );
+}
+
 function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   const [showSKU,setShowSKU]=useState(false);
   const [showMachines,setShowMachines]=useState(false);
   const [showPesos,setShowPesos]=useState(false);
+  const [showPermisos,setShowPermisos]=useState(false);
   const [pesos,setPesos]=useState(loadPesos());
   const [buscar,setBuscar]=useState("");
   const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:""});
@@ -1121,6 +1231,9 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
       <button onClick={()=>setShowMachines(true)} style={cardBtn}><span style={{fontSize:20}}>⚙️</span><div style={{textAlign:"left"}}><div>Máquinas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{machines.length} registradas</div></div></button>
       {onEditMetas && <button onClick={onEditMetas} style={cardBtn}><span style={{fontSize:20}}>🎯</span><div style={{textAlign:"left"}}><div>Metas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>Editar metas por máquina</div></div></button>}
       <button onClick={()=>setShowPesos(true)} style={cardBtn}><span style={{fontSize:20}}>⚖️</span><div style={{textAlign:"left"}}><div>Pesos de productos</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{nPesos} con peso definido</div></div></button>
+      <button onClick={()=>setShowPermisos(true)} style={cardBtn}><span style={{fontSize:20}}>👥</span><div style={{textAlign:"left"}}><div>Permisos por usuario</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>Qué pestañas ve cada quien</div></div></button>
+
+      {showPermisos && <PermisosUsuarioModal onClose={()=>setShowPermisos(false)}/>}
 
       {showPesos && (
         <Modal title="⚖️ Pesos por unidad (para calcular Merma %)" onClose={()=>setShowPesos(false)}>
@@ -2478,17 +2591,30 @@ function LastUpdated({ts}){
   return <span style={{fontSize:11.5,color:"var(--text-dim)",whiteSpace:"nowrap"}}>🕒 Actualizado {txt}</span>;
 }
 
-function PanelView({rol,catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
+function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
   const perm = permisosDe(rol);
+  // Vistas visibles para ESTE usuario: parte del rol y se recorta con el override por usuario
+  // (solo afecta lo que VE; la edición sigue atada al rol). Se relee de localStorage en cada
+  // render, así la sincronización de config (refresco + polling 60s) la actualiza sola.
+  const vistas = vistasEfectivas(rol, usuario, loadPermisosUsuario());
+  const vkey = vistas.join(',');
+  const canView = function(v){ return vistas.indexOf(v)!==-1; };
   const TABS = [
-    ['general','📊 General', perm.verGeneral],
-    ['inv','🏬 Bodega Inventario', perm.verInv],
-    ['despachos','🚚 Pedidos y Despachos', perm.verDespachos],
-    ['bodegas','📦 Producción por bodega', perm.verBodegas]
+    ['general','📊 General', canView('general')],
+    ['inv','🏬 Bodega Inventario', canView('inv_pt')||canView('inv_pp')],
+    ['despachos','🚚 Pedidos y Despachos', canView('despachos')],
+    ['bodegas','📦 Producción por bodega', canView('bodegas')]
   ].filter(function(t){ return t[2]; });
   const [tab,setTab]=useState((TABS[0] && TABS[0][0]) || 'general');
   const [subBodega,setSubBodega]=useState('pt'); // sub-pestaña dentro de "Producción por bodega"
   const [subInv,setSubInv]=useState('pt'); // sub-pestaña dentro de "Bodega de Inventario"
+  // Si el usuario pierde acceso a la pestaña/sub-pestaña activa (p.ej. el admin le cambió los
+  // permisos y llegó por la sincronización), lo reubicamos en la primera disponible.
+  useEffect(()=>{ if(TABS.length && !TABS.some(function(t){ return t[0]===tab; })) setTab(TABS[0][0]); }, [vkey]);
+  useEffect(()=>{
+    if(subInv==='pt' && !canView('inv_pt') && canView('inv_pp')) setSubInv('pp');
+    else if(subInv==='pp' && !canView('inv_pp') && canView('inv_pt')) setSubInv('pt');
+  }, [vkey]);
   const [showMetas,setShowMetas]=useState(false);
   const [metasVer,setMetasVer]=useState(0); // fuerza re-render al guardar metas
   // Fase B: check de ingreso a SIESA por reporte (compartido con la Bodega de Inventario)
@@ -2531,12 +2657,12 @@ function PanelView({rol,catalog,setCatalog,machines,setMachines,reports,refreshR
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='inv' && <>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
-          {[['pt','📦 Producto Terminado'],['pp','⚙️ Producto en Proceso']].map(([k,label])=>(
+          {[['pt','📦 Producto Terminado',canView('inv_pt')],['pp','⚙️ Producto en Proceso',canView('inv_pp')]].filter(x=>x[2]).map(([k,label])=>(
             <button key={k} onClick={()=>setSubInv(k)} style={{background:subInv===k?"var(--card)":"transparent",color:subInv===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subInv===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subInv===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
           ))}
         </div>
-        {subInv==='pt' && <div className="fade-in" key={"ipt_"+metasVer}><BodegaInventario reports={reports} okSet={siesaOk} puedeEditar={perm.editInv}/></div>}
-        {subInv==='pp' && <div className="fade-in" key={"ipp_"+metasVer}><ConsumosLamina reports={reports}/></div>}
+        {subInv==='pt' && canView('inv_pt') && <div className="fade-in" key={"ipt_"+metasVer}><BodegaInventario reports={reports} okSet={siesaOk} puedeEditar={perm.editInv}/></div>}
+        {subInv==='pp' && canView('inv_pp') && <div className="fade-in" key={"ipp_"+metasVer}><ConsumosLamina reports={reports}/></div>}
       </>}
       {tab==='despachos' && <Despachos reports={reports} okSet={siesaOk} puedeEditar={perm.editDespachos}/>}
       {tab==='general' && <>
@@ -2609,7 +2735,7 @@ function App(){
         </div>
       </header>
       {unlocked
-        ? <PanelView rol={user.rol} catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
+        ? <PanelView rol={user.rol} usuario={user.usuario} catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} reports={reports} refreshReports={refreshReports} lastUpdated={lastUpdated}/>
         : <LoginGate onLogin={onLogin}/>}
     </div>
   );
