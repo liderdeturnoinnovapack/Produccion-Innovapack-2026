@@ -2495,6 +2495,18 @@ function PanelView({rol,catalog,setCatalog,machines,setMachines,reports,refreshR
   const [siesaOk,setSiesaOk]=useState(()=>{ try{ return new Set(loadReportesSiesa()); }catch(e){ return new Set(); } });
   function toggleSiesa(id){ if(!id) return; const n=new Set(siesaOk); if(n.has(id)) n.delete(id); else n.add(id); setSiesaOk(n); saveReportesSiesa([...n]); }
   function marcarTodosSiesa(ids){ const n=new Set(siesaOk); (ids||[]).forEach(i=>{ if(i) n.add(i); }); setSiesaOk(n); saveReportesSiesa([...n]); }
+  // Los checks de SIESA son COMPARTIDOS por todo el equipo. Tras cada refresco de reportes
+  // se relee la lista desde localStorage (loadConfigRemoto ya volcó la config del Sheet antes
+  // de setReports), así el estado local no se queda con una copia vieja del montaje inicial.
+  useEffect(()=>{ setSiesaOk(new Set(loadReportesSiesa())); }, [reports]);
+  // Propagación AUTOMÁTICA entre perfiles: cada 60 s se relee la config compartida del Sheet
+  // y se sincronizan los checks de SIESA sin recargar toda la producción (más liviano).
+  useEffect(()=>{
+    var id=setInterval(async function(){
+      try{ await loadConfigRemoto(SHEETS_URL_READ); setSiesaOk(new Set(loadReportesSiesa())); }catch(e){}
+    }, 60000);
+    return function(){ clearInterval(id); };
+  }, []);
 
   return(
     <div style={{maxWidth:1680,margin:"0 auto",padding:"28px 32px 60px"}}>
