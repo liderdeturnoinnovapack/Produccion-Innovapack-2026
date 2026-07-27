@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Calidad · Autocompletar (PM-CQ-FR-02)</title>
+<style>
+  :root{ --bg:#F0EFE9; --card:#FCFBF8; --line:#D8D5CC; --text:#18181B; --dim:#71717A;
+         --blue:#0091C7; --green:#7CB342; --bad:#B91C1C; --good:#15803D;
+         --sans:'Segoe UI',system-ui,sans-serif; --mono:Consolas,monospace; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;}
+  .wrap{max-width:640px;margin:40px auto;padding:0 20px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;box-shadow:0 1px 6px rgba(0,0,0,0.05);margin-bottom:18px;}
+  h1{font-size:18px;margin:0 0 4px;}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:18px;}
+  label{display:block;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;margin:10px 0 4px;letter-spacing:.04em;}
+  input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;background:#fff;}
+  button{border:none;border-radius:9px;padding:12px 20px;font-weight:700;font-size:14px;cursor:pointer;}
+  .btn-blue{background:var(--blue);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;}
+  button:disabled{opacity:.5;cursor:default;}
+  .log{font-family:var(--mono);font-size:12px;background:#111418;color:#cfe;border-radius:10px;padding:12px 14px;white-space:pre-wrap;max-height:260px;overflow:auto;margin-top:14px;}
+  .err{color:var(--bad);font-size:13px;margin-top:8px;}
+  .hdr{border-top:3px solid var(--blue);box-shadow:0 3px 0 0 var(--green);}
+</style>
+<!-- ExcelJS: lee y reescribe el .xlsx preservando el formato -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<!-- Módulos compartidos (misma lógica del sistema) -->
+<script src="../shared/data.js?v=20260723cc"></script>
+<script src="../shared/config.js?v=20260723cc"></script>
+<script src="../shared/sku_maestro.js?v=20260723cc"></script>
+<script src="../shared/calculos.js?v=20260723cc"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="card hdr">
+    <h1>📋 Control de Calidad — Autocompletar</h1>
+    <div class="sub">Formato <b>PRODUCCIÓN VS PRODUCTO NC</b> (PM-CQ-FR-02). Llena tu archivo tal cual, agregando una fila por reporte <b>desde el 17/07/2026</b>, y lo descarga. Herramienta independiente del panel.</div>
+
+    <div id="loginBox">
+      <label>Usuario</label>
+      <input id="usuario" autocomplete="username" placeholder="usuario"/>
+      <label>Clave</label>
+      <input id="clave" type="password" autocomplete="current-password" placeholder="clave"/>
+      <div id="loginErr" class="err"></div>
+      <div style="margin-top:14px"><button id="btnLogin" class="btn-blue">Entrar</button></div>
+    </div>
+
+    <div id="genBox" style="display:none">
+      <div id="quien" class="sub"></div>
+      <button id="btnGen" class="btn-green">⬇️ Generar y descargar Excel lleno</button>
+      <div id="genErr" class="err"></div>
+    </div>
+
+    <div id="log" class="log" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var READ_URL = "https://script.google.com/macros/s/AKfycbxAWxEyCh6W8j6iMytZ3-hHgcjrSOEAAREtCJn7BSetzZ0QiiwDzdHvzOhiojkO3iYIeQ/exec";
+  window.__CONFIG_URL = READ_URL;
+  var CORTE = "2026-07-17"; // solo reportes desde esta fecha (lo anterior ya está manual en el archivo)
+  var TEMPLATE = "../" + encodeURIComponent("control calidad copia.xlsx");
+
+  var $ = function(id){ return document.getElementById(id); };
+  function log(msg){ var l=$("log"); l.style.display="block"; l.textContent += (msg+"\n"); l.scrollTop=l.scrollHeight; }
+
+  /* -------- login (reutiliza validarLogin del sistema) -------- */
+  $("btnLogin").onclick = async function(){
+    $("loginErr").textContent="";
+    var u=$("usuario").value.trim(), p=$("clave").value;
+    if(!u||!p){ $("loginErr").textContent="Escribe usuario y clave."; return; }
+    $("btnLogin").disabled=true; $("btnLogin").textContent="Verificando…";
+    var r = await validarLogin(READ_URL, u, p);
+    $("btnLogin").disabled=false; $("btnLogin").textContent="Entrar";
+    if(r.ok){
+      window.__AUTH_USER=u; window.__AUTH_PASS=p; window.__AUTH_ROL=r.rol;
+      $("loginBox").style.display="none";
+      $("genBox").style.display="block";
+      $("quien").innerHTML="Conectado como <b>"+(r.nombre||u)+"</b> ("+r.rol+").";
+    } else { $("loginErr").textContent="Usuario o clave incorrectos."; }
+  };
+
+  /* -------- helpers de mapeo -------- */
+  var MESES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  function maqAbrev(r){
+    var m=String(r.maquina||'');
+    if(/extrusora\s*1/i.test(m)) return 'EXT1';
+    if(/extrusora\s*2/i.test(m)) return 'EXT 2';
+    if(/impresora/i.test(m)) return 'IMP';
+    if(/selladora\s*1/i.test(m)) return 'S1';
+    if(/selladora\s*2/i.test(m)) return 'S2';
+    if(/selladora\s*manual/i.test(m)) return 'SM';
+    if(/refiladora/i.test(m)) return (clasificarReporte(r).bodega==='Producto en Proceso') ? 'R1PP' : 'R1PT';
+    return m;
+  }
+  function turnoNum(r){ var mm=String(r.turno||'').match(/\d+/); return mm?Number(mm[0]):''; }
+  function refUnidad(ref){
+    var s=String(ref||'');
+    var m=s.match(/(\d+(?:[.,]\d+)?)\s*(KG|LT|L)\b/i);
+    if(m){ return { size:parseFloat(m[1].replace(',','.')), unit:(/lt|^l$/i.test(m[2])?'lt':'kg') }; }
+    var x=s.match(/X\s*(\d+(?:[.,]\d+)?)/i);
+    if(x){ return { size:parseFloat(x[1].replace(',','.')), unit:'kg' }; }
+    return { size:'', unit:'' };
+  }
+  function num(v){ var n=parseFloat(String(v==null?'':v).replace(',','.')); return (isFinite(n)&&n!==0)?n:''; }
+  function esProceso(r){ return clasificarReporte(r).bodega==='Producto en Proceso'; }
+
+  // Construye el arreglo de valores para las 21 columnas C..W de un reporte.
+  function filaDe(r, consecutivo){
+    var iso=getFechaISO(r);
+    var d=new Date(iso+'T00:00:00');
+    var proc=esProceso(r);
+    var ru=refUnidad(r.referencia);
+    var unidadRep=String(r.unidad||'').toLowerCase();
+    var und = unidadRep.indexOf('kg')===0 ? '' : (Number(r.produccion)||'');
+    var pu = pesoUnidad(r)||'';
+    var cli = clienteDe(r.siesa) || (proc?'PRODUCTO EN PROCESO':'');
+    var fam = proc ? 'Producto en proceso' : (clasificarReporte(r).categoria||'');
+    var siesaN = /^\d+$/.test(String(r.siesa||'').trim()) ? Number(r.siesa) : (r.siesa||'');
+    return {
+      C: consecutivo,                 // N°
+      D: maqAbrev(r),                 // MAQ
+      E: d,                           // FECHA (Date)
+      F: MESES[d.getMonth()]||'',     // MES
+      G: r.nombre||'',                // OPERARIO
+      H: turnoNum(r),                 // TURNO
+      I: siesaN,                      // ITEMS (código Siesa)
+      J: r.referencia||'',            // REFERENCIA (PRODUCTO)
+      K: fam,                         // FAMILIA
+      L: ru.size,                     // REFERENCIA (unidad)
+      M: ru.unit,                     // UNIDAD
+      N: cli,                         // CLIENTE
+      O: num(r.extraCalibre),         // CALIBRE MIL/PULG
+      P: und,                         // UND PRODUCIDAS
+      Q: pu,                          // KG PESO POR BOLSA
+      R: Math.round(produccionKg(r)*100)/100 || '', // KG PRODUCIDOS
+      S: null,                        // UND NO CONFORMES (Calidad)
+      T: null,                        // KG NO CONFORMES (Calidad)
+      U: Math.round(mermaKg(r)*100)/100 || '', // KG DESPERDICIO
+      V: d.getMonth()+1,              // mes*
+      W: (r.observaciones && r.observaciones!=='-')?r.observaciones:'' // OBSERVACIONES
+    };
+  }
+
+  var COLS=['C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W'];
+  var COLIDX={C:3,D:4,E:5,F:6,G:7,H:8,I:9,J:10,K:11,L:12,M:13,N:14,O:15,P:16,Q:17,R:18,S:19,T:20,U:21,V:22,W:23};
+
+  /* -------- generar -------- */
+  $("btnGen").onclick = async function(){
+    $("genErr").textContent=""; $("log").textContent=""; 
+    $("btnGen").disabled=true; $("btnGen").textContent="Generando…";
+    try{
+      log("Cargando configuración compartida (pesos/clasificación)…");
+      await loadConfigRemoto(READ_URL);
+
+      log("Leyendo reportes…");
+      var reports = await loadReports(READ_URL);
+      log("Reportes totales: "+reports.length);
+
+      var desde = reports.filter(function(r){ var iso=getFechaISO(r); return iso && iso>=CORTE; })
+                         .sort(function(a,b){ var x=getFechaISO(a), y=getFechaISO(b); return x<y?-1:(x>y?1:((a.ts||0)-(b.ts||0))); });
+      log("Reportes desde "+CORTE+": "+desde.length);
+      if(desde.length===0){ throw new Error("No hay reportes desde "+CORTE+"."); }
+
+      log("Cargando plantilla del Excel…");
+      var resp = await fetch(TEMPLATE);
+      if(!resp.ok) throw new Error("No se pudo cargar la plantilla ("+resp.status+").");
+      var buf = await resp.arrayBuffer();
+
+      var wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+      var ws = wb.worksheets[0];
+
+      // Última fila con datos reales = última fila con ITEMS (col I) numérico.
+      var lastData=7;
+      for(var rr=8; rr<=1206; rr++){
+        var v=ws.getRow(rr).getCell(COLIDX.I).value;
+        var s=(v && typeof v==='object') ? (v.result!=null?v.result:'') : v;
+        if(s!=null && /^\d+$/.test(String(s).trim())) lastData=rr;
+      }
+      log("Última fila con datos reales: "+lastData);
+
+      // N° de arranque = N° de la última fila con datos + 1.
+      var lastNoRaw=ws.getRow(lastData).getCell(COLIDX.C).value;
+      var lastNo=(lastNoRaw && typeof lastNoRaw==='object')?(lastNoRaw.result||0):(Number(lastNoRaw)||0);
+
+      // Estilos de referencia: los de una fila de datos real (lastData) por columna.
+      function clon(st){ try{ return JSON.parse(JSON.stringify(st||{})); }catch(e){ return {}; } }
+      var estilos={};
+      COLS.forEach(function(c){ estilos[c]=clon(ws.getRow(lastData).getCell(COLIDX[c]).style); });
+
+      log("Escribiendo "+desde.length+" filas desde la fila "+(lastData+1)+"…");
+      desde.forEach(function(r,i){
+        var rowNum=lastData+1+i;
+        var fila=filaDe(r, lastNo+1+i);
+        var row=ws.getRow(rowNum);
+        COLS.forEach(function(c){
+          var cell=row.getCell(COLIDX[c]);
+          cell.value = (fila[c]===''? null : fila[c]);
+          cell.style = clon(estilos[c]);
+        });
+        row.commit && row.commit();
+      });
+
+      log("Empaquetando archivo…");
+      var outBuf = await wb.xlsx.writeBuffer();
+      var blob = new Blob([outBuf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+      var a=document.createElement("a");
+      var hoy=new Date().toISOString().slice(0,10);
+      a.href=URL.createObjectURL(blob);
+      a.download="Control de Calidad PM-CQ-FR-02 ("+hoy+").xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      log("✓ Listo. Se descargó el archivo con "+desde.length+" filas agregadas.");
+    }catch(e){
+      $("genErr").textContent = "Error: "+(e && e.message ? e.message : e);
+      log("✗ "+(e && e.message ? e.message : e));
+    }
+    $("btnGen").disabled=false; $("btnGen").textContent="⬇️ Generar y descargar Excel lleno";
+  };
+})();
+</script>
+</body>
+</html>
