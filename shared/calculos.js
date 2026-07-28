@@ -470,7 +470,20 @@ function inventarioBodegaPT(reports, okSet){
   });
   // Ajustes manuales (solo admin): 'salida' resta, 'entrada' suma. Sin sentido = salida (compat).
   loadAjustes().forEach(function(a){
-    var g=map[String(a.siesa||'').trim()]; if(!g) return;
+    var sk=String(a.siesa||'').trim(); if(!sk) return;
+    var g=map[sk];
+    if(!g){
+      // La referencia no está en bodega. Una ENTRADA la CREA (reintegro de producción
+      // anterior al corte que no entró al conteo físico). Respeta si se mide en kg.
+      if(a.sentido!=='entrada') return; // no hay nada que restar de algo inexistente
+      g=ens(sk, a.referencia); if(!g) return;
+      var cant0=Number(a.cantidad)||0;
+      var enKg0=/l[aá]mina|rollo|termo/i.test(g.categoria||'');
+      if(enKg0){ g.kg=Math.max(0, g.kg+cant0); }
+      else { var pu0=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0; g.unidades=Math.max(0, g.unidades+cant0); g.kg=Math.max(0, g.kg+cant0*pu0); }
+      if(a.fecha && a.fecha>g.ultima) g.ultima=a.fecha;
+      return;
+    }
     var cant=Number(a.cantidad)||0;
     var signo=(a.sentido==='entrada')?1:-1;
     var pu2=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0;
@@ -493,6 +506,29 @@ function inventarioDisponible(reports, okSet){
   var map={};
   inventarioBodegaPT(reports, okSet).forEach(function(x){ map[x.siesa]={unidades:x.unidades, kg:x.kg}; });
   return map;
+}
+
+/* Producción de PRODUCTO TERMINADO con fecha ANTERIOR o IGUAL al corte, agrupada por SKU.
+   Es la producción que la Bodega de Inventario NO suma (asume que ya está en el conteo
+   físico del corte). Sirve para detectar material que se produjo antes del corte pero
+   NO entró al conteo, y reintegrarlo manualmente. [{siesa,referencia,categoria,sector,
+   unidades,kg,reportes,ultima}]. */
+function produccionPreCorte(reports){
+  var corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
+  var cls=loadClasificacion(), P=loadPesos(), map={};
+  (reports||[]).forEach(function(r){
+    if(!requiereSiesa(r)) return;                     // solo Producto Terminado
+    var iso=getFechaISO(r); if(!iso || iso>corte) return; // solo hasta el corte (inclusive)
+    var k=String(r.siesa||r.sku||'').trim(); if(!k) return;
+    var c=cls[k]||{};
+    if(!map[k]) map[k]={siesa:k, referencia:r.referencia||'', categoria:c.categoria||'-', sector:c.sector||'-', unidades:0, kg:0, reportes:0, ultima:''};
+    var g=map[k];
+    if(!g.referencia && r.referencia) g.referencia=r.referencia;
+    var unidad=String(r.unidad||'').toLowerCase(), prod=Number(r.produccion)||0;
+    if(unidad.indexOf('kg')===0) g.kg+=prod; else { g.unidades+=prod; g.kg+=produccionKg(r,P); }
+    g.reportes++; if(iso>g.ultima) g.ultima=iso;
+  });
+  return Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return b.kg-a.kg; });
 }
 
 /* Descarga la config remota y la refleja en localStorage (misma clave que usan

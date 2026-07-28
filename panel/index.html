@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723h"></script>
+<script src="../shared/calculos.js?v=20260723i"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1883,9 +1883,10 @@ const MOTIVOS_ENTRADA=[
   'Producción no ingresada (corte)','Corrección de conteo (a la alza)',
   'Reintegro / devolución a bodega','Ajuste de inventario','Otro'
 ];
-function AjusteForm({siesa, referencia, disponible, onClose, onSaved}){
+function AjusteForm({siesa, referencia, disponible, sentidoInicial, onClose, onSaved}){
   const hoy=new Date().toISOString().slice(0,10);
-  const [f,setF]=useState({fecha:hoy, sentido:'salida', cantidad:'', motivo:MOTIVOS_AJUSTE[0], motivoOtro:'', observaciones:''});
+  const _si=(sentidoInicial==='entrada')?'entrada':'salida';
+  const [f,setF]=useState({fecha:hoy, sentido:_si, cantidad:'', motivo:(_si==='entrada'?MOTIVOS_ENTRADA:MOTIVOS_AJUSTE)[0], motivoOtro:'', observaciones:''});
   const [msg,setMsg]=useState('');
   const maxDisp=Math.round(disponible||0);
   const esEntrada=f.sentido==='entrada';
@@ -1936,6 +1937,70 @@ function AjusteForm({siesa, referencia, disponible, onClose, onSaved}){
           <button type="submit" style={{background:esEntrada?'var(--good)':'var(--bad)',color:'#fff',border:'none',borderRadius:8,padding:'9px 20px',fontWeight:700,cursor:'pointer'}}>{esEntrada?'➕ Confirmar entrada':'✂️ Confirmar salida'}</button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/* ===== REINTEGRAR PRODUCCIÓN ANTERIOR AL CORTE =====
+   Lista la producción de Producto Terminado con fecha <= corte que la Bodega de Inventario
+   NO suma (asume que ya está en el conteo físico). Marca como CANDIDATO lo que no figura en
+   el conteo físico. Permite reintegrar (entrada) por fila reutilizando AjusteForm. Solo admin. */
+function ReintegrarPreCorteModal({reports, okSet, onClose, onSaved}){
+  const [buscar,setBuscar]=useState("");
+  const [soloCand,setSoloCand]=useState(true);
+  const [ajustando,setAjustando]=useState(null);
+  const [ver,setVer]=useState(0);
+  const corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
+  ver;
+  const pre=produccionPreCorte(reports);
+  const fisico={}; ((window.INVENTARIO_BASE||{}).pt||[]).forEach(function(x){ const k=String(x.siesa||'').trim(); if(k) fisico[k]=(fisico[k]||0)+(Number(x.und)||0); });
+  const actual=inventarioDisponible(reports, okSet);
+  let rows=pre.map(function(x){ return {...x, enFisico:(fisico[x.siesa]!==undefined), fisico:fisico[x.siesa]||0, actual:(actual[x.siesa]&&actual[x.siesa].unidades)||0}; });
+  const nCand=rows.filter(function(r){ return !r.enFisico; }).length;
+  if(soloCand) rows=rows.filter(function(r){ return !r.enFisico; });
+  if(buscar.trim()){ const q=buscar.trim().toLowerCase(); rows=rows.filter(function(r){ return ((r.referencia||'')+' '+(r.siesa||'')).toLowerCase().includes(q); }); }
+  const th={padding:"8px 9px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)",fontSize:11.5,textAlign:"left"};
+  return(
+    <Modal title="➕ Reintegrar producción anterior al corte" onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:10}}>
+        Producción de <b>Producto Terminado</b> con fecha hasta el corte (<b>{corte}</b>) que la Bodega de Inventario no cuenta (asume que ya está en el conteo físico).
+        Los <b style={{color:"var(--amber)"}}>candidatos</b> son los que <b>no figuran en el conteo físico</b>: puede ser material que no se contó… o que ya se despachó. <b>Revisa antes de reintegrar</b> para no inflar el inventario.
+      </div>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:12}}>
+        <input style={{...inputStyle,maxWidth:300,fontSize:13,padding:"7px 10px"}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
+        <label style={{display:"flex",alignItems:"center",gap:7,fontSize:12,cursor:"pointer"}}>
+          <input type="checkbox" checked={soloCand} onChange={e=>setSoloCand(e.target.checked)} style={{width:15,height:15,accentColor:"var(--accent)",cursor:"pointer"}}/>
+          Solo candidatos ({nCand})
+        </label>
+      </div>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"52vh",border:"1px solid var(--line)",borderRadius:10}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"var(--panel-2)",borderBottom:"1px solid var(--line)"}}>
+            <th style={th}>Referencia</th><th style={th}>Código</th><th style={th}>Tipo</th>
+            <th style={th}>Producido antes del corte</th><th style={th}>En conteo físico</th><th style={th}>En inventario hoy</th><th style={th}></th>
+          </tr></thead>
+          <tbody>
+            {rows.slice(0,300).map(function(x,i){
+              return (
+                <tr key={x.siesa+"_"+i} style={{borderTop:"1px solid var(--line)",background:!x.enFisico?"rgba(245,158,11,0.06)":"transparent"}}>
+                  <td style={{padding:"7px 9px",maxWidth:230,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia||"-"}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)"}}>{x.siesa}</td>
+                  <td style={{padding:"7px 9px",fontSize:11,color:"var(--text-dim)"}}>{x.categoria}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{Math.round(x.unidades).toLocaleString()} und · {Math.round(x.kg).toLocaleString()} kg</td>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{x.enFisico?<span style={{color:"var(--good)"}}>Sí ({Math.round(x.fisico).toLocaleString()})</span>:<span style={{color:"var(--amber)",fontWeight:700}}>No</span>}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)"}}>{Math.round(x.actual).toLocaleString()}</td>
+                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>
+                    <button onClick={()=>setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.actual})} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:7,padding:"5px 11px",fontSize:12,fontWeight:700,cursor:"pointer"}}>➕ Reintegrar</button>
+                  </td>
+                </tr>
+              );
+            })}
+            {rows.length===0 && <tr><td colSpan="7" style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>{soloCand?"No hay candidatos: toda la producción anterior al corte figura en el conteo físico.":"Sin resultados."}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {rows.length>300 && <div style={{fontSize:11.5,color:"var(--text-dim)",marginTop:8}}>Mostrando 300 de {rows.length.toLocaleString()}. Usa el buscador para acotar.</div>}
+      {ajustando && <AjusteForm {...ajustando} sentidoInicial="entrada" onClose={()=>setAjustando(null)} onSaved={()=>{ setAjustando(null); setVer(v=>v+1); onSaved&&onSaved(); }}/>}
     </Modal>
   );
 }
@@ -2015,6 +2080,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
   const [showFilter,setShowFilter]=useState(false);
   const [traza,setTraza]=useState(null);
   const [ajustando,setAjustando]=useState(null); // {siesa,referencia,disponible}
+  const [showReintegrar,setShowReintegrar]=useState(false);
   const [ver,setVer]=useState(0);
   const sort=useSort('unidades','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
@@ -2047,10 +2113,13 @@ function BodegaInventario({reports, okSet, puedeEditar}){
       <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Inventario físico del <b>corte (17/07)</b> + producción confirmada en SIESA <b>posterior al corte</b>. Antesala de <b>Despachos</b>. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
 
       {/* SUB-PESTAÑAS */}
-      <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
-        {[['inv','📦 Inventario ('+invAll.length+')'],['ajustes','✂️ Ajustes ('+loadAjustes().length+')']].map(([k,label])=>(
-          <button key={k} onClick={()=>setSubTab(k)} style={{background:subTab===k?"var(--card)":"transparent",color:subTab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subTab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subTab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
-        ))}
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:18,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",width:"fit-content"}}>
+          {[['inv','📦 Inventario ('+invAll.length+')'],['ajustes','✂️ Ajustes ('+loadAjustes().length+')']].map(([k,label])=>(
+            <button key={k} onClick={()=>setSubTab(k)} style={{background:subTab===k?"var(--card)":"transparent",color:subTab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subTab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subTab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
+          ))}
+        </div>
+        {puedeEditar && <button onClick={()=>setShowReintegrar(true)} title="Reintegrar producción anterior al corte que no entró al conteo físico" style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--text)"}}>➕ Reintegrar producción anterior al corte</button>}
       </div>
 
       {subTab==='ajustes' && <HistorialAjustes key={"haj_"+ver}/>}
@@ -2134,6 +2203,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
       {traza && <TrazabilidadModal siesa={traza} reports={reports} onClose={()=>setTraza(null)}/>}
       </>}
       {ajustando && <AjusteForm {...ajustando} onClose={()=>setAjustando(null)} onSaved={()=>{ setAjustando(null); setVer(v=>v+1); }}/>}
+      {showReintegrar && <ReintegrarPreCorteModal reports={reports} okSet={okSet} onClose={()=>setShowReintegrar(false)} onSaved={()=>setVer(v=>v+1)}/>}
     </div>
   );
 }
