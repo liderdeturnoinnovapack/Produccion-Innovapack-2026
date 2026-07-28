@@ -469,26 +469,27 @@ function inventarioBodegaPT(reports, okSet){
     g.desdeCorte=true; if(!g.ultima) g.ultima=corte;
   });
   // Ajustes manuales (solo admin): 'salida' resta, 'entrada' suma. Sin sentido = salida (compat).
+  // Una ENTRADA puede CREAR la referencia si no estaba en bodega (reintegro de producción
+  // anterior al corte no contada). La cantidad se interpreta en KG para productos que se
+  // miden en kg (lámina/rollo/termoencogible) y en UNIDADES para el resto.
   loadAjustes().forEach(function(a){
     var sk=String(a.siesa||'').trim(); if(!sk) return;
     var g=map[sk];
     if(!g){
-      // La referencia no está en bodega. Una ENTRADA la CREA (reintegro de producción
-      // anterior al corte que no entró al conteo físico). Respeta si se mide en kg.
       if(a.sentido!=='entrada') return; // no hay nada que restar de algo inexistente
       g=ens(sk, a.referencia); if(!g) return;
-      var cant0=Number(a.cantidad)||0;
-      var enKg0=/l[aá]mina|rollo|termo/i.test(g.categoria||'');
-      if(enKg0){ g.kg=Math.max(0, g.kg+cant0); }
-      else { var pu0=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0; g.unidades=Math.max(0, g.unidades+cant0); g.kg=Math.max(0, g.kg+cant0*pu0); }
       if(a.fecha && a.fecha>g.ultima) g.ultima=a.fecha;
-      return;
     }
     var cant=Number(a.cantidad)||0;
     var signo=(a.sentido==='entrada')?1:-1;
-    var pu2=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0;
-    g.unidades=Math.max(0, g.unidades+signo*cant);
-    g.kg=Math.max(0, g.kg+signo*cant*pu2);
+    var enKg=/l[aá]mina|rollo|termo/i.test(g.categoria||'');
+    if(enKg){
+      g.kg=Math.max(0, g.kg+signo*cant);            // se mide en kg: la cantidad ES kg
+    } else {
+      var pu2=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0;
+      g.unidades=Math.max(0, g.unidades+signo*cant);
+      g.kg=Math.max(0, g.kg+signo*cant*pu2);
+    }
   });  // + producción confirmada POSTERIOR al corte (lo previo ya está en el corte)
   (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;

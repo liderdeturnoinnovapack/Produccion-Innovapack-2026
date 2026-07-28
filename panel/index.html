@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723i"></script>
+<script src="../shared/calculos.js?v=20260723j"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1883,11 +1883,12 @@ const MOTIVOS_ENTRADA=[
   'Producción no ingresada (corte)','Corrección de conteo (a la alza)',
   'Reintegro / devolución a bodega','Ajuste de inventario','Otro'
 ];
-function AjusteForm({siesa, referencia, disponible, sentidoInicial, onClose, onSaved}){
+function AjusteForm({siesa, referencia, disponible, enKg, sentidoInicial, onClose, onSaved}){
   const hoy=new Date().toISOString().slice(0,10);
   const _si=(sentidoInicial==='entrada')?'entrada':'salida';
   const [f,setF]=useState({fecha:hoy, sentido:_si, cantidad:'', motivo:(_si==='entrada'?MOTIVOS_ENTRADA:MOTIVOS_AJUSTE)[0], motivoOtro:'', observaciones:''});
   const [msg,setMsg]=useState('');
+  const uni=enKg?'kg':'und'; // los productos en kg (lámina/rollo/termo) se ajustan en kg
   const maxDisp=Math.round(disponible||0);
   const esEntrada=f.sentido==='entrada';
   const motivos=esEntrada?MOTIVOS_ENTRADA:MOTIVOS_AJUSTE;
@@ -1896,7 +1897,7 @@ function AjusteForm({siesa, referencia, disponible, sentidoInicial, onClose, onS
     e.preventDefault();
     const cant=Number(f.cantidad);
     if(!cant||cant<=0){ setMsg('La cantidad debe ser mayor que 0.'); return; }
-    if(!esEntrada && cant>maxDisp){ setMsg('No puedes restar más que el disponible ('+maxDisp.toLocaleString()+' und).'); return; }
+    if(!esEntrada && cant>maxDisp){ setMsg('No puedes restar más que el disponible ('+maxDisp.toLocaleString()+' '+uni+').'); return; }
     const motivoFinal=f.motivo==='Otro'?(f.motivoOtro.trim()||'Otro'):f.motivo;
     if(f.motivo==='Otro'&&!f.motivoOtro.trim()){ setMsg('Describe el motivo.'); return; }
     registrarAjuste({fecha:f.fecha, sentido:f.sentido, siesa:String(siesa), referencia, cantidad:cant, motivo:motivoFinal, observaciones:f.observaciones.trim()});
@@ -1906,10 +1907,10 @@ function AjusteForm({siesa, referencia, disponible, sentidoInicial, onClose, onS
   return(
     <Modal title={'⚖️ Ajuste de inventario · '+((referencia||'').slice(0,40))} onClose={onClose}>
       <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:12}}>
-        Código: <b style={{fontFamily:'var(--mono)'}}>{siesa}</b> · Disponible actual: <b style={{color:'var(--amber)'}}>{maxDisp.toLocaleString()} und</b><br/>
+        Código: <b style={{fontFamily:'var(--mono)'}}>{siesa}</b> · Disponible actual: <b style={{color:'var(--amber)'}}>{maxDisp.toLocaleString()} {uni}</b>{enKg && <span> · <b style={{color:'var(--brand-blue)'}}>se ajusta en kg</b></span>}<br/>
         {esEntrada
-          ? <span>La <b style={{color:'var(--good)'}}>Entrada (+)</b> suma unidades (mal conteo a la alza o producción no ingresada por el corte).</span>
-          : <span>La <b style={{color:'var(--bad)'}}>Salida (−)</b> resta unidades del inventario.</span>} Queda registrada con causa (solo admin).
+          ? <span>La <b style={{color:'var(--good)'}}>Entrada (+)</b> suma {uni} (mal conteo a la alza o producción no ingresada por el corte).</span>
+          : <span>La <b style={{color:'var(--bad)'}}>Salida (−)</b> resta {uni} del inventario.</span>} Queda registrada con causa (solo admin).
       </div>
       <div style={{display:'flex',gap:1,background:'var(--panel-2)',borderRadius:9,padding:3,marginBottom:14}}>
         {[['salida','Salida (−)'],['entrada','Entrada (+)']].map(([k,l])=>(
@@ -1919,7 +1920,7 @@ function AjusteForm({siesa, referencia, disponible, sentidoInicial, onClose, onS
       <form onSubmit={guardar} style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         <div><div style={lab}>Fecha del ajuste</div><input type="date" style={inputStyle} value={f.fecha} onChange={e=>setF({...f,fecha:e.target.value})}/></div>
         <div>
-          <div style={lab}>{esEntrada?'Cantidad a sumar *':'Cantidad a restar * (máx. '+maxDisp.toLocaleString()+')'}</div>
+          <div style={lab}>{esEntrada?('Cantidad a sumar ('+uni+') *'):('Cantidad a restar ('+uni+') * (máx. '+maxDisp.toLocaleString()+')')}</div>
           <input type="number" min="1" max={esEntrada?undefined:maxDisp} style={inputStyle} value={f.cantidad} onChange={e=>setF({...f,cantidad:e.target.value})} placeholder={esEntrada?'0':maxDisp.toLocaleString()}/>
         </div>
         <div style={{gridColumn:'1/-1'}}>
@@ -1953,18 +1954,27 @@ function ReintegrarPreCorteModal({reports, okSet, onClose, onSaved}){
   const corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
   ver;
   const pre=produccionPreCorte(reports);
-  const fisico={}; ((window.INVENTARIO_BASE||{}).pt||[]).forEach(function(x){ const k=String(x.siesa||'').trim(); if(k) fisico[k]=(fisico[k]||0)+(Number(x.und)||0); });
   const actual=inventarioDisponible(reports, okSet);
-  let rows=pre.map(function(x){ return {...x, enFisico:(fisico[x.siesa]!==undefined), fisico:fisico[x.siesa]||0, actual:(actual[x.siesa]&&actual[x.siesa].unidades)||0}; });
-  const nCand=rows.filter(function(r){ return !r.enFisico; }).length;
-  if(soloCand) rows=rows.filter(function(r){ return !r.enFisico; });
+  const esKg=function(cat){ return /l[aá]mina|rollo|termo/i.test(cat||''); };
+  let rows=pre.map(function(x){
+    const kg=esKg(x.categoria);
+    const invUnd=(actual[x.siesa]&&actual[x.siesa].unidades)||0;
+    const invKg=(actual[x.siesa]&&actual[x.siesa].kg)||0;
+    const prodN=kg?x.kg:x.unidades;   // producido pre-corte en su unidad nativa
+    const invN=kg?invKg:invUnd;       // inventario hoy en su unidad nativa
+    return {...x, enKg:kg, invN:invN, prodN:prodN, dif:Math.max(0,prodN-invN)};
+  });
+  const esCand=function(r){ return (r.prodN - r.invN) > 1; }; // se produjo más de lo que hoy figura
+  const nCand=rows.filter(esCand).length;
+  if(soloCand) rows=rows.filter(esCand);
   if(buscar.trim()){ const q=buscar.trim().toLowerCase(); rows=rows.filter(function(r){ return ((r.referencia||'')+' '+(r.siesa||'')).toLowerCase().includes(q); }); }
+  rows=rows.sort(function(a,b){ return b.dif-a.dif; });
   const th={padding:"8px 9px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)",fontSize:11.5,textAlign:"left"};
   return(
     <Modal title="➕ Reintegrar producción anterior al corte" onClose={onClose}>
       <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:10}}>
-        Producción de <b>Producto Terminado</b> con fecha hasta el corte (<b>{corte}</b>) que la Bodega de Inventario no cuenta (asume que ya está en el conteo físico).
-        Los <b style={{color:"var(--amber)"}}>candidatos</b> son los que <b>no figuran en el conteo físico</b>: puede ser material que no se contó… o que ya se despachó. <b>Revisa antes de reintegrar</b> para no inflar el inventario.
+        Producción de <b>Producto Terminado</b> con fecha hasta el corte (<b>{corte}</b>) que la Bodega de Inventario no cuenta (asume que ya está en el conteo físico). Cada producto va en su unidad: <b>kg</b> para lámina/rollo/termoencogible, <b>und</b> para el resto.
+        Los <b style={{color:"var(--amber)"}}>candidatos</b> son donde <b>se produjo más de lo que hoy figura</b> en inventario (posible material no contado). Puede también ser material ya despachado: <b>revisa antes de reintegrar</b> para no inflar el inventario.
       </div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:12}}>
         <input style={{...inputStyle,maxWidth:300,fontSize:13,padding:"7px 10px"}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia o código…"/>
@@ -1977,25 +1987,27 @@ function ReintegrarPreCorteModal({reports, okSet, onClose, onSaved}){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead><tr style={{background:"var(--panel-2)",borderBottom:"1px solid var(--line)"}}>
             <th style={th}>Referencia</th><th style={th}>Código</th><th style={th}>Tipo</th>
-            <th style={th}>Producido antes del corte</th><th style={th}>En conteo físico</th><th style={th}>En inventario hoy</th><th style={th}></th>
+            <th style={th}>Producido antes del corte</th><th style={th}>En inventario hoy</th><th style={th}>Diferencia</th><th style={th}></th>
           </tr></thead>
           <tbody>
             {rows.slice(0,300).map(function(x,i){
+              const cand=(x.prodN - x.invN)>1;
+              const u=x.enKg?'kg':'und';
               return (
-                <tr key={x.siesa+"_"+i} style={{borderTop:"1px solid var(--line)",background:!x.enFisico?"rgba(245,158,11,0.06)":"transparent"}}>
-                  <td style={{padding:"7px 9px",maxWidth:230,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia||"-"}</td>
+                <tr key={x.siesa+"_"+i} style={{borderTop:"1px solid var(--line)",background:cand?"rgba(245,158,11,0.06)":"transparent"}}>
+                  <td style={{padding:"7px 9px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.referencia||"-"}</td>
                   <td style={{padding:"7px 9px",fontFamily:"var(--mono)"}}>{x.siesa}</td>
                   <td style={{padding:"7px 9px",fontSize:11,color:"var(--text-dim)"}}>{x.categoria}</td>
-                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{Math.round(x.unidades).toLocaleString()} und · {Math.round(x.kg).toLocaleString()} kg</td>
-                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{x.enFisico?<span style={{color:"var(--good)"}}>Sí ({Math.round(x.fisico).toLocaleString()})</span>:<span style={{color:"var(--amber)",fontWeight:700}}>No</span>}</td>
-                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)"}}>{Math.round(x.actual).toLocaleString()}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{Math.round(x.prodN).toLocaleString()} {u}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{Math.round(x.invN).toLocaleString()} {u}</td>
+                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",whiteSpace:"nowrap",color:cand?"var(--amber)":"var(--text-dim)",fontWeight:cand?700:400}}>{x.dif>1?("+"+Math.round(x.dif).toLocaleString()+" "+u):"—"}</td>
                   <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>
-                    <button onClick={()=>setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.actual})} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:7,padding:"5px 11px",fontSize:12,fontWeight:700,cursor:"pointer"}}>➕ Reintegrar</button>
+                    <button onClick={()=>setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.invN,enKg:x.enKg})} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:7,padding:"5px 11px",fontSize:12,fontWeight:700,cursor:"pointer"}}>➕ Reintegrar</button>
                   </td>
                 </tr>
               );
             })}
-            {rows.length===0 && <tr><td colSpan="7" style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>{soloCand?"No hay candidatos: toda la producción anterior al corte figura en el conteo físico.":"Sin resultados."}</td></tr>}
+            {rows.length===0 && <tr><td colSpan="7" style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>{soloCand?"No hay candidatos: la producción anterior al corte ya está reflejada en el inventario.":"Sin resultados."}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -2190,7 +2202,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
                 <td style={{padding:"8px 10px",color:"var(--accent)",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>🔎 ver</td>
                 <td style={{padding:"8px 8px",whiteSpace:"nowrap"}}>
                   {puedeEditar
-                    ? <button title="Registrar salida / ajuste de inventario" onClick={e=>{e.stopPropagation();setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:x.unidades});}} style={{background:"rgba(220,38,38,0.1)",color:"var(--bad)",border:"1px solid rgba(220,38,38,0.2)",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✂️</button>
+                    ? <button title="Registrar salida / ajuste de inventario" onClick={e=>{e.stopPropagation();var _kg=/l[aá]mina|rollo|termo/i.test(x.categoria||'');setAjustando({siesa:x.siesa,referencia:x.referencia,disponible:_kg?x.kg:x.unidades,enKg:_kg});}} style={{background:"rgba(220,38,38,0.1)",color:"var(--bad)",border:"1px solid rgba(220,38,38,0.2)",borderRadius:7,padding:"5px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✂️</button>
                     : <span style={{color:"var(--text-dim)"}}>—</span>}
                 </td>
               </tr>
