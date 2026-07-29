@@ -202,7 +202,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -452,7 +452,7 @@ function laminaConsumoInfo(reports){
    Agrupado por referencia. Fuente de la Bodega de Inventario y de la disponibilidad
    en Despachos. Así aparecen también las referencias que solo están en el corte. */
 function inventarioBodegaPT(reports, okSet){
-  var corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
+  var corte=cortePT();
   var P=loadPesos(), cls=loadClasificacion(), map={};
   function ens(siesa, ref){
     var k=String(siesa||'').trim(); if(!k) return null;
@@ -515,7 +515,7 @@ function inventarioDisponible(reports, okSet){
    NO entró al conteo, y reintegrarlo manualmente. [{siesa,referencia,categoria,sector,
    unidades,kg,reportes,ultima}]. */
 function produccionPreCorte(reports){
-  var corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
+  var corte=cortePT();
   var cls=loadClasificacion(), P=loadPesos(), map={};
   (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;                     // solo Producto Terminado
@@ -532,8 +532,47 @@ function produccionPreCorte(reports){
   return Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return b.kg-a.kg; });
 }
 
-/* Descarga la config remota y la refleja en localStorage (misma clave que usan
-   los loaders). Devuelve el objeto remoto (o null si falla). */
+/* ===== CORTE DE INVENTARIO editable (re-inventario físico) =====
+   El corte de PRODUCTO TERMINADO puede reemplazarse por un inventario físico nuevo
+   (fecha + conteo) sin tocar código: se guarda en config (corte_override) y se
+   aplica sobre INVENTARIO_BASE como fechaCortePT + pt. El corte de PROCESO (rollos /
+   lámina impresa) queda intacto en fechaCorte. Sin override => base original. */
+var _INV_BASE_ORIG = null;
+/* Fecha del corte que rige el PRODUCTO TERMINADO (nueva si hay override, si no la original). */
+function cortePT(){
+  var B = window.INVENTARIO_BASE || {};
+  return B.fechaCortePT || B.fechaCorte || '2026-07-17';
+}
+function loadCorteOverride(){ try{ var r=localStorage.getItem('corte-override'); return r?JSON.parse(r):null; }catch(e){ return null; } }
+/* Aplica (o quita) el corte nuevo sobre window.INVENTARIO_BASE. Guarda la base ORIGINAL
+   una sola vez para poder restaurarla. El pt del override viene compacto [[siesa,cant]]. */
+function aplicarCorte(){
+  try{
+    if(!_INV_BASE_ORIG && window.INVENTARIO_BASE) _INV_BASE_ORIG = window.INVENTARIO_BASE;
+    if(!_INV_BASE_ORIG) return; // contexto sin INVENTARIO_BASE (p.ej. el formulario): no tocar
+    var o = loadCorteOverride();
+    if(o && o.fecha && Array.isArray(o.pt) && o.pt.length){
+      var cat = {}; (loadCatalog()||[]).forEach(function(c){ var k=c.siesa||c.sku; if(k) cat[k]=c.referencia||''; });
+      var ptFull = o.pt.map(function(row){ var s=String(row[0]||'').trim(); return { siesa:s, referencia:cat[s]||'', und:Number(row[1])||0 }; }).filter(function(x){ return x.siesa; });
+      window.INVENTARIO_BASE = Object.assign({}, _INV_BASE_ORIG, { fechaCortePT:o.fecha, pt:ptFull });
+    } else {
+      window.INVENTARIO_BASE = _INV_BASE_ORIG; // sin override válido => corte original
+    }
+  }catch(e){}
+}
+/* Guarda un corte nuevo {fecha, pt:[[siesa,cant]]} (o null para restaurar el original). */
+function saveCorteOverride(obj){
+  var valido = obj && obj.fecha && Array.isArray(obj.pt) && obj.pt.length;
+  try{
+    if(valido) localStorage.setItem('corte-override', JSON.stringify(obj));
+    else localStorage.removeItem('corte-override');
+  }catch(e){}
+  postConfig_('corte_override', valido ? obj : {});
+  aplicarCorte();
+}
+
+/* Descarga la config remota y la refleja en localStorage; aplica el corte nuevo si existe.
+   Devuelve el objeto remoto (o null si falla). */
 async function loadConfigRemoto(url){
   if(!url) return null;
   try{
@@ -546,6 +585,7 @@ async function loadConfigRemoto(url){
           try{ localStorage.setItem(_CFG_KEYS[k], JSON.stringify(cfg[k])); }catch(e){}
         }
       }
+      aplicarCorte(); // refleja el corte nuevo (si lo hay) en INVENTARIO_BASE
       return cfg;
     }
   }catch(e){}

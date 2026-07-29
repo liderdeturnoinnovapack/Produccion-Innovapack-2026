@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723j"></script>
+<script src="../shared/calculos.js?v=20260723k"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1496,7 +1496,8 @@ function InventarioFisico({bodega,reports}){
   const [soloPend,setSoloPend]=useState(true); // vista limpia: solo referencias pendientes de ingreso a SIESA
   function toggleOk(siesa){ const n=new Set(ok); if(n.has(siesa)) n.delete(siesa); else n.add(siesa); setOk(n); saveVerificadoSiesa([...n]); }
   const B = window.INVENTARIO_BASE || {};
-  const fecha = B.fechaCorte ? fechaLarga(B.fechaCorte) : "-";
+  const _fc = (bodega==='pt') ? (B.fechaCortePT||B.fechaCorte) : B.fechaCorte;
+  const fecha = _fc ? fechaLarga(_fc) : "-";
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   const q = buscar.trim().toLowerCase();
   const th = h => <th key={h} style={{padding:"9px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>;
@@ -1951,7 +1952,7 @@ function ReintegrarPreCorteModal({reports, okSet, onClose, onSaved}){
   const [soloCand,setSoloCand]=useState(true);
   const [ajustando,setAjustando]=useState(null);
   const [ver,setVer]=useState(0);
-  const corte=(window.INVENTARIO_BASE||{}).fechaCorte||'2026-07-17';
+  const corte=cortePT();
   ver;
   const pre=produccionPreCorte(reports);
   const actual=inventarioDisponible(reports, okSet);
@@ -2013,6 +2014,100 @@ function ReintegrarPreCorteModal({reports, okSet, onClose, onSaved}){
       </div>
       {rows.length>300 && <div style={{fontSize:11.5,color:"var(--text-dim)",marginTop:8}}>Mostrando 300 de {rows.length.toLocaleString()}. Usa el buscador para acotar.</div>}
       {ajustando && <AjusteForm {...ajustando} sentidoInicial="entrada" onClose={()=>setAjustando(null)} onSaved={()=>{ setAjustando(null); setVer(v=>v+1); onSaved&&onSaved(); }}/>}
+    </Modal>
+  );
+}
+
+/* ===== NUEVO CORTE / RE-INVENTARIO FÍSICO (solo admin) =====
+   Reemplaza el conteo físico de PRODUCTO TERMINADO por uno nuevo (fecha + conteo pegado
+   desde Excel: Código [tab] Cantidad). Guarda compacto en config. Reversible (restaurar
+   corte original). Opcional: limpiar los ajustes manuales acumulados. */
+function NuevoCorteModal({onClose, onSaved}){
+  const hoy=new Date().toISOString().slice(0,10);
+  const [fecha,setFecha]=useState(hoy);
+  const [texto,setTexto]=useState("");
+  const [limpiarAj,setLimpiarAj]=useState(true);
+  const [confirmar,setConfirmar]=useState(false);
+  const [msg,setMsg]=useState("");
+  const cat={}; (loadCatalog()||[]).forEach(function(c){ const k=c.siesa||c.sku; if(k) cat[k]=c.referencia||''; });
+  const ov=loadCorteOverride();
+  const vigente=(cortePT()||'').split('-').reverse().slice(0,2).join('/');
+  const parsed=(function(){
+    const out=[]; let malas=0, desconocidos=0;
+    (texto||'').split(/\r?\n/).forEach(function(ln){
+      const t=ln.trim(); if(!t) return;
+      const cols=(t.indexOf('\t')>=0 ? t.split('\t') : t.split(/;|,|\s{2,}/)).map(function(s){return s.trim();}).filter(function(s){return s!=='';});
+      if(cols.length<2){ malas++; return; }
+      const codigo=cols[0];
+      const raw=String(cols[cols.length-1]).replace(/\s/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.');
+      const cant=Number(raw);
+      if(!codigo || isNaN(cant)){ malas++; return; }
+      if(!cat[codigo]) desconocidos++;
+      out.push([codigo, cant]);
+    });
+    return {rows:out, malas:malas, desconocidos:desconocidos};
+  })();
+  const total=parsed.rows.reduce(function(s,r){ return s+(Number(r[1])||0); },0);
+  const lab={fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
+  function guardar(){
+    if(!fecha){ setMsg("Pon la fecha del inventario."); return; }
+    if(!parsed.rows.length){ setMsg("Pega el conteo (Código y Cantidad)."); return; }
+    if(!confirmar){ setMsg("Marca la casilla de confirmación."); return; }
+    saveCorteOverride({ fecha:fecha, pt:parsed.rows });
+    if(limpiarAj) saveAjustes([]);
+    onSaved&&onSaved(); onClose&&onClose();
+  }
+  function restaurar(){
+    if(!confirmar){ setMsg("Marca la confirmación para restaurar."); return; }
+    saveCorteOverride(null);
+    if(limpiarAj) saveAjustes([]);
+    onSaved&&onSaved(); onClose&&onClose();
+  }
+  return(
+    <Modal title="🗓️ Nuevo corte / re-inventario (Producto Terminado)" onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>
+        Reemplaza el conteo físico de <b>Producto Terminado</b> por uno nuevo. Desde la fecha que pongas, el inventario = <b>este conteo</b> + producción posterior. Corte de PT vigente: <b>{vigente}</b> {ov&&ov.fecha?"(ya hay un corte nuevo cargado)":"(original)"}. El corte de <b>proceso</b> (rollos/lámina) no se toca.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+        <div><div style={lab}>Fecha del inventario físico *</div><input type="date" style={inputStyle} value={fecha} max={hoy} onChange={e=>setFecha(e.target.value)}/></div>
+        <div style={{display:"flex",alignItems:"flex-end",fontSize:12,color:"var(--text-dim)"}}>{parsed.rows.length} ref. · total {Math.round(total).toLocaleString()}{parsed.desconocidos>0 && <span style={{color:"var(--amber)"}}> · {parsed.desconocidos} sin catálogo</span>}{parsed.malas>0 && <span style={{color:"var(--bad)"}}> · {parsed.malas} línea(s) ignoradas</span>}</div>
+      </div>
+      <div style={lab}>Conteo físico — pega desde Excel: Código [tab] Cantidad (una fila por producto). Lámina/rollo/termo en kg, bolsas en unidades.</div>
+      <textarea value={texto} onChange={e=>setTexto(e.target.value)} placeholder={"5030088\t6334\n5020264\t42300"} style={{...inputStyle,minHeight:150,fontFamily:"var(--mono)",fontSize:12,whiteSpace:"pre",overflowX:"auto"}}/>
+      {parsed.rows.length>0 && (
+        <div style={{marginTop:10,border:"1px solid var(--line)",borderRadius:8,maxHeight:160,overflowY:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:"var(--panel-2)"}}><th style={{padding:"6px 9px",textAlign:"left"}}>Código</th><th style={{padding:"6px 9px",textAlign:"left"}}>Referencia</th><th style={{padding:"6px 9px",textAlign:"right"}}>Cantidad</th></tr></thead>
+            <tbody>
+              {parsed.rows.slice(0,12).map(function(r,i){ return (
+                <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"6px 9px",fontFamily:"var(--mono)"}}>{r[0]}</td>
+                  <td style={{padding:"6px 9px",maxWidth:300,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:cat[r[0]]?"var(--text)":"var(--amber)"}}>{cat[r[0]]||"(sin catálogo)"}</td>
+                  <td style={{padding:"6px 9px",textAlign:"right",fontFamily:"var(--mono)"}}>{Number(r[1]).toLocaleString()}</td>
+                </tr>
+              ); })}
+            </tbody>
+          </table>
+          {parsed.rows.length>12 && <div style={{fontSize:11,color:"var(--text-dim)",padding:"6px 9px"}}>… y {parsed.rows.length-12} más.</div>}
+        </div>
+      )}
+      <label style={{display:"flex",alignItems:"center",gap:8,marginTop:12,fontSize:12,cursor:"pointer"}}>
+        <input type="checkbox" checked={limpiarAj} onChange={e=>setLimpiarAj(e.target.checked)} style={{width:15,height:15,accentColor:"var(--accent)"}}/>
+        Limpiar los ajustes manuales acumulados (recomendado: el conteo nuevo ya los reemplaza)
+      </label>
+      <label style={{display:"flex",alignItems:"flex-start",gap:8,marginTop:8,fontSize:12,cursor:"pointer"}}>
+        <input type="checkbox" checked={confirmar} onChange={e=>setConfirmar(e.target.checked)} style={{width:15,height:15,accentColor:"var(--bad)",marginTop:2}}/>
+        <span>Entiendo que esto <b>reemplaza</b> el inventario de Producto Terminado para todo el equipo.</span>
+      </label>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14,gap:12,flexWrap:"wrap"}}>
+        {ov&&ov.fecha
+          ? <button onClick={restaurar} style={{background:"transparent",color:"var(--text-dim)",border:"1px solid var(--line)",borderRadius:8,padding:"8px 12px",fontSize:12,cursor:"pointer"}}>↺ Restaurar corte original</button>
+          : <span/>}
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <span style={{fontSize:12,color:"var(--bad)"}}>{msg}</span>
+          <button onClick={guardar} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>Guardar corte nuevo</button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -2093,11 +2188,13 @@ function BodegaInventario({reports, okSet, puedeEditar}){
   const [traza,setTraza]=useState(null);
   const [ajustando,setAjustando]=useState(null); // {siesa,referencia,disponible}
   const [showReintegrar,setShowReintegrar]=useState(false);
+  const [showNuevoCorte,setShowNuevoCorte]=useState(false);
   const [ver,setVer]=useState(0);
   const sort=useSort('unidades','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   // Inventario físico del corte + producción confirmada posterior al corte.
   const invAll=inventarioBodegaPT(reports, okSet); ver;
+  const corteTxt=(cortePT()||'').split('-').reverse().slice(0,2).join('/'); // dd/mm del corte de PT vigente
   const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
   const sectores=["Todos",...new Set(invAll.map(x=>x.sector).filter(s=>s&&s!=="-"))].sort();
   const clientesInv=["Todos",...new Set(invAll.map(x=>clienteDe(x.siesa)).filter(Boolean))].sort();
@@ -2122,7 +2219,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
   return (
     <div style={{marginBottom:26}}>
       <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>🏬 Bodega de Inventario <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(confirmado en SIESA · listo para despacho)</span></div>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Inventario físico del <b>corte (17/07)</b> + producción confirmada en SIESA <b>posterior al corte</b>. Antesala de <b>Despachos</b>. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:12}}>Inventario físico del <b>corte ({corteTxt})</b> + producción confirmada en SIESA <b>posterior al corte</b>. Antesala de <b>Despachos</b>. Clic en una referencia para ver su <b>trazabilidad de producción</b>.{pendientes>0 && <span> · <span style={{color:"var(--amber)"}}>⏳ {pendientes} reporte(s) en standby</span> (arriba).</span>}</div>
 
       {/* SUB-PESTAÑAS */}
       <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:18,flexWrap:"wrap"}}>
@@ -2132,6 +2229,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
           ))}
         </div>
         {puedeEditar && <button onClick={()=>setShowReintegrar(true)} title="Reintegrar producción anterior al corte que no entró al conteo físico" style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--text)"}}>➕ Reintegrar producción anterior al corte</button>}
+        {puedeEditar && <button onClick={()=>setShowNuevoCorte(true)} title="Cargar un inventario físico nuevo como corte de Producto Terminado" style={{background:"var(--panel-2)",border:"1px solid var(--line)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer",color:"var(--text)"}}>🗓️ Nuevo corte / re-inventario</button>}
       </div>
 
       {subTab==='ajustes' && <HistorialAjustes key={"haj_"+ver}/>}
@@ -2216,6 +2314,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
       </>}
       {ajustando && <AjusteForm {...ajustando} onClose={()=>setAjustando(null)} onSaved={()=>{ setAjustando(null); setVer(v=>v+1); }}/>}
       {showReintegrar && <ReintegrarPreCorteModal reports={reports} okSet={okSet} onClose={()=>setShowReintegrar(false)} onSaved={()=>setVer(v=>v+1)}/>}
+      {showNuevoCorte && <NuevoCorteModal onClose={()=>setShowNuevoCorte(false)} onSaved={()=>setVer(v=>v+1)}/>}
     </div>
   );
 }
