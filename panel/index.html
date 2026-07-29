@@ -62,7 +62,7 @@
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
 <script src="../shared/pedidos_base.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723k"></script>
+<script src="../shared/calculos.js?v=20260723l"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -154,6 +154,7 @@ function LoginGate({onLogin}){
             <option value="logistico">Logístico</option>
             <option value="administrativo">Administrativo</option>
             <option value="gerencia">Gerencia</option>
+            <option value="calidad">Calidad</option>
           </select>
           <input style={inp} value={codigo} onChange={e=>setCodigo(e.target.value)} placeholder="Código de área"/>
           <input style={inp} value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre"/>
@@ -1082,7 +1083,7 @@ function PermisosUsuarioModal({onClose}){
   const [custom,setCustom]=useState({});                   // {usuario:true} => vistas personalizadas
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState("");
-  const rolLabel={admin:'Admin',logistico:'Logístico',administrativo:'Administrativo',gerencia:'Gerencia'};
+  const rolLabel={admin:'Admin',logistico:'Logístico',administrativo:'Administrativo',gerencia:'Gerencia',calidad:'Calidad'};
 
   useEffect(()=>{
     let alive=true;
@@ -1809,16 +1810,59 @@ function DetalleReporteModal({r, lam, onClose}){
 /* ===== FASE B: PENDIENTES DE INGRESO A SIESA (prioridad, en la parte superior) =====
    Reportes de PRODUCTO TERMINADO que aún no se han confirmado en SIESA. Quedan en
    standby hasta marcarlos; al marcarlos pasan a la Bodega de Inventario. */
-function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar}){
+/* Editor de verificación de Calidad para un reporte (Aprobado / Retenido / Rechazado
+   + cantidad afectada + observaciones). Informativo; lo llena el área de Calidad. */
+function CalidadModal({r, actual, onClose, onSaved}){
+  const [estado,setEstado]=useState((actual&&actual.estado)||'aprobado');
+  const [cant,setCant]=useState((actual&&actual.cant!=null)?String(actual.cant):'');
+  const [obs,setObs]=useState((actual&&actual.obs)||'');
+  const requiereCant=(estado==='retenido'||estado==='rechazado');
+  const lab={fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
+  function guardar(){
+    const reg={ estado:estado, cant:requiereCant?(Number(cant)||0):0, obs:(obs||'').trim(), usuario:(window.__AUTH_USER||''), ts:Date.now() };
+    onSaved&&onSaved(reg); onClose&&onClose();
+  }
+  return(
+    <Modal title="🔬 Verificación de Calidad" onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>{r.referencia} · <b style={{fontFamily:"var(--mono)"}}>{r.siesa}</b> · {r.produccion} {r.unidad} · <span style={{fontFamily:"var(--mono)"}}>{r.consecutivo||"-"}</span></div>
+      <div style={lab}>Concepto</div>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        {ESTADOS_CALIDAD.map(function(s){
+          const on=estado===s.k;
+          return <button key={s.k} type="button" onClick={()=>setEstado(s.k)} style={{flex:1,padding:"9px 0",borderRadius:8,border:on?("2px solid "+s.color):"1px solid var(--line)",background:on?s.color:"var(--panel-2)",color:on?"#fff":"var(--text)",fontWeight:on?700:500,fontSize:13,cursor:"pointer"}}>{s.label}</button>;
+        })}
+      </div>
+      {requiereCant && (
+        <div style={{marginBottom:12}}>
+          <div style={lab}>Cantidad {estado==='rechazado'?'rechazada':'retenida'}</div>
+          <input type="number" min="0" style={inputStyle} value={cant} onChange={e=>setCant(e.target.value)} placeholder={"Cantidad "+(estado==='rechazado'?'rechazada':'retenida')}/>
+        </div>
+      )}
+      <div style={lab}>Observaciones</div>
+      <textarea value={obs} onChange={e=>setObs(e.target.value)} placeholder="Observaciones de calidad (opcional)" style={{...inputStyle,minHeight:70}}/>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:14}}>
+        <button onClick={guardar} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>Guardar verificación</button>
+      </div>
+    </Modal>
+  );
+}
+
+function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, puedeCalidad}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
   const [detalle,setDetalle]=useState(null); // reporte seleccionado para ver info completa
+  const [calVerif,setCalVerif]=useState(()=>loadCalidadVerif()); // verificación de calidad por reporte
+  const [calEdit,setCalEdit]=useState(null);   // reporte en edición de calidad
+  useEffect(()=>{ setCalVerif(loadCalidadVerif()); },[reports]); // refleja lo que marcó Calidad al refrescar
   const lamInfo = laminaConsumoInfo(reports); // consumo de lámina impresa/doblada por reporte
   const totalPend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
   const q=buscar.trim().toLowerCase();
   let pend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r)));
   if(q) pend=pend.filter(r=>((r.referencia||'')+' '+(r.siesa||'')+' '+(r.maquina||'')+' '+(r.consecutivo||'')+' '+(r.nombre||'')).toLowerCase().includes(q));
-  pend=pend.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  // Ordenado por referencia para agrupar y mostrar un SUBTOTAL bajo cada grupo con varios reportes.
+  const keyOf=r=>String(r.siesa||r.sku||r.referencia||'');
+  pend=pend.sort((a,b)=>{ const ra=(a.referencia||''), rb=(b.referencia||''); if(ra!==rb) return ra.localeCompare(rb); return (b.ts||0)-(a.ts||0); });
+  const grupos={}; pend.forEach(r=>{ const k=keyOf(r); if(!grupos[k]) grupos[k]={n:0,prod:0,lam:0,unidad:r.unidad||'',ref:r.referencia||k}; const g=grupos[k]; g.n++; g.prod+=Number(r.produccion)||0; const li=lamInfo.byReport[reporteId(r)]; if(li&&li.tieneLamina) g.lam+=li.consumoKg||0; });
   if(totalPend===0) return (
     <div style={{background:"var(--card)",border:"1px solid var(--line)",borderLeft:"4px solid var(--good)",borderRadius:12,padding:"12px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
       <span style={{fontSize:18}}>✅</span>
@@ -1847,23 +1891,48 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar})
           <div style={{overflowX:"auto",overflowY:"auto",maxHeight:320,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel-2)"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
               <thead><tr style={{textAlign:"left",borderBottom:"1px solid var(--line)"}}>
-                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Lámina (kg)","Consecutivo"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
+                {["✓ SIESA","Fecha","Máquina","Referencia","Producción","Lámina (kg)","Consecutivo","Calidad"].map(h=><th key={h} style={{padding:"8px 10px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",position:"sticky",top:0,background:"var(--panel-2)"}}>{h}</th>)}
               </tr></thead>
               <tbody>
-                {pend.slice(0,400).map((r,i)=>{
-                  const id=reporteId(r);
-                  return (
-                    <tr key={id||i} onClick={()=>setDetalle(r)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}} title="Clic para ver información completa del reporte">
-                      <td style={{padding:"7px 10px",textAlign:"center"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={false} disabled={!puedeEditar} onChange={()=>puedeEditar&&onToggle(id)} title={puedeEditar?"Marcar ingreso a SIESA":"Solo el admin puede marcar SIESA"} style={{width:16,height:16,cursor:puedeEditar?"pointer":"not-allowed",accentColor:"var(--good)",opacity:puedeEditar?1:0.4}}/></td>
-                      <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
-                      <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
-                      <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
-                      <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.produccion} {r.unidad}</td>
-                      <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",color:(lamInfo.byReport[id]&&lamInfo.byReport[id].saldoKg<-0.5)?"var(--bad)":"inherit"}} title={lamInfo.byReport[id]&&lamInfo.byReport[id].tieneLamina?("Medida "+(lamInfo.byReport[id].medida||"?")+" cm · disponible ≈ "+Math.round(lamInfo.byReport[id].disponibleKg)+" kg · saldo ≈ "+Math.round(lamInfo.byReport[id].saldoKg)+" kg"):""}>{lamInfo.byReport[id]&&lamInfo.byReport[id].tieneLamina?("≈ "+Math.round(lamInfo.byReport[id].consumoKg).toLocaleString()):"—"}</td>
-                      <td style={{padding:"7px 10px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
-                    </tr>
-                  );
-                })}
+                {(function(){
+                  const shown=pend.slice(0,400);
+                  const out=[];
+                  shown.forEach(function(r,i){
+                    const id=reporteId(r);
+                    const li=lamInfo.byReport[id];
+                    const cv=calVerif[id];
+                    const meta=cv?ESTADOS_CALIDAD.filter(function(x){return x.k===cv.estado;})[0]:null;
+                    out.push(
+                      <tr key={id||("r"+i)} onClick={()=>setDetalle(r)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}} title="Clic para ver información completa del reporte">
+                        <td style={{padding:"7px 10px",textAlign:"center"}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={false} disabled={!puedeEditar} onChange={()=>puedeEditar&&onToggle(id)} title={puedeEditar?"Marcar ingreso a SIESA":"Solo el admin puede marcar SIESA"} style={{width:16,height:16,cursor:puedeEditar?"pointer":"not-allowed",accentColor:"var(--good)",opacity:puedeEditar?1:0.4}}/></td>
+                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:12}}>{r.fecha}</td>
+                        <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
+                        <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
+                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{r.produccion} {r.unidad}</td>
+                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)",color:(li&&li.saldoKg<-0.5)?"var(--bad)":"inherit"}} title={li&&li.tieneLamina?("Medida "+(li.medida||"?")+" cm · disponible ≈ "+Math.round(li.disponibleKg)+" kg · saldo ≈ "+Math.round(li.saldoKg)+" kg"):""}>{li&&li.tieneLamina?("≈ "+Math.round(li.consumoKg).toLocaleString()):"—"}</td>
+                        <td style={{padding:"7px 10px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
+                        <td style={{padding:"7px 10px",textAlign:"center",whiteSpace:"nowrap"}} onClick={e=>e.stopPropagation()}>
+                          <span onClick={()=>puedeCalidad&&setCalEdit(r)} title={cv&&cv.obs?cv.obs:(puedeCalidad?"Registrar verificación de calidad":"Verificación de calidad")} style={{display:"inline-block",padding:"3px 9px",borderRadius:20,fontSize:11,fontWeight:700,cursor:puedeCalidad?"pointer":"default",background:meta?meta.color:"var(--panel-2)",color:meta?"#fff":"var(--text-dim)",border:meta?"none":"1px dashed var(--line)"}}>{meta?meta.label:(puedeCalidad?"+ Verificar":"—")}{meta&&(cv.estado==='retenido'||cv.estado==='rechazado')&&cv.cant?(" ("+Number(cv.cant).toLocaleString()+")"):""}</span>
+                        </td>
+                      </tr>
+                    );
+                    const k=keyOf(r);
+                    const last=(i===shown.length-1)||(keyOf(shown[i+1])!==k);
+                    if(last && grupos[k] && grupos[k].n>1){
+                      const g=grupos[k];
+                      out.push(
+                        <tr key={"sub_"+k} style={{background:"var(--panel-2)",borderTop:"2px solid var(--amber)"}}>
+                          <td></td>
+                          <td colSpan={3} style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:"var(--text-dim)",fontSize:11.5}}>Σ Subtotal {g.ref} · {g.n} reportes</td>
+                          <td style={{padding:"6px 10px",fontFamily:"var(--mono)",fontWeight:700}}>{Math.round(g.prod).toLocaleString()} {g.unidad}</td>
+                          <td style={{padding:"6px 10px",fontFamily:"var(--mono)",fontWeight:700}}>{g.lam>0?("≈ "+Math.round(g.lam).toLocaleString()):"—"}</td>
+                          <td></td><td></td>
+                        </tr>
+                      );
+                    }
+                  });
+                  return out;
+                })()}
               </tbody>
             </table>
           </div>
@@ -1871,6 +1940,7 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar})
         </div>
       )}
       {detalle && <DetalleReporteModal r={detalle} lam={lamInfo.byReport[reporteId(detalle)]} onClose={()=>setDetalle(null)}/>}
+      {calEdit && <CalidadModal r={calEdit} actual={calVerif[reporteId(calEdit)]} onClose={()=>setCalEdit(null)} onSaved={(reg)=>{ const id=reporteId(calEdit); const n={...calVerif,[id]:reg}; setCalVerif(n); saveCalidadVerif(n); }}/>}
     </div>
   );
 }
@@ -2833,7 +2903,7 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
       {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
 
       {/* Fase B: reportes en standby hasta ingreso a SIESA — solo en el panel de Producción por bodega */}
-      {tab==='bodegas' && <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa}/>}
+      {tab==='bodegas' && <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa} puedeCalidad={perm.editCalidad}/>}
 
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='inv' && <>
@@ -2902,7 +2972,7 @@ function App(){
 
   function onLogin(u){ window.__AUTH_USER=u.usuario; window.__AUTH_PASS=u.pass; window.__AUTH_ROL=u.rol; setUser(u); }
   function salir(){ window.__AUTH_USER=null; window.__AUTH_PASS=null; window.__AUTH_ROL=null; setUser(null); setReports([]); }
-  const rolLabel={admin:'Admin',logistico:'Logístico',administrativo:'Administrativo',gerencia:'Gerencia'};
+  const rolLabel={admin:'Admin',logistico:'Logístico',administrativo:'Administrativo',gerencia:'Gerencia',calidad:'Calidad'};
 
   return(
     <div id="app-root">

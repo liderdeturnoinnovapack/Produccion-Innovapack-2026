@@ -202,7 +202,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override', calidad_verif:'calidad-verif' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -748,12 +748,24 @@ async function registrarUsuario(url, area, codigo, nombre, usuario, pass){
 /* Permisos por rol. Flags de visualización (ver*) y de edición (edit*). */
 function permisosDe(rol){
   rol = String(rol||'').toLowerCase();
-  if(rol==='admin')          return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:true,  editInv:true,  editDespachos:true,  editSiesa:true };
-  if(rol==='logistico')      return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:true,  editSiesa:false };
-  if(rol==='administrativo') return { verGeneral:false, verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
-  if(rol==='gerencia')       return { verGeneral:true,  verInv:true, verDespachos:true, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
-  return { verGeneral:false, verInv:false, verDespachos:false, verBodegas:false, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false };
+  if(rol==='admin')          return { verGeneral:true,  verInv:true,  verDespachos:true,  verBodegas:true, editAdmin:true,  editInv:true,  editDespachos:true,  editSiesa:true,  editCalidad:true  };
+  if(rol==='logistico')      return { verGeneral:false, verInv:true,  verDespachos:true,  verBodegas:true, editAdmin:false, editInv:false, editDespachos:true,  editSiesa:false, editCalidad:false };
+  if(rol==='administrativo') return { verGeneral:false, verInv:true,  verDespachos:true,  verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false, editCalidad:false };
+  if(rol==='gerencia')       return { verGeneral:true,  verInv:true,  verDespachos:true,  verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false, editCalidad:false };
+  if(rol==='calidad')        return { verGeneral:false, verInv:false, verDespachos:false, verBodegas:true, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false, editCalidad:true  };
+  return { verGeneral:false, verInv:false, verDespachos:false, verBodegas:false, editAdmin:false, editInv:false, editDespachos:false, editSiesa:false, editCalidad:false };
 }
+
+/* ===== VERIFICACIÓN DE CALIDAD por reporte (Aprobado/Retenido/Rechazado) =====
+   Informativa: NO toca el inventario ni el ingreso a SIESA. La llena el área de Calidad.
+   Compartida vía config (clave calidad_verif). Forma: { <reporteId>: {estado,cant,obs,usuario,ts} }. */
+var ESTADOS_CALIDAD = [
+  { k:'aprobado',  label:'Aprobado',  color:'var(--good)'  },
+  { k:'retenido',  label:'Retenido',  color:'var(--amber)' },
+  { k:'rechazado', label:'Rechazado', color:'var(--bad)'   }
+];
+function loadCalidadVerif(){ try{ var r=localStorage.getItem('calidad-verif'); return r?JSON.parse(r):{}; }catch(e){ return {}; } }
+function saveCalidadVerif(obj){ try{ localStorage.setItem('calidad-verif', JSON.stringify(obj||{})); }catch(e){} postConfig_('calidad_verif', obj||{}); }
 
 /* ===== VISTAS DEL PANEL + PERMISOS POR USUARIO (override sobre el rol) =====
    Cada "vista" es una pestaña (o sub-pestaña) del panel. El admin puede recortar,

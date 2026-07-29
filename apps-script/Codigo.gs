@@ -30,14 +30,17 @@ var SS = SpreadsheetApp.getActiveSpreadsheet();
 var HOJAS_ESPECIALES = ['Config', 'Usuarios', 'Auditoria'];
 
 /* ===== USUARIOS Y ROLES ===== */
-var ROLES_AUTOREGISTRO = ['logistico', 'administrativo', 'gerencia'];
+var ROLES_AUTOREGISTRO = ['logistico', 'administrativo', 'gerencia', 'calidad'];
 var CUPO_POR_AREA = 3;
 // Codigos de registro por area (cambialos para mas seguridad).
 var CODIGOS_AREA = {
   logistico:      'logistica2026',
   administrativo: 'administracion2026',
-  gerencia:       'gerencia2026'
+  gerencia:       'gerencia2026',
+  calidad:        'calidad2026'
 };
+// Claves de config que puede escribir cada rol no-admin (ademas de lo suyo).
+var CONFIG_CALIDAD = ['calidad_verif']; // el area de Calidad solo escribe su verificacion
 // Claves de config que un LOGISTICO puede escribir (operativo). El resto = solo admin.
 // (ajustes_inventario NO va aqui: los ajustes de inventario son solo admin.)
 var CONFIG_LOGISTICO = ['despachos', 'pedidos_extra'];
@@ -155,6 +158,7 @@ function puedeGuardarConfig_(clave, usuario, pass) {
   if (!v.ok) return false;
   if (v.rol === 'admin') return true;
   if (v.rol === 'logistico') return CONFIG_LOGISTICO.indexOf(String(clave)) !== -1;
+  if (v.rol === 'calidad') return CONFIG_CALIDAD.indexOf(String(clave)) !== -1;
   return false; // administrativo / gerencia: no escriben config
 }
 
