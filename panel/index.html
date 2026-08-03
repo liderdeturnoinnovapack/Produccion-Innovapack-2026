@@ -1852,12 +1852,16 @@ function CalidadModal({r, actual, onClose, onSaved}){
 function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   if(!grupo || !reportes || reportes.length===0) return null;
   
-  // Calcular totales y extraer datos únicos del primer reporte (todos del mismo SKU)
+  // Calcular totales
   const r0 = reportes[0];
   const tipo = tipoProceso(r0);
   const color = colorProceso(r0);
   const cls = clasificarReporte(r0);
   const sector = cls.sector || "—";
+  const pesos = loadPesos();
+  const metasT = loadMetas();
+  const metaDe = (maq)=>((metasT[maq]||{}).meta)||0;
+  const fmtHoras = (h)=>{ if(!(h>0)) return "-"; let hh=Math.floor(h), mm=Math.round((h-hh)*60); if(mm===60){hh++;mm=0;} return h.toFixed(1)+" h ("+(hh>0?hh+"h ":"")+mm+"m)"; };
   
   // Medida: extraer del primer reporte con lamInfo (si aplica)
   let medida = "—";
@@ -1870,24 +1874,65 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
     }
   }
   
-  // Totales
-  let totalProd = 0, totalLam = 0, totalTiempos = 0, totalMerma = 0;
+  // Totales de producción, merma y lámina
+  let totalProd = 0, totalProdKg = 0, totalMermaKg = 0, totalLam = 0;
   reportes.forEach(r=>{
     totalProd += Number(r.produccion) || 0;
+    totalProdKg += produccionKg(r);
+    totalMermaKg += mermaKg(r);
     const id = reporteId(r);
     const li = lamInfo.byReport[id];
     if(li && li.tieneLamina) totalLam += li.consumoKg || 0;
-    totalTiempos += sumNumeros(r.tiemposMuertosMinutos);
-    totalMerma += sumNumeros(r.merma);
   });
   
-  const lab = {fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
-  const fila = (label, valor) => (
-    <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}>
-      <span style={{fontSize:12,color:'var(--text-dim)'}}>{label}</span>
-      <span style={{fontSize:12,fontWeight:600,fontFamily:'var(--mono)'}}>{valor}</span>
-    </div>
-  );
+  // Acumular tiempos por máquina de todos los reportes
+  const tiemposPorMaq = {};
+  reportes.forEach(r=>{
+    const kgBase = (produccionKg(r)||0) + (mermaKg(r)||0);
+    const unidadRep = String(r.unidad||'').toLowerCase();
+    const pu = pesoUnidad(r,pesos);
+    const undSell = unidadRep.indexOf('kg')===0 ? (pu>0?(Number(r.produccion)||0)/pu:0) : (Number(r.produccion)||0);
+    const lam = lamInfo.byReport[reporteId(r)];
+    
+    // Extrusión
+    const mExt = metaDe("Extrusora 1")||metaDe("Extrusora 2");
+    if(mExt>0 && kgBase>0){
+      if(!tiemposPorMaq.Extrusión) tiemposPorMaq.Extrusión={cant:0,unidad:"kg",meta:mExt,metaU:"kg/h",horas:0};
+      tiemposPorMaq.Extrusión.cant += kgBase;
+      tiemposPorMaq.Extrusión.horas += kgBase/mExt;
+    }
+    // Impresión
+    if(lam && lam.tieneImpresion){
+      const mI = metaDe("Impresora");
+      if(mI>0 && kgBase>0){
+        if(!tiemposPorMaq.Impresión) tiemposPorMaq.Impresión={cant:0,unidad:"kg",meta:mI,metaU:"kg/h",horas:0};
+        tiemposPorMaq.Impresión.cant += kgBase;
+        tiemposPorMaq.Impresión.horas += kgBase/mI;
+      }
+    }
+    // Doblado
+    if(lam && lam.tieneDoblado){
+      const mD = metaDe("Refiladora");
+      if(mD>0 && kgBase>0){
+        if(!tiemposPorMaq.Doblado) tiemposPorMaq.Doblado={cant:0,unidad:"kg",meta:mD,metaU:"kg/h",horas:0};
+        tiemposPorMaq.Doblado.cant += kgBase;
+        tiemposPorMaq.Doblado.horas += kgBase/mD;
+      }
+    }
+    // Sellado
+    if((window.MAQUINAS_UND||[]).indexOf(r.maquina)>=0){
+      const mS = metaDe(r.maquina);
+      if(mS>0 && undSell>0){
+        if(!tiemposPorMaq.Sellado) tiemposPorMaq.Sellado={cant:0,unidad:"und",meta:mS,metaU:"und/h",horas:0};
+        tiemposPorMaq.Sellado.cant += undSell;
+        tiemposPorMaq.Sellado.horas += undSell/mS;
+      }
+    }
+  });
+  
+  const procesos = Object.keys(tiemposPorMaq).map(k=>({proc:k,...tiemposPorMaq[k]}));
+  const totalH = procesos.reduce((s,p)=>s+p.horas,0);
+  const kgBaseTot = totalProdKg + totalMermaKg;
   
   return (
     <Modal title={"📊 Resumen · "+grupo.ref} onClose={onClose}>
@@ -1895,24 +1940,65 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
         Código: <b style={{fontFamily:"var(--mono)"}}>{r0.siesa || r0.sku || "—"}</b> · {grupo.n} reportes agrupados
       </div>
       
-      <div style={{marginBottom:16}}>
-        <div style={lab}>Descripción del material</div>
-        {fila("Tipo", tipo)}
-        {fila("Color", color || "—")}
-        {fila("Medida", medida)}
-        {fila("Sector", sector)}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+        {[
+          {label:"Producción",val:Math.round(totalProd).toLocaleString()+" "+grupo.unidad,color:"var(--good)"},
+          {label:String(grupo.unidad||'').toLowerCase().indexOf('kg')===0?"Producción (kg)":"Peso estimado",val:String(grupo.unidad||'').toLowerCase().indexOf('kg')===0?Math.round(totalProd).toLocaleString()+" kg":(totalProdKg>0?"≈ "+Math.round(totalProdKg).toLocaleString()+" kg":"-"),color:"var(--good)"},
+          {label:"Merma",val:totalMermaKg>0?"≈ "+Math.round(totalMermaKg).toLocaleString()+" kg":"—",color:"var(--bad)"},
+        ].map(x=>(
+          <div key={x.label} style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+            <div style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>{x.label}</div>
+            <div style={{fontSize:18,fontWeight:700,fontFamily:"var(--mono)",color:x.color}}>{x.val}</div>
+          </div>
+        ))}
       </div>
       
-      <div style={{marginBottom:16}}>
-        <div style={lab}>Totales consolidados</div>
-        {fila("Producción total", Math.round(totalProd).toLocaleString() + " " + grupo.unidad)}
-        {fila("Lámina consumida", totalLam > 0 ? ("≈ " + Math.round(totalLam).toLocaleString() + " kg") : "—")}
-        {fila("Tiempos muertos", totalTiempos > 0 ? (Math.round(totalTiempos).toLocaleString() + " min") : "—")}
-        {fila("Merma", totalMerma > 0 ? (Math.round(totalMerma).toLocaleString() + " kg") : "—")}
-      </div>
+      {procesos.length>0 && (
+        <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(124,179,66,0.08)",border:"1px solid rgba(124,179,66,0.3)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>⏱️ Tiempos por proceso (estimado según metas)</div>
+          <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>Base en kg = peso estimado + merma (<b>{Math.round(kgBaseTot).toLocaleString()} kg</b>). Sellado por unidades. Metas editables del panel.</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{textAlign:"left",color:"var(--text-dim)"}}>
+              {["Proceso","Cantidad","Meta","Tiempo estimado"].map(h=><th key={h} style={{padding:"4px 6px",fontWeight:600,fontSize:10.5,textTransform:"uppercase"}}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {procesos.map(p=>(
+                <tr key={p.proc} style={{borderTop:"1px solid var(--line)"}}>
+                  <td style={{padding:"6px 6px",fontWeight:600}}>{p.proc}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)"}}>{Math.round(p.cant).toLocaleString()} {p.unidad}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{p.meta.toLocaleString()} {p.metaU}</td>
+                  <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--accent)"}}>{fmtHoras(p.horas)}</td>
+                </tr>
+              ))}
+              <tr style={{borderTop:"2px solid var(--line)"}}>
+                <td style={{padding:"6px 6px",fontWeight:700}} colSpan="3">Total estimado</td>
+                <td style={{padding:"6px 6px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--good)"}}>{fmtHoras(totalH)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {totalLam>0 && (
+        <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(0,145,199,0.06)",border:"1px solid rgba(0,145,199,0.25)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:10,fontFamily:"var(--head)"}}>🧵 Lámina (impresión / doblada)</div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {[
+              {label:"Tipo lámina",val:tipo+(color?" "+color:""),color:"var(--brand-green)"},
+              {label:"Medida lámina",val:medida,color:"var(--brand-blue)"},
+            ].map(x=>(
+              <div key={x.label} style={{flex:"0 1 200px",background:"var(--card)",borderRadius:8,padding:"9px 10px",textAlign:"center"}}>
+                <div style={{fontSize:10,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>{x.label}</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:"var(--mono)",color:x.color,wordBreak:"break-word"}}>{x.val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:10.5,color:"var(--text-dim)",marginTop:8}}>Lámina consumida total: <b>≈ {Math.round(totalLam).toLocaleString()} kg</b></div>
+        </div>
+      )}
       
       <div>
-        <div style={lab}>Reportes del grupo ({reportes.length})</div>
+        <div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:8}}>Reportes del grupo ({reportes.length})</div>
         <div style={{maxHeight:200,overflowY:"auto",border:"1px solid var(--line)",borderRadius:8,background:"var(--panel-2)"}}>
           {reportes.map((r,i)=>{
             const id = reporteId(r);
