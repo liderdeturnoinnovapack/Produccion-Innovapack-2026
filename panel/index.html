@@ -2017,6 +2017,118 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   );
 }
 
+/* Modal para cargar nuevo corte de inventario de Producto en Proceso desde Excel.
+   Formato: Código SIESA | Tipo | Color | Medida | Cantidad_kg */
+function NuevoCorteProcesoModal({onClose, onSaved}){
+  const [fecha,setFecha]=useState(new Date().toISOString().slice(0,10));
+  const [texto,setTexto]=useState('');
+  const [limpiarAjustes,setLimpiarAjustes]=useState(true);
+  const [msg,setMsg]=useState('');
+  const [preview,setPreview]=useState(null);
+  
+  function parsear(){
+    const lineas = texto.trim().split('\n').filter(l=>l.trim());
+    if(lineas.length===0){ setMsg('Pega los datos desde Excel (5 columnas: Código | Tipo | Color | Medida | Cantidad_kg)'); setPreview(null); return; }
+    const items = [];
+    let errores = 0;
+    lineas.forEach((ln,i)=>{
+      const cols = ln.split('\t').map(c=>c.trim());
+      if(cols.length<5){ errores++; return; }
+      const siesa = cols[0]||'';
+      const tipo = cols[1]||'';
+      const color = cols[2]||'';
+      const medida = cols[3]||'';
+      const kg = parseFloat(cols[4])||0;
+      if(!tipo || kg<=0){ errores++; return; }
+      items.push([siesa, tipo, color, medida, kg]);
+    });
+    if(errores>0) setMsg(`⚠️ ${errores} filas inválidas (omitidas). Formato: Código | Tipo | Color | Medida | Cantidad_kg`);
+    else setMsg('');
+    setPreview(items.length>0 ? {items, totalKg:items.reduce((s,x)=>s+x[4],0)} : null);
+  }
+  
+  function aplicar(){
+    if(!preview || preview.items.length===0){ setMsg('No hay datos válidos para aplicar.'); return; }
+    if(!window.confirm(`¿Confirmas reemplazar el inventario de Producto en Proceso con ${preview.items.length} items (${Math.round(preview.totalKg).toLocaleString()} kg totales)?`)) return;
+    
+    // Limpiar ajustes si está marcado
+    if(limpiarAjustes){
+      try{ localStorage.removeItem('ajustes-inventario'); }catch(e){}
+      postConfig_('ajustes_inventario',[]);
+    }
+    
+    // Guardar el nuevo corte
+    saveCorteOverridePP({fecha, pp:preview.items});
+    setMsg('✅ Inventario de Producto en Proceso actualizado. Recargando...');
+    setTimeout(()=>{ onSaved&&onSaved(); onClose&&onClose(); window.location.reload(); }, 1200);
+  }
+  
+  function restaurar(){
+    if(!window.confirm('¿Restaurar el inventario de Producto en Proceso al corte original (17/07/2026)?')) return;
+    restaurarCorteOriginalPP();
+    setMsg('✅ Inventario restaurado. Recargando...');
+    setTimeout(()=>{ onSaved&&onSaved(); onClose&&onClose(); window.location.reload(); }, 1200);
+  }
+  
+  const corteActual = loadCorteOverridePP();
+  const lab = {fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
+  
+  return (
+    <Modal title="📋 Nuevo corte · Producto en Proceso" onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14,padding:"10px 12px",background:"rgba(234,179,8,0.08)",borderRadius:8,border:"1px solid rgba(234,179,8,0.2)"}}>
+        ⚠️ Esta herramienta <b>reemplaza completamente</b> el inventario de Producto en Proceso con tu conteo físico. El inventario agregado NO mantiene números de rollo individuales (solo totales por tipo/medida/color).
+      </div>
+      
+      {corteActual && (
+        <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(0,145,199,0.08)",borderRadius:8,border:"1px solid rgba(0,145,199,0.25)",fontSize:12}}>
+          📅 Corte actual: <b>{corteActual.fecha}</b> ({(corteActual.pp||[]).length} items) · 
+          <button onClick={restaurar} style={{marginLeft:8,padding:"4px 10px",fontSize:11,background:"var(--accent)",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontWeight:600}}>Restaurar corte original</button>
+        </div>
+      )}
+      
+      <div style={{marginBottom:12}}>
+        <div style={lab}>Fecha del nuevo corte físico *</div>
+        <input type="date" style={{...inputStyle,maxWidth:200}} value={fecha} onChange={e=>setFecha(e.target.value)}/>
+      </div>
+      
+      <div style={{marginBottom:12}}>
+        <div style={lab}>Pegar datos desde Excel (5 columnas) *</div>
+        <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:6}}>
+          Formato: <b>Código SIESA</b> (o "-" si no aplica) · <b>Tipo</b> (ej: Lámina Impresa, Lámina, Semitubular) · <b>Color</b> (Blanco/Transparente) · <b>Medida</b> (solo número, ej: 63) · <b>Cantidad_kg</b>
+        </div>
+        <textarea value={texto} onChange={e=>{setTexto(e.target.value);setPreview(null);setMsg('');}} placeholder="Pega aquí desde Excel (Ctrl+V)&#10;Ejemplo:&#10;5010343	Lámina Impresa	Blanco	63	450&#10;-	Lámina	Transparente	80	600&#10;-	Semitubular	Blanco	120	520" style={{...inputStyle,minHeight:150,fontFamily:'var(--mono)',fontSize:11,lineHeight:1.6}}/>
+        <button onClick={parsear} style={{marginTop:8,padding:"8px 16px",background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Validar datos</button>
+      </div>
+      
+      {preview && (
+        <div style={{marginBottom:14,padding:"12px",background:"var(--panel-2)",borderRadius:10,border:"1px solid var(--line)"}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"var(--good)"}}>✓ {preview.items.length} items válidos · Total: {Math.round(preview.totalKg).toLocaleString()} kg</div>
+          <div style={{maxHeight:150,overflowY:"auto",fontSize:11,fontFamily:"var(--mono)"}}>
+            {preview.items.slice(0,10).map((it,i)=>(
+              <div key={i} style={{padding:"4px 0",borderBottom:"1px solid var(--line)"}}>{it[0]||"-"} | {it[1]} | {it[2]||"-"} | {it[3]} cm | {it[4]} kg</div>
+            ))}
+            {preview.items.length>10 && <div style={{padding:"6px 0",color:"var(--text-dim)"}}>... y {preview.items.length-10} más</div>}
+          </div>
+        </div>
+      )}
+      
+      <div style={{marginBottom:14}}>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:12}}>
+          <input type="checkbox" checked={limpiarAjustes} onChange={e=>setLimpiarAjustes(e.target.checked)} style={{width:16,height:16,cursor:"pointer"}}/>
+          <span>Limpiar ajustes anteriores (recomendado: empezar de cero)</span>
+        </label>
+      </div>
+      
+      {msg && <div style={{padding:"10px 12px",background:msg.indexOf('✅')>=0?"rgba(21,128,61,0.1)":"rgba(185,28,28,0.1)",borderRadius:8,marginBottom:12,fontSize:12,color:msg.indexOf('✅')>=0?"var(--good)":"var(--bad)"}}>{msg}</div>}
+      
+      <div style={{display:"flex",justifyContent:"flex-end",gap:10}}>
+        <button onClick={onClose} style={{padding:"10px 20px",background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Cancelar</button>
+        <button onClick={aplicar} disabled={!preview} style={{padding:"10px 20px",background:preview?"var(--good)":"var(--panel-2)",color:preview?"#fff":"var(--text-dim)",border:"none",borderRadius:8,fontWeight:700,cursor:preview?"pointer":"not-allowed"}}>Aplicar nuevo corte</button>
+      </div>
+    </Modal>
+  );
+}
+
 function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, puedeCalidad}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
@@ -2924,6 +3036,7 @@ function ConsumosLamina({reports}){
   const [buscar,setBuscar]=useState("");
   const [fMaterial,setFMaterial]=useState("Todos");
   const [soloDef,setSoloDef]=useState(false);
+  const [showNuevoCorte,setShowNuevoCorte]=useState(false);
   const sort=useSort('saldo','desc');
   const bal=balanceLamina(reports);
   const materiales=["Todos",...new Set(bal.map(x=>x.material).filter(Boolean))].sort();
@@ -2961,6 +3074,8 @@ function ConsumosLamina({reports}){
         <input style={{...selStyle,maxWidth:280}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar tipo o medida…"/>
         <select style={{...selStyle,maxWidth:170}} value={fMaterial} onChange={e=>setFMaterial(e.target.value)}>{materiales.map(m=><option key={m} value={m}>{m==="Todos"?"Todos los tipos":m}</option>)}</select>
         <button onClick={()=>setSoloDef(!soloDef)} style={{background:soloDef?"var(--bad)":"var(--panel-2)",color:soloDef?"#fff":"var(--text-dim)",border:"1px solid var(--line)",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{soloDef?"● Solo en déficit":"○ Solo en déficit"}</button>
+        <div style={{flex:1}}></div>
+        <button onClick={()=>setShowNuevoCorte(true)} style={{background:"var(--brand-blue)",color:"#fff",border:"none",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 4px rgba(0,145,199,0.2)"}}>📋 Nuevo corte</button>
       </div>
       <div style={{overflowX:"auto",overflowY:"auto",maxHeight:460,border:"1px solid var(--line)",borderRadius:12,background:"var(--card)",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
@@ -2990,6 +3105,7 @@ function ConsumosLamina({reports}){
         </table>
       </div>
       <div style={{fontSize:11,color:"var(--text-dim)",marginTop:8}}>Nota: el consumo se toma de la <b>impresión</b>. Un saldo negativo indica que se imprimió más de lo que hay registrado como producido+corte en esa familia (revisar corte o producción de extrusión).</div>
+      {showNuevoCorte && <NuevoCorteProcesoModal onClose={()=>setShowNuevoCorte(false)} onSaved={()=>setShowNuevoCorte(false)}/>}
     </div>
   );
 }

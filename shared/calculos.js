@@ -202,7 +202,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override', calidad_verif:'calidad-verif' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override', corte_override_pp:'corte-override-pp', calidad_verif:'calidad-verif' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
@@ -536,7 +536,10 @@ function produccionPreCorte(reports){
    El corte de PRODUCTO TERMINADO puede reemplazarse por un inventario físico nuevo
    (fecha + conteo) sin tocar código: se guarda en config (corte_override) y se
    aplica sobre INVENTARIO_BASE como fechaCortePT + pt. El corte de PROCESO (rollos /
-   lámina impresa) queda intacto en fechaCorte. Sin override => base original. */
+   lámina impresa) queda intacto en fechaCorte. Sin override => base original. 
+   
+   PRODUCTO EN PROCESO también puede reemplazarse (corte_override_pp) con formato
+   agregado: [[siesa,tipo,color,medida,kg]]. Sin números de rollo individuales. */
 var _INV_BASE_ORIG = null;
 /* Fecha del corte que rige el PRODUCTO TERMINADO (nueva si hay override, si no la original). */
 function cortePT(){
@@ -558,6 +561,8 @@ function aplicarCorte(){
     } else {
       window.INVENTARIO_BASE = _INV_BASE_ORIG; // sin override válido => corte original
     }
+    // Aplicar también el override de PP si existe
+    aplicarCortePP();
   }catch(e){}
 }
 /* Guarda un corte nuevo {fecha, pt:[[siesa,cant]]} (o null para restaurar el original). */
@@ -569,6 +574,69 @@ function saveCorteOverride(obj){
   }catch(e){}
   postConfig_('corte_override', valido ? obj : {});
   aplicarCorte();
+}
+
+/* ===== CORTE DE PRODUCTO EN PROCESO (override agregado sin números de rollo) ===== */
+function loadCorteOverridePP(){ try{ var r=localStorage.getItem('corte-override-pp'); return r?JSON.parse(r):null; }catch(e){ return null; } }
+
+/* Aplica el corte de PP sobre window.INVENTARIO_BASE. Formato: [[siesa,tipo,color,medida,kg]].
+   Los items con siesa van a ppRollos (para balance de lámina), los sin siesa a un pool genérico.
+   Las láminas impresas (tipo="Lámina Impresa") van a ppImpresas. */
+function aplicarCortePP(){
+  try{
+    if(!_INV_BASE_ORIG && window.INVENTARIO_BASE) _INV_BASE_ORIG = window.INVENTARIO_BASE;
+    if(!_INV_BASE_ORIG) return;
+    var o = loadCorteOverridePP();
+    if(o && o.fecha && Array.isArray(o.pp) && o.pp.length){
+      var cat = {}; (loadCatalog()||[]).forEach(function(c){ var k=c.siesa||c.sku; if(k) cat[k]=c.referencia||''; });
+      var ppRollos = [], ppImpresas = [];
+      o.pp.forEach(function(row){
+        var siesa = String(row[0]||'').trim();
+        var tipo = String(row[1]||'').trim();
+        var color = String(row[2]||'').trim();
+        var medida = String(row[3]||'').trim();
+        var kg = Number(row[4])||0;
+        if(kg<=0) return;
+        // Lámina Impresa va a ppImpresas
+        if(/impres/i.test(tipo)){
+          ppImpresas.push({ siesa:siesa||'', referencia:cat[siesa]||tipo, kg:kg });
+        } else {
+          // Resto va a ppRollos (desc = tipo + color + medida)
+          var desc = [tipo, color, medida+'CM'].filter(function(x){return x;}).join(' ');
+          ppRollos.push({ siesa:siesa||'', desc:desc, kg:kg });
+        }
+      });
+      var base = _INV_BASE_ORIG;
+      window.INVENTARIO_BASE = Object.assign({}, base, {
+        fechaCortePP: o.fecha,
+        pp: ppRollos,
+        ppRollos: ppRollos, // alias
+        ppImpresas: ppImpresas
+      });
+    } else {
+      // Sin override válido => mantener el corte original de PP
+      if(window.INVENTARIO_BASE.fechaCortePP){
+        delete window.INVENTARIO_BASE.fechaCortePP;
+        window.INVENTARIO_BASE.pp = _INV_BASE_ORIG.pp || _INV_BASE_ORIG.ppRollos || [];
+        window.INVENTARIO_BASE.ppRollos = _INV_BASE_ORIG.ppRollos || _INV_BASE_ORIG.pp || [];
+        window.INVENTARIO_BASE.ppImpresas = _INV_BASE_ORIG.ppImpresas || [];
+      }
+    }
+  }catch(e){}
+}
+
+function saveCorteOverridePP(obj){
+  var valido = obj && obj.fecha && Array.isArray(obj.pp) && obj.pp.length;
+  try{
+    if(valido) localStorage.setItem('corte-override-pp', JSON.stringify(obj));
+    else localStorage.removeItem('corte-override-pp');
+  }catch(e){}
+  postConfig_('corte_override_pp', valido ? obj : {});
+  aplicarCortePP();
+}
+
+function restaurarCorteOriginalPP(){
+  saveCorteOverridePP(null);
 }
 
 /* Descarga la config remota y la refleja en localStorage; aplica el corte nuevo si existe.
