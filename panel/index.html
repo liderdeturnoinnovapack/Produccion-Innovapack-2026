@@ -1847,10 +1847,95 @@ function CalidadModal({r, actual, onClose, onSaved}){
   );
 }
 
+/* Modal de resumen por referencia: muestra tipo, color, medida, sector y totales
+   de producción, lámina, tiempos muertos y merma para todos los reportes del grupo. */
+function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
+  if(!grupo || !reportes || reportes.length===0) return null;
+  
+  // Calcular totales y extraer datos únicos del primer reporte (todos del mismo SKU)
+  const r0 = reportes[0];
+  const tipo = tipoProceso(r0);
+  const color = colorProceso(r0);
+  const cls = clasificarReporte(r0);
+  const sector = cls.sector || "—";
+  
+  // Medida: extraer del primer reporte con lamInfo (si aplica)
+  let medida = "—";
+  for(let i=0; i<reportes.length; i++){
+    const id = reporteId(reportes[i]);
+    const li = lamInfo.byReport[id];
+    if(li && li.medida){
+      medida = li.medida + " cm";
+      break;
+    }
+  }
+  
+  // Totales
+  let totalProd = 0, totalLam = 0, totalTiempos = 0, totalMerma = 0;
+  reportes.forEach(r=>{
+    totalProd += Number(r.produccion) || 0;
+    const id = reporteId(r);
+    const li = lamInfo.byReport[id];
+    if(li && li.tieneLamina) totalLam += li.consumoKg || 0;
+    totalTiempos += sumNumeros(r.tiemposMuertosMinutos);
+    totalMerma += sumNumeros(r.merma);
+  });
+  
+  const lab = {fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
+  const fila = (label, valor) => (
+    <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}>
+      <span style={{fontSize:12,color:'var(--text-dim)'}}>{label}</span>
+      <span style={{fontSize:12,fontWeight:600,fontFamily:'var(--mono)'}}>{valor}</span>
+    </div>
+  );
+  
+  return (
+    <Modal title={"📊 Resumen · "+grupo.ref} onClose={onClose}>
+      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>
+        Código: <b style={{fontFamily:"var(--mono)"}}>{r0.siesa || r0.sku || "—"}</b> · {grupo.n} reportes agrupados
+      </div>
+      
+      <div style={{marginBottom:16}}>
+        <div style={lab}>Descripción del material</div>
+        {fila("Tipo", tipo)}
+        {fila("Color", color || "—")}
+        {fila("Medida", medida)}
+        {fila("Sector", sector)}
+      </div>
+      
+      <div style={{marginBottom:16}}>
+        <div style={lab}>Totales consolidados</div>
+        {fila("Producción total", Math.round(totalProd).toLocaleString() + " " + grupo.unidad)}
+        {fila("Lámina consumida", totalLam > 0 ? ("≈ " + Math.round(totalLam).toLocaleString() + " kg") : "—")}
+        {fila("Tiempos muertos", totalTiempos > 0 ? (Math.round(totalTiempos).toLocaleString() + " min") : "—")}
+        {fila("Merma", totalMerma > 0 ? (Math.round(totalMerma).toLocaleString() + " kg") : "—")}
+      </div>
+      
+      <div>
+        <div style={lab}>Reportes del grupo ({reportes.length})</div>
+        <div style={{maxHeight:200,overflowY:"auto",border:"1px solid var(--line)",borderRadius:8,background:"var(--panel-2)"}}>
+          {reportes.map((r,i)=>{
+            const id = reporteId(r);
+            return (
+              <div key={id||i} style={{padding:"8px 10px",borderBottom:i<reportes.length-1?"1px solid var(--line)":"none",fontSize:12}}>
+                <div style={{fontWeight:600,marginBottom:2}}>{r.fecha} · {r.maquina} · {r.turno}</div>
+                <div style={{color:"var(--text-dim)",fontSize:11}}>
+                  Producción: <b>{r.produccion} {r.unidad}</b> · Consecutivo: <b style={{fontFamily:"var(--mono)"}}>{r.consecutivo || "—"}</b> · Operario: {r.nombre || "—"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, puedeCalidad}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
   const [detalle,setDetalle]=useState(null); // reporte seleccionado para ver info completa
+  const [resumen,setResumen]=useState(null); // key del grupo para mostrar resumen
   const [calVerif,setCalVerif]=useState(()=>loadCalidadVerif()); // verificación de calidad por reporte
   const [calEdit,setCalEdit]=useState(null);   // reporte en edición de calidad
   useEffect(()=>{ setCalVerif(loadCalidadVerif()); },[reports]); // refleja lo que marcó Calidad al refrescar
@@ -1921,9 +2006,9 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, 
                     if(last && grupos[k] && grupos[k].n>1){
                       const g=grupos[k];
                       out.push(
-                        <tr key={"sub_"+k} style={{background:"var(--panel-2)",borderTop:"2px solid var(--amber)"}}>
+                        <tr key={"sub_"+k} onClick={()=>setResumen(k)} style={{background:"var(--panel-2)",borderTop:"2px solid var(--amber)",cursor:"pointer"}} title="🔎 Clic para ver resumen completo del grupo">
                           <td></td>
-                          <td colSpan={3} style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:"var(--text-dim)",fontSize:11.5}}>Σ Subtotal {g.ref} · {g.n} reportes</td>
+                          <td colSpan={3} style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:"var(--text-dim)",fontSize:11.5}}>🔎 Σ Subtotal {g.ref} · {g.n} reportes</td>
                           <td style={{padding:"6px 10px",fontFamily:"var(--mono)",fontWeight:700}}>{Math.round(g.prod).toLocaleString()} {g.unidad}</td>
                           <td style={{padding:"6px 10px",fontFamily:"var(--mono)",fontWeight:700}}>{g.lam>0?("≈ "+Math.round(g.lam).toLocaleString()):"—"}</td>
                           <td></td><td></td>
@@ -1940,6 +2025,10 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, 
         </div>
       )}
       {detalle && <DetalleReporteModal r={detalle} lam={lamInfo.byReport[reporteId(detalle)]} onClose={()=>setDetalle(null)}/>}
+      {resumen && (function(){
+        const reportesGrupo = pend.filter(r=>keyOf(r)===resumen);
+        return <ResumenRefModal grupo={grupos[resumen]} reportes={reportesGrupo} lamInfo={lamInfo} onClose={()=>setResumen(null)}/>;
+      })()}
       {calEdit && <CalidadModal r={calEdit} actual={calVerif[reporteId(calEdit)]} onClose={()=>setCalEdit(null)} onSaved={(reg)=>{ const id=reporteId(calEdit); const n={...calVerif,[id]:reg}; setCalVerif(n); saveCalidadVerif(n); }}/>}
     </div>
   );
