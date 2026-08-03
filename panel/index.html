@@ -2092,12 +2092,12 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, 
                     if(last && grupos[k] && grupos[k].n>1){
                       const g=grupos[k];
                       out.push(
-                        <tr key={"sub_"+k} onClick={()=>setResumen(k)} style={{background:"var(--panel-2)",borderTop:"2px solid var(--amber)",cursor:"pointer"}} title="🔎 Clic para ver resumen completo del grupo">
-                          <td></td>
-                          <td colSpan={3} style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:"var(--text-dim)",fontSize:11.5}}>🔎 Σ Subtotal {g.ref} · {g.n} reportes</td>
-                          <td style={{padding:"6px 10px",fontFamily:"var(--mono)",fontWeight:700}}>{Math.round(g.prod).toLocaleString()} {g.unidad}</td>
-                          <td style={{padding:"6px 10px",fontFamily:"var(--mono)",fontWeight:700}}>{g.lam>0?("≈ "+Math.round(g.lam).toLocaleString()):"—"}</td>
-                          <td></td><td></td>
+                        <tr key={"sub_"+k} onClick={()=>setResumen(k)} style={{background:"rgba(234,179,8,0.12)",borderTop:"3px solid var(--amber)",borderBottom:"3px solid var(--amber)",cursor:"pointer",transition:"background 0.2s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(234,179,8,0.2)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(234,179,8,0.12)"} title="🔎 Clic para ver resumen completo del grupo (tipo, color, medida, tiempos por proceso)">
+                          <td style={{padding:"10px"}}></td>
+                          <td colSpan={3} style={{padding:"10px 10px",textAlign:"right",fontWeight:700,color:"var(--amber)",fontSize:12.5}}>🔎 Σ Subtotal {g.ref} · {g.n} reportes</td>
+                          <td style={{padding:"10px 10px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--text)",fontSize:13}}>{Math.round(g.prod).toLocaleString()} {g.unidad}</td>
+                          <td style={{padding:"10px 10px",fontFamily:"var(--mono)",fontWeight:700,color:"var(--text)",fontSize:13}}>{g.lam>0?("≈ "+Math.round(g.lam).toLocaleString()):"—"}</td>
+                          <td style={{padding:"10px"}}></td><td style={{padding:"10px"}}></td>
                         </tr>
                       );
                     }
