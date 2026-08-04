@@ -251,6 +251,65 @@ function loadPedidosExtra(){ try{ const r=localStorage.getItem('pedidos-extra');
 function savePedidosExtra(arr){ try{ localStorage.setItem('pedidos-extra', JSON.stringify(arr)); }catch(e){} postConfig_('pedidos_extra', arr); }
 function loadPedidos(){ return (window.PEDIDOS_BASE||[]).concat(loadPedidosExtra()); }
 function agregarPedido(p){ const arr=loadPedidosExtra(); arr.push(p); savePedidosExtra(arr); return arr; }
+
+/* Actualización masiva de pedidos: Reemplazar o Agregar/Actualizar.
+   Formato: [[fecha,pedido,cliente,item,resumen,pedida,pendiente]].
+   Estado se calcula automáticamente. */
+function reemplazarPedidos(pedidosArray){
+  // Reemplaza completamente pedidos_extra con los nuevos
+  const pedidos = pedidosArray.map(function(p){
+    return {
+      fecha: p[0]||'',
+      pedido: p[1]||'',
+      cliente: p[2]||'',
+      item: String(p[3]||'').trim(),
+      resumen: p[4]||'',
+      pedida: Number(p[5])||0,
+      pendiente: Number(p[6])||0,
+      estado: calcularEstadoPedido(p[0], Number(p[6])||0)
+    };
+  });
+  savePedidosExtra(pedidos);
+  return pedidos;
+}
+
+function actualizarPedidos(pedidosArray){
+  // Agrega o actualiza pedidos. Si existe (mismo pedido+item) lo actualiza, si no lo agrega.
+  const existentes = loadPedidosExtra();
+  const mapa = {}; // key = pedido+item
+  existentes.forEach(function(p){ mapa[p.pedido+'|'+p.item] = p; });
+  
+  pedidosArray.forEach(function(p){
+    const key = (p[1]||'') + '|' + String(p[3]||'').trim();
+    mapa[key] = {
+      fecha: p[0]||'',
+      pedido: p[1]||'',
+      cliente: p[2]||'',
+      item: String(p[3]||'').trim(),
+      resumen: p[4]||'',
+      pedida: Number(p[5])||0,
+      pendiente: Number(p[6])||0,
+      estado: calcularEstadoPedido(p[0], Number(p[6])||0)
+    };
+  });
+  
+  const resultado = Object.keys(mapa).map(function(k){ return mapa[k]; });
+  savePedidosExtra(resultado);
+  return resultado;
+}
+
+function calcularEstadoPedido(fecha, pendiente){
+  if(pendiente <= 0) return 'Completado';
+  if(!fecha) return 'Pendiente';
+  try{
+    const f = new Date(fecha);
+    const hoy = new Date();
+    const dias = Math.floor((hoy - f) / (1000*60*60*24));
+    if(dias > 35) return '⚠️ +35 días';
+    if(dias > 20) return '⚠️ +20 días';
+    return 'Pendiente';
+  }catch(e){ return 'Pendiente'; }
+}
 /* ===== AJUSTES DE INVENTARIO (salidas / correcciones) =====
    Cada ajuste resta unidades del disponible de una referencia.
    Requiere motivo obligatorio. Se comparte para todo el equipo.
