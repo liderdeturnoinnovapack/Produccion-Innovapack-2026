@@ -2833,13 +2833,18 @@ function HistorialDespachos(){
   const totDespachado=list.reduce((s,d)=>s+(Number(d.cantDespachada)||0),0);
   const nPedidos=new Set(list.map(d=>d.pedido)).size;
   
-  // Agrupar despachos por tipo de producto (clasificación SKU)
+  // Agrupar despachos por tipo
   const porTipo={};
   list.forEach(d=>{
-    const clasificacion = clasificarReferencia(d.item||d.resumen||'');
-    const tipo = clasificacion.tipo || 'Otro';
-    if(!porTipo[tipo]) porTipo[tipo] = 0;
-    porTipo[tipo] += Number(d.cantDespachada)||0;
+    const ref = (d.resumen||'').toUpperCase();
+    let tipo = 'Otro';
+    if(ref.includes('VALV')) tipo = 'Bolsa Valvulada';
+    else if(ref.includes('AGUA')) tipo = 'Bolsa de Agua';
+    else if(ref.includes('ABIERT')) tipo = 'Bolsa Abierta';
+    else if(ref.includes('FLOW')) tipo = 'Flow Pack';
+    else if(ref.includes('LAMINA')) tipo = 'Lámina';
+    else if(ref.includes('BOLSA')) tipo = 'Bolsa';
+    porTipo[tipo] = (porTipo[tipo]||0) + (Number(d.cantDespachada)||0);
   });
   const despachosPorTipo=Object.entries(porTipo).map(([l,v])=>({label:l,val:Math.round(v)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
   
@@ -2983,13 +2988,18 @@ function Despachos({reports, okSet, puedeEditar}){
   const porEstado={}; list.forEach(p=>{const e=p.estado||'—';porEstado[e]=(porEstado[e]||0)+1;});
   const pieEstado=Object.entries(porEstado).map(([label,val])=>({label,val})).filter(d=>d.val>0);
   
-  // Agrupar pedidos activos por tipo de producto (clasificación SKU)
+  // Agrupar pedidos activos por tipo (análisis simple del texto de referencia)
   const porTipo={}; 
   activos.forEach(p=>{
-    const clasificacion = clasificarReferencia(p.item||p.resumen||'');
-    const tipo = clasificacion.tipo || 'Otro';
-    if(!porTipo[tipo]) porTipo[tipo] = 0;
-    porTipo[tipo] += p.pendReal;
+    const ref = (p.resumen||'').toUpperCase();
+    let tipo = 'Otro';
+    if(ref.includes('VALV')) tipo = 'Bolsa Valvulada';
+    else if(ref.includes('AGUA')) tipo = 'Bolsa de Agua';
+    else if(ref.includes('ABIERT')) tipo = 'Bolsa Abierta';
+    else if(ref.includes('FLOW')) tipo = 'Flow Pack';
+    else if(ref.includes('LAMINA')) tipo = 'Lámina';
+    else if(ref.includes('BOLSA')) tipo = 'Bolsa';
+    porTipo[tipo] = (porTipo[tipo]||0) + p.pendReal;
   });
   const topTipos=Object.entries(porTipo).map(([l,v])=>({label:l,val:Math.round(v)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
   
