@@ -2832,6 +2832,17 @@ function HistorialDespachos(){
   list=aplicarOrden(list, sort, getV);
   const totDespachado=list.reduce((s,d)=>s+(Number(d.cantDespachada)||0),0);
   const nPedidos=new Set(list.map(d=>d.pedido)).size;
+  
+  // Agrupar despachos por tipo de producto (clasificación SKU)
+  const porTipo={};
+  list.forEach(d=>{
+    const clasificacion = clasificarReferencia(d.item||d.resumen||'');
+    const tipo = clasificacion.tipo || 'Otro';
+    if(!porTipo[tipo]) porTipo[tipo] = 0;
+    porTipo[tipo] += Number(d.cantDespachada)||0;
+  });
+  const despachosPorTipo=Object.entries(porTipo).map(([l,v])=>({label:l,val:Math.round(v)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
+  
   return(
     <div style={{marginBottom:26}}>
       <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📋 Historial de despachos</div>
@@ -2842,6 +2853,11 @@ function HistorialDespachos(){
         <InvCard label="Unidades despachadas" value={Math.round(totDespachado).toLocaleString()} color="var(--good)"/>
         <InvCard label="Transportadoras" value={list.filter(d=>d.tipoEntrega==='transportadora').length.toLocaleString()} color="var(--amber)" sub="registros con transportadora"/>
       </div>
+      {despachosPorTipo.length>0 && (
+        <div style={{marginBottom:18}}>
+          <BarChartDash data={despachosPorTipo} title="✅ Despachos por tipo de producto" sub="Unidades despachadas agrupadas por clasificación" color="var(--good)" labelKey="label" valueKey="val" unidad="und"/>
+        </div>
+      )}
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
         <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar pedido, remisión, cliente…"/>
         <select style={{...selStyle,maxWidth:190}} value={fTipo} onChange={e=>setFTipo(e.target.value)}>
@@ -2966,8 +2982,17 @@ function Despachos({reports, okSet, puedeEditar}){
   const nCerrados=todos.filter(p=>p.pendReal<=0).length;
   const porEstado={}; list.forEach(p=>{const e=p.estado||'—';porEstado[e]=(porEstado[e]||0)+1;});
   const pieEstado=Object.entries(porEstado).map(([label,val])=>({label,val})).filter(d=>d.val>0);
-  const porCli={}; list.forEach(p=>{const c=p.cliente||'—';porCli[c]=(porCli[c]||0)+p.pendReal;});
-  const topCli=Object.entries(porCli).map(([l,v])=>({label:String(l).slice(0,20),val:Math.round(v)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val).slice(0,10);
+  
+  // Agrupar pedidos activos por tipo de producto (clasificación SKU)
+  const porTipo={}; 
+  activos.forEach(p=>{
+    const clasificacion = clasificarReferencia(p.item||p.resumen||'');
+    const tipo = clasificacion.tipo || 'Otro';
+    if(!porTipo[tipo]) porTipo[tipo] = 0;
+    porTipo[tipo] += p.pendReal;
+  });
+  const topTipos=Object.entries(porTipo).map(([l,v])=>({label:l,val:Math.round(v)})).filter(d=>d.val>0).sort((a,b)=>b.val-a.val);
+  
   const activeF=[fCliente!=="Todos",fEstado!=="Todos",fInv!=="Todos",!!fDesde,!!fHasta].filter(Boolean).length;
   const nDesp=loadDespachos().length; ver;
   return (
@@ -3005,7 +3030,7 @@ function Despachos({reports, okSet, puedeEditar}){
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
           <PieChart data={pieEstado} title="Activos por estado"/>
-          <BarChartDash data={topCli} title="Top 10 clientes por pendiente real" sub="Eje X: cliente" color="var(--amber)" labelKey="label" valueKey="val" unidad="und"/>
+          <BarChartDash data={topTipos} title="📦 Pedidos pendientes por tipo de producto" sub="Unidades pendientes agrupadas por clasificación" color="var(--brand-blue)" labelKey="label" valueKey="val" unidad="und"/>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
           <input style={{...selStyle,maxWidth:300}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar cliente, item, N° pedido…"/>
