@@ -61,7 +61,6 @@
 <script src="../shared/config.js?v=20260712z4"></script>
 <script src="../shared/inventario_base.js?v=20260712z4"></script>
 <script src="../shared/sku_maestro.js?v=20260712z4"></script>
-<script src="../shared/pedidos_base.js?v=20260712z4"></script>
 <script src="../shared/calculos.js?v=20260723l"></script>
 </head>
 <body>
@@ -2131,105 +2130,6 @@ function NuevoCorteProcesoModal({onClose, onSaved}){
 
 /* Modal para cargar/actualizar pedidos desde Excel.
    Formato: Fecha | N° pedido | Razón social cliente | Item SIESA | Referencia | Cant. pedida | Cant. pendiente actual */
-function NuevoPedidosModal({onClose, onSaved}){
-  const [texto,setTexto]=useState('');
-  const [modo,setModo]=useState('actualizar'); // 'reemplazar' o 'actualizar'
-  const [msg,setMsg]=useState('');
-  const [preview,setPreview]=useState(null);
-  
-  function parsear(){
-    const lineas = texto.trim().split('\n').filter(l=>l.trim());
-    if(lineas.length===0){ setMsg('Pega los datos desde Excel (7 columnas: Fecha | N° pedido | Razón social | Item SIESA | Referencia | Cant. pedida | Cant. pendiente)'); setPreview(null); return; }
-    const items = [];
-    let errores = 0;
-    lineas.forEach((ln,i)=>{
-      const cols = ln.split('\t').map(c=>c.trim());
-      if(cols.length<7){ errores++; return; }
-      const fecha = cols[0]||'';
-      const pedido = cols[1]||'';
-      const cliente = cols[2]||'';
-      const item = cols[3]||'';
-      const resumen = cols[4]||'';
-      const pedida = parseFloat(cols[5])||0;
-      const pendiente = parseFloat(cols[6])||0;
-      if(!pedido || !item || pedida<=0){ errores++; return; }
-      items.push([fecha, pedido, cliente, item, resumen, pedida, pendiente]);
-    });
-    if(errores>0) setMsg(`⚠️ ${errores} filas inválidas (omitidas). Verifica el formato.`);
-    else setMsg('');
-    setPreview(items.length>0 ? {items, totalPedida:items.reduce((s,x)=>s+x[5],0), totalPendiente:items.reduce((s,x)=>s+x[6],0)} : null);
-  }
-  
-  function aplicar(){
-    if(!preview || preview.items.length===0){ setMsg('No hay datos válidos para aplicar.'); return; }
-    const accion = modo==='reemplazar' ? 'reemplazar todos los pedidos' : 'agregar/actualizar pedidos';
-    if(!window.confirm(`¿Confirmas ${accion} con ${preview.items.length} pedidos?`)) return;
-    
-    if(modo==='reemplazar'){
-      reemplazarPedidos(preview.items);
-      setMsg('✅ Pedidos reemplazados correctamente.');
-    } else {
-      actualizarPedidos(preview.items);
-      setMsg('✅ Pedidos actualizados correctamente.');
-    }
-    
-    setTimeout(()=>{ onSaved&&onSaved(); onClose&&onClose(); }, 800);
-  }
-  
-  const lab = {fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
-  const pedidosActuales = loadPedidosExtra();
-  
-  return (
-    <Modal title="📦 Actualizar Pedidos" onClose={onClose}>
-      <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14,padding:"10px 12px",background:"rgba(0,145,199,0.08)",borderRadius:8,border:"1px solid rgba(0,145,199,0.25)"}}>
-        📋 Actualmente tienes <b>{pedidosActuales.length} pedidos</b> en el sistema. Puedes <b>reemplazarlos</b> completamente o <b>agregar/actualizar</b> pedidos específicos.
-      </div>
-      
-      <div style={{marginBottom:14}}>
-        <div style={lab}>Modo de operación</div>
-        <div style={{display:'flex',gap:1,background:'var(--panel-2)',borderRadius:9,padding:3}}>
-          {[['actualizar','🔄 Agregar / Actualizar (recomendado)'],['reemplazar','🔁 Reemplazar todo']].map(([k,l])=>(
-            <button type="button" key={k} onClick={()=>setModo(k)} style={{flex:1,background:modo===k?'var(--card)':'transparent',color:modo===k?'var(--text)':'var(--text-dim)',border:'none',borderRadius:7,padding:'10px 12px',fontWeight:modo===k?700:500,fontSize:12,cursor:'pointer',textAlign:'left'}}>{l}</button>
-          ))}
-        </div>
-        <div style={{fontSize:11,color:'var(--text-dim)',marginTop:6}}>
-          {modo==='actualizar' 
-            ? '✓ Si el pedido ya existe (mismo N° + Item), actualiza sus datos. Si es nuevo, lo agrega.' 
-            : '⚠️ Borra TODOS los pedidos actuales y carga solo los que pegues aquí.'}
-        </div>
-      </div>
-      
-      <div style={{marginBottom:12}}>
-        <div style={lab}>Pegar datos desde Excel (7 columnas) *</div>
-        <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:6}}>
-          <b>Fecha</b> (dd/mm/aaaa) · <b>N° pedido</b> · <b>Razón social cliente</b> · <b>Item SIESA</b> (código) · <b>Referencia</b> · <b>Cant. pedida</b> · <b>Cant. pendiente actual</b>
-        </div>
-        <textarea value={texto} onChange={e=>{setTexto(e.target.value);setPreview(null);setMsg('');}} placeholder="Pega aquí desde Excel (Ctrl+V)&#10;Ejemplo:&#10;23/02/2026	PEV-00002940	JBG FUTURE SAS	5020276	BOLSA VAL PEGA TODO CON LATEX 25 KG	5000	5000&#10;12/03/2026	PEV-00002980	SAN REMO FACTORY	5010457	BOLSA AGUA SAN REMO 6,5 LT	8000	3000" style={{...inputStyle,minHeight:150,fontFamily:'var(--mono)',fontSize:11,lineHeight:1.6}}/>
-        <button onClick={parsear} style={{marginTop:8,padding:"8px 16px",background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Validar datos</button>
-      </div>
-      
-      {preview && (
-        <div style={{marginBottom:14,padding:"12px",background:"var(--panel-2)",borderRadius:10,border:"1px solid var(--line)"}}>
-          <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"var(--good)"}}>✓ {preview.items.length} pedidos válidos · Total pedido: {Math.round(preview.totalPedida).toLocaleString()} und · Pendiente: {Math.round(preview.totalPendiente).toLocaleString()} und</div>
-          <div style={{maxHeight:150,overflowY:"auto",fontSize:11,fontFamily:"var(--mono)"}}>
-            {preview.items.slice(0,10).map((it,i)=>(
-              <div key={i} style={{padding:"4px 0",borderBottom:"1px solid var(--line)"}}>{it[0]} | {it[1]} | {it[2].slice(0,20)} | {it[3]} | Pedida:{it[5]} Pend:{it[6]}</div>
-            ))}
-            {preview.items.length>10 && <div style={{padding:"6px 0",color:"var(--text-dim)"}}>... y {preview.items.length-10} más</div>}
-          </div>
-        </div>
-      )}
-      
-      {msg && <div style={{padding:"10px 12px",background:msg.indexOf('✅')>=0?"rgba(21,128,61,0.1)":"rgba(185,28,28,0.1)",borderRadius:8,marginBottom:12,fontSize:12,color:msg.indexOf('✅')>=0?"var(--good)":"var(--bad)"}}>{msg}</div>}
-      
-      <div style={{display:"flex",justifyContent:"flex-end",gap:10}}>
-        <button onClick={onClose} style={{padding:"10px 20px",background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Cancelar</button>
-        <button onClick={aplicar} disabled={!preview} style={{padding:"10px 20px",background:preview?(modo==='reemplazar'?"var(--amber)":"var(--good)"):"var(--panel-2)",color:preview?"#fff":"var(--text-dim)",border:"none",borderRadius:8,fontWeight:700,cursor:preview?"pointer":"not-allowed"}}>{modo==='reemplazar'?'Reemplazar todo':'Agregar / Actualizar'}</button>
-      </div>
-    </Modal>
-  );
-}
-
 function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, puedeCalidad}){
   const [buscar,setBuscar]=useState("");
   const [abierto,setAbierto]=useState(true);
@@ -3000,13 +2900,39 @@ function Despachos({reports, okSet, puedeEditar}){
   const [fHasta,setFHasta]=useState("");
   const [showFilter,setShowFilter]=useState(false);
   const [showForm,setShowForm]=useState(false);
-  const [showActualizarPedidos,setShowActualizarPedidos]=useState(false);
   const [despachandoPed,setDespachandoPed]=useState(null);
   const [lupaHist,setLupaHist]=useState(null);
   const [ver,setVer]=useState(0);
+  const [pedidos,setPedidos]=useState([]);
+  const [loadingPedidos,setLoadingPedidos]=useState(true);
+  
+  // Cargar pedidos desde el Sheet al montar y cuando cambia `ver`
+  useEffect(()=>{
+    setLoadingPedidos(true);
+    fetch(SHEETS_URL_READ+'?tipo=pedidos')
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.ok && Array.isArray(data.pedidos)){
+          // Calcular estado para cada pedido
+          const pedidosConEstado = data.pedidos.map(p=>({
+            ...p,
+            estado: calcularEstadoPedido(p.fecha, p.pendiente)
+          }));
+          setPedidos(pedidosConEstado);
+        } else {
+          setPedidos([]);
+        }
+        setLoadingPedidos(false);
+      })
+      .catch(err=>{
+        console.error('Error cargando pedidos:', err);
+        setPedidos([]);
+        setLoadingPedidos(false);
+      });
+  }, [ver]);
+  
   const sort=useSort('fecha','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
-  const pedidos=loadPedidos(); ver;
   const disp=inventarioDisponible(reports, okSet);
   let all=pedidos.map((p,idx)=>{
     const yaDespachado=totalDespachado(p.pedido, p.item);
@@ -3051,16 +2977,23 @@ function Despachos({reports, okSet, puedeEditar}){
           <div style={{fontSize:15,fontWeight:700,fontFamily:"var(--head)"}}>🚚 Pedidos y Despachos</div>
           <div style={{fontSize:12,color:"var(--text-dim)",marginTop:2}}>El pendiente se reduce al registrar despachos. Los pedidos completamente despachados pasan al <b>Historial</b>.</div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          {puedeEditar && <button onClick={()=>setShowActualizarPedidos(true)} style={{background:"var(--brand-blue)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap",boxShadow:"0 2px 4px rgba(0,145,199,0.2)"}}>📦 Actualizar Pedidos</button>}
-          {puedeEditar && <button onClick={()=>setShowForm(true)} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>➕ Agregar pedido</button>}
-        </div>
+        {puedeEditar && <button onClick={()=>setShowForm(true)} style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>➕ Agregar pedido</button>}
       </div>
+      
+      {loadingPedidos && (
+        <div style={{padding:"20px",textAlign:"center",color:"var(--text-dim)",fontSize:13}}>
+          <div style={{marginBottom:8}}>⏳</div>
+          Cargando pedidos desde el Sheet...
+        </div>
+      )}
+      
+      {!loadingPedidos && (
       <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
         {[['activos','📋 Activos ('+activos.length+')'],['historial','✅ Historial ('+nDesp+')']].map(([k,label])=>(
           <button key={k} onClick={()=>setSubTab(k)} style={{background:subTab===k?"var(--card)":"transparent",color:subTab===k?"var(--text)":"var(--text-dim)",border:"none",borderRadius:8,padding:"7px 16px",fontWeight:subTab===k?600:500,fontSize:13,cursor:"pointer",boxShadow:subTab===k?"0 1px 2px rgba(0,0,0,0.06)":"none"}}>{label}</button>
         ))}
       </div>
+      )}
       {subTab==='historial' && <HistorialDespachos key={"hd_"+ver}/>}
       {subTab==='activos' && <>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:18}}>
@@ -3129,8 +3062,8 @@ function Despachos({reports, okSet, puedeEditar}){
         </div>
         {list.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {list.length}.</div>}
       </>}
+      )}
       {showForm && <PedidoForm onClose={()=>setShowForm(false)} onSaved={()=>{ setShowForm(false); setVer(v=>v+1); }}/>}
-      {showActualizarPedidos && <NuevoPedidosModal onClose={()=>setShowActualizarPedidos(false)} onSaved={()=>{ setShowActualizarPedidos(false); setVer(v=>v+1); }}/>}
       {despachandoPed && <DespachoForm {...despachandoPed} onClose={()=>setDespachandoPed(null)} onSaved={()=>{ setDespachandoPed(null); setVer(v=>v+1); }}/>}
       {lupaHist && <HistorialDespachosPedido {...lupaHist} onClose={()=>setLupaHist(null)}/>}
     </div>
