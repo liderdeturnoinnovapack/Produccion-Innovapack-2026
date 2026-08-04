@@ -2167,13 +2167,13 @@ function NuevoPedidosModal({onClose, onSaved}){
     
     if(modo==='reemplazar'){
       reemplazarPedidos(preview.items);
-      setMsg('✅ Pedidos reemplazados. Recargando...');
+      setMsg('✅ Pedidos reemplazados correctamente.');
     } else {
       actualizarPedidos(preview.items);
-      setMsg('✅ Pedidos actualizados. Recargando...');
+      setMsg('✅ Pedidos actualizados correctamente.');
     }
     
-    setTimeout(()=>{ onSaved&&onSaved(); onClose&&onClose(); window.location.reload(); }, 1200);
+    setTimeout(()=>{ onSaved&&onSaved(); onClose&&onClose(); }, 800);
   }
   
   const lab = {fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4};
