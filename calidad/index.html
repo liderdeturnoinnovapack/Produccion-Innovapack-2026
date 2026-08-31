@@ -115,11 +115,43 @@
     var proc=esProceso(r);
     var ru=refUnidad(r.referencia);
     var unidadRep=String(r.unidad||'').toLowerCase();
-    var und = unidadRep.indexOf('kg')===0 ? '' : (Number(r.produccion)||'');
+    var maq=String(r.maquina||'').toLowerCase();
+    
+    // REGLA ESPECIAL POR MÁQUINA:
+    // Para Producto en Proceso (extrusoras, impresora, refiladora PP):
+    // - UND PRODUCIDAS = número de rollos totales
+    // - CALIBRE = el calibre del reporte (datosExtra.calibre o rollos[0].calibre)
+    var und, calibre;
+    
+    if(proc){
+      // Producto en Proceso: buscar número de rollos
+      var rollosTotales = 0;
+      if(r.datosExtra && r.datosExtra.rollosTotales){
+        rollosTotales = Number(r.datosExtra.rollosTotales) || 0;
+      } else if(r.rollos && r.rollos.length>0){
+        rollosTotales = r.rollos.length;
+      }
+      und = rollosTotales || '';
+      
+      // Calibre del reporte (datosExtra.calibre o primer rollo)
+      if(r.datosExtra && r.datosExtra.calibre){
+        calibre = num(r.datosExtra.calibre);
+      } else if(r.rollos && r.rollos.length>0 && r.rollos[0].calibre){
+        calibre = num(r.rollos[0].calibre);
+      } else {
+        calibre = num(r.extraCalibre);
+      }
+    } else {
+      // Producto Terminado: unidades producidas (si no es kg)
+      und = unidadRep.indexOf('kg')===0 ? '' : (Number(r.produccion)||'');
+      calibre = num(r.extraCalibre);
+    }
+    
     var pu = pesoUnidad(r)||'';
     var cli = clienteDe(r.siesa) || (proc?'PRODUCTO EN PROCESO':'');
     var fam = proc ? 'Producto en proceso' : (clasificarReporte(r).categoria||'');
     var siesaN = /^\d+$/.test(String(r.siesa||'').trim()) ? Number(r.siesa) : (r.siesa||'');
+    
     return {
       C: consecutivo,                 // N°
       D: maqAbrev(r),                 // MAQ
@@ -133,8 +165,8 @@
       L: ru.size,                     // REFERENCIA (unidad)
       M: ru.unit,                     // UNIDAD
       N: cli,                         // CLIENTE
-      O: num(r.extraCalibre),         // CALIBRE MIL/PULG
-      P: und,                         // UND PRODUCIDAS
+      O: calibre,                     // CALIBRE MIL/PULG (del reporte)
+      P: und,                         // UND PRODUCIDAS (rollos en PP, unidades en PT)
       Q: pu,                          // KG PESO POR BOLSA
       R: Math.round(produccionKg(r)*100)/100 || '', // KG PRODUCIDOS
       S: null,                        // UND NO CONFORMES (Calidad)
@@ -166,7 +198,9 @@
       if(desde.length===0){ throw new Error("No hay reportes desde "+CORTE+"."); }
 
       log("Cargando plantilla del Excel…");
-      var resp = await fetch(TEMPLATE);
+      var resp = await fetch(TEMPLATE).catch(function(err){
+        throw new Error("No se pudo cargar la plantilla. Si estás usando file://, abre esta página desde un servidor local o GitHub Pages.");
+      });
       if(!resp.ok) throw new Error("No se pudo cargar la plantilla ("+resp.status+").");
       var buf = await resp.arrayBuffer();
 
