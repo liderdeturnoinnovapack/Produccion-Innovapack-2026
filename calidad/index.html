@@ -105,7 +105,11 @@
     if(x){ return { size:parseFloat(x[1].replace(',','.')), unit:'kg' }; }
     return { size:'', unit:'' };
   }
-  function num(v){ var n=parseFloat(String(v==null?'':v).replace(',','.')); return (isFinite(n)&&n!==0)?n:''; }
+  function num(v){ 
+    if(v==null || v==='') return ''; 
+    var n=parseFloat(String(v).replace(',','.')); 
+    return (isFinite(n) && n!==0) ? n : ''; 
+  }
   function esProceso(r){ return clasificarReporte(r).bodega==='Producto en Proceso'; }
 
   // Construye el arreglo de valores para las 21 columnas C..W de un reporte.
@@ -117,34 +121,32 @@
     var unidadRep=String(r.unidad||'').toLowerCase();
     var maq=String(r.maquina||'').toLowerCase();
     
-    // REGLA ESPECIAL POR MÁQUINA:
-    // Para Producto en Proceso (extrusoras, impresora, refiladora PP):
-    // - UND PRODUCIDAS = número de rollos totales
-    // - CALIBRE = el calibre del reporte (datosExtra.calibre o rollos[0].calibre)
-    var und, calibre;
+    // CALIBRE: buscar en datosExtra.calibre o en el primer rollo (Extrusora 1)
+    var calibre = '';
+    if(r.datosExtra && r.datosExtra.calibre!=null && r.datosExtra.calibre!==''){
+      calibre = num(r.datosExtra.calibre);
+    } else if(r.rollos && Array.isArray(r.rollos) && r.rollos.length>0 && r.rollos[0].calibre!=null && r.rollos[0].calibre!==''){
+      calibre = num(r.rollos[0].calibre);
+    }
     
+    // UNIDADES PRODUCIDAS:
+    var und = '';
     if(proc){
-      // Producto en Proceso: buscar número de rollos
-      var rollosTotales = 0;
-      if(r.datosExtra && r.datosExtra.rollosTotales){
-        rollosTotales = Number(r.datosExtra.rollosTotales) || 0;
-      } else if(r.rollos && r.rollos.length>0){
-        rollosTotales = r.rollos.length;
-      }
-      und = rollosTotales || '';
-      
-      // Calibre del reporte (datosExtra.calibre o primer rollo)
-      if(r.datosExtra && r.datosExtra.calibre){
-        calibre = num(r.datosExtra.calibre);
-      } else if(r.rollos && r.rollos.length>0 && r.rollos[0].calibre){
-        calibre = num(r.rollos[0].calibre);
-      } else {
-        calibre = num(r.extraCalibre);
+      // Producto en Proceso: número de rollos
+      if(r.datosExtra && r.datosExtra.rollosTotales!=null && r.datosExtra.rollosTotales!==''){
+        und = Number(r.datosExtra.rollosTotales) || '';
+      } else if(r.datosExtra && r.datosExtra.rollosProducidos!=null && r.datosExtra.rollosProducidos!==''){
+        // Refiladora usa "rollosProducidos"
+        und = Number(r.datosExtra.rollosProducidos) || '';
+      } else if(r.rollos && Array.isArray(r.rollos) && r.rollos.length>0){
+        // Contar rollos en el array
+        und = r.rollos.length;
       }
     } else {
-      // Producto Terminado: unidades producidas (si no es kg)
-      und = unidadRep.indexOf('kg')===0 ? '' : (Number(r.produccion)||'');
-      calibre = num(r.extraCalibre);
+      // Producto Terminado: unidades si NO es en kg
+      if(unidadRep.indexOf('kg')<0 && unidadRep.indexOf('kilogramo')<0){
+        und = Number(r.produccion) || '';
+      }
     }
     
     var pu = pesoUnidad(r)||'';
