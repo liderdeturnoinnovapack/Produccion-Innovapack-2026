@@ -106,7 +106,7 @@
     return { size:'', unit:'' };
   }
   function num(v){ 
-    if(v==null || v==='') return ''; 
+    if(v==null || v==='' || v==='-') return ''; 
     var n=parseFloat(String(v).replace(',','.')); 
     return (isFinite(n) && n!==0) ? n : ''; 
   }
@@ -121,26 +121,30 @@
     var unidadRep=String(r.unidad||'').toLowerCase();
     var maq=String(r.maquina||'').toLowerCase();
     
-    // CALIBRE: buscar en datosExtra.calibre o en el primer rollo (Extrusora 1)
+    // CALIBRE: leer de extraCalibre (campos aplanados) o parsear extraRollos
     var calibre = '';
-    if(r.datosExtra && r.datosExtra.calibre!=null && r.datosExtra.calibre!==''){
-      calibre = num(r.datosExtra.calibre);
-    } else if(r.rollos && Array.isArray(r.rollos) && r.rollos.length>0 && r.rollos[0].calibre!=null && r.rollos[0].calibre!==''){
-      calibre = num(r.rollos[0].calibre);
+    if(r.extraCalibre && r.extraCalibre !== '-'){
+      calibre = num(r.extraCalibre);
+    } else if(r.extraRollos && r.extraRollos !== '-'){
+      // Extrusora 1: parsear el primer rollo de extraRollos
+      var rollos = parseRollos(r);
+      if(rollos.length > 0 && rollos[0].calibre){
+        calibre = num(rollos[0].calibre);
+      }
     }
     
     // UNIDADES PRODUCIDAS:
     var und = '';
     if(proc){
-      // Producto en Proceso: número de rollos
-      if(r.datosExtra && r.datosExtra.rollosTotales!=null && r.datosExtra.rollosTotales!==''){
-        und = Number(r.datosExtra.rollosTotales) || '';
-      } else if(r.datosExtra && r.datosExtra.rollosProducidos!=null && r.datosExtra.rollosProducidos!==''){
+      // Producto en Proceso: número de rollos (leer de campos aplanados)
+      if(r.extraRollosTotales && r.extraRollosTotales !== '-'){
+        und = Number(r.extraRollosTotales) || '';
+      } else if(r.extraRollosProducidos && r.extraRollosProducidos !== '-'){
         // Refiladora usa "rollosProducidos"
-        und = Number(r.datosExtra.rollosProducidos) || '';
-      } else if(r.rollos && Array.isArray(r.rollos) && r.rollos.length>0){
-        // Contar rollos en el array
-        und = r.rollos.length;
+        und = Number(r.extraRollosProducidos) || '';
+      } else if(r.extraRollos && r.extraRollos !== '-'){
+        // Extrusora 1: contar rollos parseados
+        und = parseRollos(r).length || '';
       }
     } else {
       // Producto Terminado: unidades si NO es en kg
