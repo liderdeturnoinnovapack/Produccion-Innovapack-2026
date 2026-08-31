@@ -229,6 +229,25 @@
       COLS.forEach(function(c){ estilos[c]=clon(ws.getRow(lastData).getCell(COLIDX[c]).style); });
 
       log("Escribiendo "+desde.length+" filas desde la fila "+(lastData+1)+"…");
+      
+      // DEBUG: ver estructura de los primeros 3 reportes
+      if(desde.length>0){
+        log("\n=== DEBUG: Primeros 3 reportes ===");
+        desde.slice(0,3).forEach(function(r,idx){
+          log("Reporte "+(idx+1)+" - "+r.maquina+" / "+r.referencia);
+          log("  unidad: "+r.unidad+" | produccion: "+r.produccion);
+          log("  datosExtra: "+JSON.stringify(r.datosExtra||{}).substring(0,200));
+          log("  rollos: "+(r.rollos?r.rollos.length+" rollos":"sin array de rollos"));
+          if(r.rollos && r.rollos.length>0){
+            log("    primer rollo: "+JSON.stringify(r.rollos[0]).substring(0,150));
+          }
+          var fila=filaDe(r,999);
+          log("  → CALIBRE (O): '"+fila.O+"' | UND (P): '"+fila.P+"'");
+          log("");
+        });
+        log("=== FIN DEBUG ===\n");
+      }
+      
       desde.forEach(function(r,i){
         var rowNum=lastData+1+i;
         var fila=filaDe(r, lastNo+1+i);
