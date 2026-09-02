@@ -1383,6 +1383,7 @@ function TrazabilidadModal({siesa, reports, onClose}){
 function InventarioRollos({reports, okSet}){
   const [fTipo,setFTipo]=useState("");
   const [buscar,setBuscar]=useState("");
+  const [traza,setTraza]=useState(null);
   const sort=useSort('kg','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   const tipoColor=t=>TIPO_COLORS[t]||"#64748B";
@@ -1450,7 +1451,7 @@ function InventarioRollos({reports, okSet}){
           </tr></thead>
           <tbody>
             {items.slice(0,500).map((r,i)=>(
-              <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+              <tr key={i} onClick={()=>setTraza(r.codigo)} style={{borderTop:"1px solid var(--line)",cursor:"pointer"}} title="Clic para ver trazabilidad de producción">
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",color:"var(--text-dim)"}}>{i+1}</td>
                 <td style={{padding:"8px 10px",fontFamily:"var(--mono)",fontSize:12,whiteSpace:"nowrap"}}>{r.codigo||"-"}</td>
                 <td style={{padding:"8px 10px",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia||"-"}</td>
@@ -1465,6 +1466,7 @@ function InventarioRollos({reports, okSet}){
         </table>
       </div>
       {items.length>500 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>Mostrando 500 de {items.length.toLocaleString()}. Usa los filtros para acotar.</div>}
+      {traza && <TrazabilidadModal siesa={traza} reports={reports} onClose={()=>setTraza(null)}/>}
     </div>
   );
 }
