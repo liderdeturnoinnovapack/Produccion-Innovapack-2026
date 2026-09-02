@@ -32,6 +32,10 @@ Todo en **español**. Desplegado en **GitHub Pages**:
     y POST `{tipo:"config",...}`. Cache local en `localStorage` + migración inicial.
 
 ## Convenciones de trabajo (IMPORTANTES)
+- **HTML de prueba obligatorio:** Antes de hacer cualquier commit de cambios visuales
+  o de funcionalidad, crear un HTML de prueba independiente que muestre el antes/después
+  del cambio. Guardar estos archivos como `prueba_*.html` en la raíz del proyecto para
+  revisión del usuario. Solo hacer commit después de aprobación explícita.
 - **Validar antes de subir:** transformar el `<script type="text/babel">` con
   `@babel/standalone` (preset react) y `node --check shared/calculos.js`.
 - **Push:** siempre a `main` con la herramienta de push (no `git push` manual).
