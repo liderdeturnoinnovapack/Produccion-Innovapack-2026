@@ -3558,9 +3558,8 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
 
       {showMetas && <MetasEditor onClose={()=>setShowMetas(false)} onSaved={()=>setMetasVer(v=>v+1)}/>}
 
-      {/* Fase B: reportes en standby hasta ingreso a SIESA — Producto Terminado en PT, Producto en Proceso en PP */}
+      {/* Fase B: reportes en standby hasta ingreso a SIESA — solo PT aquí (PP se mueve dentro de su tab) */}
       {tab==='bodegas' && subBodega==='pt' && <PendientesSiesa reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa} puedeCalidad={perm.editCalidad}/>}
-      {tab==='bodegas' && subBodega==='pp' && <PendientesProceso reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa}/>}
 
       <div className="fade-in" key={tab+"_"+metasVer}>
       {tab==='inv' && <>
@@ -3587,7 +3586,12 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
           ))}
         </div>
         {subBodega==='pt' && <div className="fade-in" key={"spt_"+metasVer}><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/><BodegaView reports={reports} titulo="Producto Terminado" showFiltros={true}/></div>}
-        {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}><InventarioFisico bodega="pp" reports={reports}/><InventarioRollos reports={reports}/><BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/></div>}
+        {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}>
+          <PendientesProceso reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa}/>
+          <InventarioFisico bodega="pp" reports={reports}/>
+          <InventarioRollos reports={reports}/>
+          <BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/>
+        </div>}
       </>}
       </div>
     </div>
