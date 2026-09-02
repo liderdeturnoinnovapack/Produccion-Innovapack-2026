@@ -1380,16 +1380,17 @@ function TrazabilidadModal({siesa, reports, onClose}){
   );
 }
 
-function InventarioRollos({reports, okSet}){
+function InventarioRollos({reports}){
   const [fTipo,setFTipo]=useState("");
   const [buscar,setBuscar]=useState("");
+  const [ok,setOk]=useState(()=>{ try{ return new Set(loadVerificadoSiesa()); }catch(e){ return new Set(); } });
   const sort=useSort('kg','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
   const tipoColor=t=>TIPO_COLORS[t]||"#64748B";
 
   // Solo reportes cuya bodega es "Producto en Proceso" (excluye la excepción Termo→PT).
   const base=reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso");
-  const all=inventarioPP_Agrupado(base, okSet);
+  const all=inventarioPP_Agrupado(base, ok);
 
   // Opciones de filtro derivadas de los datos.
   const tipos=[...new Set(all.map(r=>r.tipo).filter(Boolean))].sort();
@@ -3568,7 +3569,7 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
         {subBodega==='pt' && <div className="fade-in" key={"spt_"+metasVer}><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/><BodegaView reports={reports} titulo="Producto Terminado" showFiltros={true}/></div>}
         {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}>
           <PendientesProceso reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa}/>
-          <InventarioRollos reports={reports} okSet={siesaOk}/>
+          <InventarioRollos reports={reports}/>
           <BodegaView reports={reports} titulo="Producto en Proceso" showFiltros={false}/>
         </div>}
       </>}
