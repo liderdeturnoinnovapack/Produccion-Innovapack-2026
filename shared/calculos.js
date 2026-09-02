@@ -1210,10 +1210,13 @@ function inventarioProceso(list){
     const codigo = r.siesa || r.sku || "";
     const rolls  = parseRollos(r);
     if(rolls.length){
+      // Distribuir el peso producido entre los rollos (no usar peso del rollo madre)
+      const pesoProducido = produccionKg(r);
+      const pesoPorRollo = pesoProducido / rolls.length;
       rolls.forEach(roll=>{
         out.push({
           ...roll, tipo, color, codigo,
-          peso: roll.peso || roll.pesoFinal || roll.pesoInicial || ""
+          peso: roll.peso || Math.round(pesoPorRollo)
         });
       });
     } else {
