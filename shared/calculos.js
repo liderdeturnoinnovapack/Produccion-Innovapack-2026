@@ -1234,3 +1234,41 @@ function inventarioProceso(list){
   });
   return out;
 }
+
+/* Inventario de Producto en Proceso AGRUPADO por referencia + tipo (como PT).
+   Solo cuenta reportes ingresados a SIESA (okSet). Agrupa por código SIESA + tipo de proceso.
+   Similar a inventarioPT pero con tipos de proceso en lugar de categorías. */
+function inventarioPP_Agrupado(list, okSet){
+  const mapa = {};
+  list.forEach(r => {
+    // Solo contar si está ingresado a SIESA
+    if(!okSet || !okSet.has(reporteId(r))) return;
+    
+    const tipo = tipoProceso(r);
+    const codigo = r.siesa || r.sku || r.referencia || "";
+    const key = codigo + "|" + tipo; // clave única: código + tipo de proceso
+    
+    if(!mapa[key]){
+      mapa[key] = {
+        codigo: codigo,
+        referencia: r.referencia,
+        tipo: tipo,
+        color: colorProceso(r),
+        rollos: 0,
+        kg: 0,
+        reportes: 0,
+        ultima: ""
+      };
+    }
+    
+    const item = mapa[key];
+    item.rollos += obtenerRollos(r);
+    item.kg += produccionKg(r);
+    item.reportes += 1;
+    
+    const iso = getFechaISO(r);
+    if(iso && iso > item.ultima) item.ultima = iso;
+  });
+  
+  return Object.values(mapa);
+}
