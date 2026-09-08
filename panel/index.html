@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712z4"></script>
-<script src="../shared/config.js?v=20260712z4"></script>
-<script src="../shared/inventario_base.js?v=20260712z4"></script>
-<script src="../shared/sku_maestro.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260902b"></script>
+<script src="../shared/data.js?v=20260827a"></script>
+<script src="../shared/config.js?v=20260827a"></script>
+<script src="../shared/inventario_base.js?v=20260827a"></script>
+<script src="../shared/sku_maestro.js?v=20260827a"></script>
+<script src="../shared/calculos.js?v=20260827a"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1323,7 +1323,7 @@ function InvCard({label,value,color,sub}){
 }
 
 function TrazabilidadModal({siesa, reports, onClose}){
-  const rows=reports.filter(r=>(r.siesa===siesa||r.sku===siesa)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const rows=reports.filter(r=>(r.siesa===siesa||r.sku===siesa)).sort((a,b)=>(a.ts||0)-(b.ts||0)); // orden cronológico
   const ref=rows.length?rows[0].referencia:siesa;
   const cls=rows.length?clasificarReporte(rows[0]):{};
   const p=loadPesos();
@@ -1334,12 +1334,65 @@ function TrazabilidadModal({siesa, reports, onClose}){
   const totalMerma=rows.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
   const fechasISO=rows.map(getFechaISO).filter(Boolean).sort();
   const rango=fechasISO.length?`${fechaLarga(fechasISO[0])} → ${fechaLarga(fechasISO[fechasISO.length-1])}`:"-";
+  
+  // AGRUPACIÓN EN LOTES: por mes + detección de brechas >10 días
+  const lotes = [];
+  rows.forEach((r, idx) => {
+    const fISO = getFechaISO(r);
+    if(!fISO) return; // skip sin fecha válida
+    const mes = fISO.substring(0,7); // YYYY-MM
+    
+    // Si es el primer reporte o cambió de mes o hay brecha >10 días
+    let crearNuevoLote = false;
+    if(lotes.length === 0){
+      crearNuevoLote = true;
+    } else {
+      const loteActual = lotes[lotes.length - 1];
+      const ultimaFecha = loteActual.ultimaFecha;
+      const diasDif = (new Date(fISO) - new Date(ultimaFecha)) / (1000*60*60*24);
+      
+      if(loteActual.mes !== mes || diasDif > 10){
+        crearNuevoLote = true;
+        if(diasDif > 10){
+          loteActual.brechaHasta = fISO;
+          loteActual.diasBrecha = Math.round(diasDif);
+        }
+      }
+    }
+    
+    if(crearNuevoLote){
+      lotes.push({
+        mes: mes,
+        reportes: [r],
+        primeraFecha: fISO,
+        ultimaFecha: fISO,
+        brechaHasta: null,
+        diasBrecha: 0
+      });
+    } else {
+      const loteActual = lotes[lotes.length - 1];
+      loteActual.reportes.push(r);
+      loteActual.ultimaFecha = fISO;
+    }
+  });
+  
+  // Calcular totales por lote
+  lotes.forEach(lote => {
+    lote.totalUnd = lote.reportes.reduce((s,r)=>{const u=String(r.unidad||"").toLowerCase();return s+(u.indexOf("kg")===0?0:(Number(r.produccion)||0));},0);
+    lote.totalKg = lote.reportes.reduce((s,r)=>s+produccionKg(r,p),0);
+    lote.totalMerma = lote.reportes.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  });
+  
+  // Colores para headers de lotes (alternando)
+  const loteColors = ["linear-gradient(135deg, #0091C7 0%, #7CB342 100%)", "linear-gradient(135deg, #7CB342 0%, #0091C7 100%)"];
+  
   const mini=(label,val,color)=>(
     <div style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 14px",flex:"1 1 120px"}}>
       <div style={{fontSize:10,color:"var(--text-dim)",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.05em"}}>{label}</div>
       <div style={{fontSize:16,fontWeight:700,fontFamily:"var(--mono)",color:color||"var(--text)"}}>{val}</div>
     </div>
   );
+  
   return (
     <Modal title={`🔎 Trazabilidad · ${ref}`} onClose={onClose}>
       <div style={{display:"flex",gap:10,marginBottom:8,fontSize:12,color:"var(--text-dim)",flexWrap:"wrap"}}>
@@ -1356,35 +1409,91 @@ function TrazabilidadModal({siesa, reports, onClose}){
         {mini("Merma",totalMerma.toLocaleString(),"var(--bad)")}
         {mini("Periodo",rango)}
       </div>
-      <div style={{overflowX:"auto",border:"1px solid var(--line)",borderRadius:10}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr style={{background:"var(--panel-2)",textAlign:"left"}}>
-            {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"8px 9px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {rows.map((r,i)=>{
-              const rolls=parseRollos(r);
-              const madres=rolls.map(x=>x.rolloMadre).filter(Boolean).join(", ");
-              const prods=rolls.map(x=>x.numero).filter(Boolean).join(", ");
-              const traza=[madres?("Madre: "+madres):"",prods?("Prod: #"+prods):""].filter(Boolean).join(" · ")||"-";
-              return (
-                <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
-                  <td style={{padding:"7px 9px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{fechaLarga(getFechaISO(r))||"-"}</td>
-                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.turno||"-"}</td>
-                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.maquina}</td>
-                  <td style={{padding:"7px 9px"}}>{r.nombre}</td>
-                  <td style={{padding:"7px 9px",whiteSpace:"nowrap"}}>{r.produccion} {r.unidad}</td>
-                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",color:"var(--good)"}}>{Math.round(produccionKg(r,p)).toLocaleString()}</td>
-                  <td style={{padding:"7px 9px",color:"var(--bad)"}}>{r.mermasCantidad||"-"}</td>
-                  <td style={{padding:"7px 9px",fontSize:11}}>{traza}</td>
-                  <td style={{padding:"7px 9px",fontFamily:"var(--mono)",fontSize:11,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
-                </tr>
-              );
-            })}
-            {rows.length===0 && <tr><td colSpan="9" style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para esta referencia.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      
+      {lotes.length > 0 && (
+        <div style={{fontSize:14,fontWeight:700,marginBottom:12,paddingBottom:8,borderBottom:"2px solid var(--line)",fontFamily:"var(--head)"}}>
+          📊 Producción agrupada en lotes ({lotes.length} {lotes.length===1?"lote":"lotes"})
+        </div>
+      )}
+      
+      {lotes.map((lote, loteidx) => {
+        const mesNombre = new Date(lote.mes+"-15").toLocaleDateString("es-ES", {month:"long", year:"numeric"}).replace(/^\w/, c => c.toUpperCase());
+        
+        return (
+          <React.Fragment key={loteidx}>
+            {/* Brecha visual si existe */}
+            {lote.brechaHasta && loteidx < lotes.length - 1 && (
+              <div style={{background:"#FEF3C7",borderLeft:"4px solid var(--amber)",padding:"10px 14px",margin:"12px 0",borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:18}}>⚠️</span>
+                <span style={{fontSize:12.5,fontWeight:600,color:"#92400e"}}>
+                  Brecha de {lote.diasBrecha} días sin producir ({fechaCorta(lote.ultimaFecha)} → {fechaCorta(lote.brechaHasta)})
+                </span>
+              </div>
+            )}
+            
+            {/* Lote container */}
+            <div style={{marginBottom:20}}>
+              <div style={{background:loteColors[loteidx % 2],color:"white",padding:"10px 14px",borderRadius:"10px 10px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+                <div style={{fontFamily:"var(--head)",fontSize:14.5,fontWeight:700}}>
+                  🗓️ Lote {mesNombre}
+                </div>
+                <div style={{display:"flex",gap:14,fontSize:11.5,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end"}}>
+                    <span style={{fontSize:9,opacity:0.9,textTransform:"uppercase"}}>Reportes</span>
+                    <span style={{fontFamily:"var(--mono)",fontSize:13,fontWeight:700}}>{lote.reportes.length}</span>
+                  </div>
+                  {lote.totalUnd > 0 && (
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end"}}>
+                      <span style={{fontSize:9,opacity:0.9,textTransform:"uppercase"}}>Unidades</span>
+                      <span style={{fontFamily:"var(--mono)",fontSize:13,fontWeight:700}}>{Math.round(lote.totalUnd).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end"}}>
+                    <span style={{fontSize:9,opacity:0.9,textTransform:"uppercase"}}>Peso</span>
+                    <span style={{fontFamily:"var(--mono)",fontSize:13,fontWeight:700}}>{Math.round(lote.totalKg).toLocaleString()} kg</span>
+                  </div>
+                  {lote.totalMerma > 0 && (
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end"}}>
+                      <span style={{fontSize:9,opacity:0.9,textTransform:"uppercase"}}>Merma</span>
+                      <span style={{fontFamily:"var(--mono)",fontSize:13,fontWeight:700}}>{lote.totalMerma.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{border:"2px solid var(--brand-blue)",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead><tr style={{background:"var(--panel-2)",textAlign:"left"}}>
+                    {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"7px 8px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",fontSize:11}}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {lote.reportes.map((r,i)=>{
+                      const rolls=parseRollos(r);
+                      const madres=rolls.map(x=>x.rolloMadre).filter(Boolean).join(", ");
+                      const prods=rolls.map(x=>x.numero).filter(Boolean).join(", ");
+                      const traza=[madres?("Madre: "+madres):"",prods?("Prod: #"+prods):""].filter(Boolean).join(" · ")||"-";
+                      return (
+                        <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
+                          <td style={{padding:"6px 8px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:11.5}}>{fechaLarga(getFechaISO(r))||"-"}</td>
+                          <td style={{padding:"6px 8px",whiteSpace:"nowrap",fontSize:11.5}}>{r.turno||"-"}</td>
+                          <td style={{padding:"6px 8px",whiteSpace:"nowrap",fontSize:11.5}}>{r.maquina}</td>
+                          <td style={{padding:"6px 8px",fontSize:11.5}}>{r.nombre}</td>
+                          <td style={{padding:"6px 8px",whiteSpace:"nowrap",fontFamily:"var(--mono)",color:"var(--good)",fontSize:11.5}}>{r.produccion} {r.unidad}</td>
+                          <td style={{padding:"6px 8px",fontFamily:"var(--mono)",color:"var(--good)"}}>{Math.round(produccionKg(r,p)).toLocaleString()}</td>
+                          <td style={{padding:"6px 8px",color:"var(--bad)",fontFamily:"var(--mono)",fontSize:11.5}}>{r.mermasCantidad||"-"}</td>
+                          <td style={{padding:"6px 8px",fontSize:10.5}}>{traza}</td>
+                          <td style={{padding:"6px 8px",fontFamily:"var(--mono)",fontSize:10.5,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </React.Fragment>
+        );
+      })}
+      
+      {rows.length===0 && <div style={{padding:16,textAlign:"center",color:"var(--text-dim)"}}>Sin reportes para esta referencia.</div>}
     </Modal>
   );
 }
@@ -2138,16 +2247,54 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, 
   const [resumen,setResumen]=useState(null); // key del grupo para mostrar resumen
   const [calVerif,setCalVerif]=useState(()=>loadCalidadVerif()); // verificación de calidad por reporte
   const [calEdit,setCalEdit]=useState(null);   // reporte en edición de calidad
+  // NUEVOS FILTROS
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
+  const [fMaquina,setFMaquina]=useState("");
+  const [fReferencia,setFReferencia]=useState("");
+  const [fCodigo,setFCodigo]=useState("");
+  
   useEffect(()=>{ setCalVerif(loadCalidadVerif()); },[reports]); // refleja lo que marcó Calidad al refrescar
   const lamInfo = laminaConsumoInfo(reports); // consumo de lámina impresa/doblada por reporte
   const totalPend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r))).length;
   const q=buscar.trim().toLowerCase();
   let pend=reports.filter(r=>requiereSiesa(r) && !okSet.has(reporteId(r)));
+  
+  // Aplicar filtros avanzados
+  if(fDesde){
+    const desde = fDesde;
+    pend = pend.filter(r => {
+      const fISO = getFechaISO(r);
+      return fISO >= desde;
+    });
+  }
+  if(fHasta){
+    const hasta = fHasta;
+    pend = pend.filter(r => {
+      const fISO = getFechaISO(r);
+      return fISO <= hasta;
+    });
+  }
+  if(fMaquina) pend = pend.filter(r => (r.maquina||"") === fMaquina);
+  if(fReferencia.trim()){
+    const qRef = fReferencia.trim().toLowerCase();
+    pend = pend.filter(r => (r.referencia||"").toLowerCase().includes(qRef));
+  }
+  if(fCodigo.trim()){
+    const qCod = fCodigo.trim().toLowerCase();
+    pend = pend.filter(r => String(r.siesa||"").toLowerCase().includes(qCod));
+  }
+  
   if(q) pend=pend.filter(r=>((r.referencia||'')+' '+(r.siesa||'')+' '+(r.maquina||'')+' '+(r.consecutivo||'')+' '+(r.nombre||'')).toLowerCase().includes(q));
   // Ordenado por referencia para agrupar y mostrar un SUBTOTAL bajo cada grupo con varios reportes.
   const keyOf=r=>String(r.siesa||r.sku||r.referencia||'');
   pend=pend.sort((a,b)=>{ const ra=(a.referencia||''), rb=(b.referencia||''); if(ra!==rb) return ra.localeCompare(rb); return (b.ts||0)-(a.ts||0); });
   const grupos={}; pend.forEach(r=>{ const k=keyOf(r); if(!grupos[k]) grupos[k]={n:0,prod:0,lam:0,unidad:r.unidad||'',ref:r.referencia||k}; const g=grupos[k]; g.n++; g.prod+=Number(r.produccion)||0; const li=lamInfo.byReport[reporteId(r)]; if(li&&li.tieneLamina) g.lam+=li.consumoKg||0; });
+  // Extraer máquinas únicas para el select
+  const maquinas = [...new Set(reports.filter(r=>requiereSiesa(r)).map(r=>r.maquina).filter(Boolean))].sort();
+  const hayFiltro = fDesde || fHasta || fMaquina || fReferencia.trim() || fCodigo.trim();
+  const numFiltros = [fDesde,fHasta,fMaquina,fReferencia.trim(),fCodigo.trim()].filter(Boolean).length;
+  
   if(totalPend===0) return (
     <div style={{background:"var(--card)",border:"1px solid var(--line)",borderLeft:"4px solid var(--good)",borderRadius:12,padding:"12px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
       <span style={{fontSize:18}}>✅</span>
@@ -2169,6 +2316,40 @@ function PendientesSiesa({reports, okSet, onToggle, onMarcarTodos, puedeEditar, 
       </div>
       {abierto && (
         <div style={{padding:"0 16px 14px"}}>
+          {/* FILTROS AVANZADOS */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(160px, 1fr))",gap:8,marginBottom:10,padding:12,background:"var(--panel-2)",borderRadius:8,border:"1px solid var(--line)"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Desde</label>
+              <input type="date" value={fDesde} onChange={e=>setFDesde(e.target.value)} style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Hasta</label>
+              <input type="date" value={fHasta} onChange={e=>setFHasta(e.target.value)} style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Máquina</label>
+              <select value={fMaquina} onChange={e=>setFMaquina(e.target.value)} style={{...inputStyle,fontSize:12,padding:"6px 8px"}}>
+                <option value="">Todas</option>
+                {maquinas.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Referencia</label>
+              <input type="text" value={fReferencia} onChange={e=>setFReferencia(e.target.value)} placeholder="Buscar..." style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Código SIESA</label>
+              <input type="text" value={fCodigo} onChange={e=>setFCodigo(e.target.value)} placeholder="Ej: 5020226" style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",alignItems:"flex-end"}}>
+              <button onClick={()=>{setFDesde("");setFHasta("");setFMaquina("");setFReferencia("");setFCodigo("");}} style={{width:"100%",background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar filtros</button>
+            </div>
+          </div>
+          {hayFiltro && (
+            <div style={{background:"#DBEAFE",border:"1px solid var(--brand-blue)",borderRadius:8,padding:"7px 12px",marginBottom:10,fontSize:12,color:"#1e40af"}}>
+              ℹ️ <b>Filtros activos ({numFiltros}):</b> {fDesde&&`Desde ${fDesde.split("-").reverse().join("/")} · `}{fHasta&&`Hasta ${fHasta.split("-").reverse().join("/")} · `}{fMaquina&&`Máquina: ${fMaquina} · `}{fReferencia.trim()&&`Ref: "${fReferencia.trim()}" · `}{fCodigo.trim()&&`Código: "${fCodigo.trim()}" · `}{pend.length} reportes visibles
+            </div>
+          )}
           <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
             <input style={{...inputStyle,fontSize:12,padding:"7px 10px",maxWidth:280}} value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar referencia, código, máquina…"/>
             {puedeEditar && <button onClick={()=>onMarcarTodos(idsVisibles)} style={{background:"var(--good)",color:"#fff",border:"none",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ Marcar {q?`los ${pend.length} visibles`:"todos"} como ingresados</button>}
@@ -2242,12 +2423,44 @@ function PendientesProceso({reports, okSet, onToggle, onMarcarTodos, puedeEditar
   const [abierto,setAbierto]=useState(true);
   const [detalle,setDetalle]=useState(null);
   const [resumen,setResumen]=useState(null);
+  // NUEVOS FILTROS
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
+  const [fMaquina,setFMaquina]=useState("");
+  const [fReferencia,setFReferencia]=useState("");
+  const [fCodigo,setFCodigo]=useState("");
   
   const pendPP = reports.filter(r => clasificarReporte(r).bodega === "Producto en Proceso" && !okSet.has(reporteId(r)));
   const totalPend = pendPP.length;
   
   const q = buscar.trim().toLowerCase();
   let pend = pendPP;
+  
+  // Aplicar filtros avanzados
+  if(fDesde){
+    const desde = fDesde;
+    pend = pend.filter(r => {
+      const fISO = getFechaISO(r);
+      return fISO >= desde;
+    });
+  }
+  if(fHasta){
+    const hasta = fHasta;
+    pend = pend.filter(r => {
+      const fISO = getFechaISO(r);
+      return fISO <= hasta;
+    });
+  }
+  if(fMaquina) pend = pend.filter(r => (r.maquina||"") === fMaquina);
+  if(fReferencia.trim()){
+    const qRef = fReferencia.trim().toLowerCase();
+    pend = pend.filter(r => (r.referencia||"").toLowerCase().includes(qRef));
+  }
+  if(fCodigo.trim()){
+    const qCod = fCodigo.trim().toLowerCase();
+    pend = pend.filter(r => String(r.siesa||"").toLowerCase().includes(qCod));
+  }
+  
   if(q) pend = pend.filter(r => ((r.referencia||'')+' '+(r.siesa||'')+' '+(r.maquina||'')+' '+(r.nombre||'')).toLowerCase().includes(q));
   
   const keyOf = r => String(r.siesa || r.sku || r.referencia || '');
@@ -2267,6 +2480,11 @@ function PendientesProceso({reports, okSet, onToggle, onMarcarTodos, puedeEditar
     g.kg += Math.round(produccionKg(r));
     g.merma += Math.round(mermaKg(r));
   });
+  
+  // Extraer máquinas únicas para el select
+  const maquinas = [...new Set(pendPP.map(r=>r.maquina).filter(Boolean))].sort();
+  const hayFiltro = fDesde || fHasta || fMaquina || fReferencia.trim() || fCodigo.trim();
+  const numFiltros = [fDesde,fHasta,fMaquina,fReferencia.trim(),fCodigo.trim()].filter(Boolean).length;
   
   if(totalPend === 0) return (
     <div style={{background:"var(--card)",border:"1px solid var(--line)",borderLeft:"4px solid var(--good)",borderRadius:12,padding:"12px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
@@ -2297,6 +2515,40 @@ function PendientesProceso({reports, okSet, onToggle, onMarcarTodos, puedeEditar
       
       {abierto && (
         <div style={{padding:"0 16px 14px"}}>
+          {/* FILTROS AVANZADOS */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(160px, 1fr))",gap:8,marginBottom:10,padding:12,background:"var(--panel-2)",borderRadius:8,border:"1px solid var(--line)"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Desde</label>
+              <input type="date" value={fDesde} onChange={e=>setFDesde(e.target.value)} style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Hasta</label>
+              <input type="date" value={fHasta} onChange={e=>setFHasta(e.target.value)} style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Máquina</label>
+              <select value={fMaquina} onChange={e=>setFMaquina(e.target.value)} style={{...inputStyle,fontSize:12,padding:"6px 8px"}}>
+                <option value="">Todas</option>
+                {maquinas.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Referencia</label>
+              <input type="text" value={fReferencia} onChange={e=>setFReferencia(e.target.value)} placeholder="Buscar..." style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              <label style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase"}}>Código SIESA</label>
+              <input type="text" value={fCodigo} onChange={e=>setFCodigo(e.target.value)} placeholder="Ej: 5020226" style={{...inputStyle,fontSize:12,padding:"6px 8px"}}/>
+            </div>
+            <div style={{display:"flex",alignItems:"flex-end"}}>
+              <button onClick={()=>{setFDesde("");setFHasta("");setFMaquina("");setFReferencia("");setFCodigo("");}} style={{width:"100%",background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✕ Limpiar filtros</button>
+            </div>
+          </div>
+          {hayFiltro && (
+            <div style={{background:"#DBEAFE",border:"1px solid var(--brand-blue)",borderRadius:8,padding:"7px 12px",marginBottom:10,fontSize:12,color:"#1e40af"}}>
+              ℹ️ <b>Filtros activos ({numFiltros}):</b> {fDesde&&`Desde ${fDesde.split("-").reverse().join("/")} · `}{fHasta&&`Hasta ${fHasta.split("-").reverse().join("/")} · `}{fMaquina&&`Máquina: ${fMaquina} · `}{fReferencia.trim()&&`Ref: "${fReferencia.trim()}" · `}{fCodigo.trim()&&`Código: "${fCodigo.trim()}" · `}{pend.length} reportes visibles
+            </div>
+          )}
           <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
             <input 
               style={{...inputStyle,fontSize:12,padding:"7px 10px",maxWidth:280}} 
