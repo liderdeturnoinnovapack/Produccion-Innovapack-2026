@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba - Filtros en Pendientes + Lotes de Producción</title>
+<style>
+:root {
+  --card: #ffffff;
+  --panel-2: #f8f9fa;
+  --line: #e5e7eb;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --th-text: #374151;
+  --good: #10b981;
+  --bad: #ef4444;
+  --amber: #f59e0b;
+  --accent: #0091C7;
+  --brand-blue: #0091C7;
+  --brand-green: #7CB342;
+  --head: 'IBM Plex Sans', sans-serif;
+  --sans: 'Inter', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+[data-theme="dark"] {
+  --card: #1f2937;
+  --panel-2: #111827;
+  --line: #374151;
+  --text: #f3f4f6;
+  --text-dim: #9ca3af;
+  --th-text: #e5e7eb;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 24px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-family: var(--head);
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: var(--brand-blue);
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 32px;
+}
+
+.section {
+  margin-bottom: 48px;
+}
+
+.section-title {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 3px solid var(--brand-blue);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--amber);
+  border-left: 4px solid var(--amber);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 6px rgba(217,119,6,0.12);
+}
+
+.card-header {
+  font-weight: 700;
+  font-size: 14px;
+  font-family: var(--head);
+  margin-bottom: 12px;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--panel-2);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+input, select {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+}
+
+button {
+  background: var(--good);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+
+button.secondary {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+thead {
+  background: var(--panel-2);
+  border-bottom: 2px solid var(--line);
+}
+
+th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--th-text);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+td {
+  padding: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  background: var(--accent);
+}
+
+.lote-container {
+  margin-bottom: 24px;
+}
+
+.lote-header {
+  background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-green) 100%);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lote-title {
+  font-family: var(--head);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lote-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.lote-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.lote-stat-label {
+  font-size: 10px;
+  opacity: 0.9;
+  text-transform: uppercase;
+}
+
+.lote-stat-value {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lote-body {
+  border: 2px solid var(--brand-blue);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+}
+
+.brecha {
+  background: #FEF3C7;
+  border-left: 4px solid var(--amber);
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brecha-icon {
+  font-size: 20px;
+}
+
+.brecha-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 900px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--line);
+}
+
+.modal-title {
+  font-family: var(--head);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.close-btn {
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 24px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.info-item {
+  background: var(--panel-2);
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid var(--brand-blue);
+}
+
+.info-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.active-filters {
+  background: #DBEAFE;
+  border: 1px solid var(--brand-blue);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #1e40af;
+}
+
+@media (max-width: 768px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <span id="theme-icon">🌙</span>
+    <span id="theme-text">Oscuro</span>
+  </button>
+
+  <h1>🧪 Prueba - Filtros + Lotes de Producción</h1>
+  <p class="subtitle">Visualización de las dos nuevas funcionalidades antes de implementar</p>
+
+  <!-- FUNCIONALIDAD 1: FILTROS EN PENDIENTES DE INGRESO -->
+  <div class="section">
+    <div class="section-title">1️⃣ Filtros en "Pendientes de ingreso a SIESA"</div>
+    
+    <div class="card">
+      <div class="card-header">
+        ⏳ Pendientes de ingreso · Producto Terminado 
+        <span class="badge">12</span>
+      </div>
+
+      <!-- FILTROS NUEVOS -->
+      <div class="filters">
+        <div class="filter-group">
+          <label class="filter-label">Desde</label>
+          <input type="date" value="2026-08-01">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Hasta</label>
+          <input type="date" value="2026-09-09">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Máquina</label>
+          <select>
+            <option>Todas las máquinas</option>
+            <option>Selladora 1</option>
+            <option>Selladora 2</option>
+            <option>Impresora</option>
+            <option>Refiladora</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Referencia</label>
+          <input type="text" placeholder="Buscar referencia...">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Código SIESA</label>
+          <input type="text" placeholder="Ej: 5020226">
+        </div>
+        <div class="filter-group" style="display: flex; align-items: flex-end;">
+          <button class="secondary" style="width: 100%;">✕ Limpiar filtros</button>
+        </div>
+      </div>
+
+      <div class="active-filters">
+        ℹ️ <b>Filtros activos:</b> Desde 01/08/2026 · Hasta 09/09/2026 · 12 reportes visibles
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>✓ SIESA</th>
+            <th>Fecha</th>
+            <th>Máquina</th>
+            <th>Referencia</th>
+            <th>Producción</th>
+            <th>Consecutivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align: center;"><input type="checkbox"></td>
+            <td class="mono" style="font-size: 12px;">02/09/2026</td>
+            <td>Selladora 1</td>
+            <td>BOLSA VALV PEGO SPLENDOR 40KG</td>
+            <td class="mono">6,400 und</td>
+            <td class="mono" style="font-size: 11px;">INV-2026-1025</td>
+          </tr>
+          <tr>
+            <td style="text-align: center;"><input type="checkbox"></td>
+            <td class="mono" style="font-size: 12px;">03/09/2026</td>
+            <td>Selladora 1</td>
+            <td>BOLSA VALV PEGO SPLENDOR 40KG</td>
+            <td class="mono">800 und</td>
+            <td class="mono" style="font-size: 11px;">INV-2026-1026</td>
+          </tr>
+          <tr>
+            <td style="text-align: center;"><input type="checkbox"></td>
+            <td class="mono" style="font-size: 12px;">28/08/2026</td>
+            <td>Impresora</td>
+            <td>LAMINA IMPRESA LOGO EMPRESA</td>
+            <td class="mono">227 kg</td>
+            <td class="mono" style="font-size: 11px;">INV-2026-0987</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top: 12px; display: flex; gap: 8px;">
+        <button>✓ Marcar los 12 visibles como ingresados</button>
+        <button class="secondary">↓ Exportar filtrados a Excel</button>
+      </div>
+    </div>
+
+    <div style="background: #D1FAE5; border-left: 4px solid var(--good); border-radius: 8px; padding: 16px; margin-top: 16px;">
+      <b>✅ Ventajas de los filtros:</b>
+      <ul style="margin-left: 20px; margin-top: 8px; font-size: 13px;">
+        <li>Buscar reportes específicos rápidamente</li>
+        <li>Marcar lotes completos por fecha o máquina</li>
+        <li>Ver cuántos filtrados hay antes de marcar</li>
+        <li>Exportar solo lo que necesitas revisar</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- FUNCIONALIDAD 2: LOTES DE PRODUCCIÓN -->
+  <div class="section">
+    <div class="section-title">2️⃣ Lotes de Producción (agrupados por mes + brecha de 10 días)</div>
+
+    <button onclick="openModal()" style="margin-bottom: 16px;">
+      🔍 Abrir ejemplo: Trazabilidad SPLENDOR 40KG (clic aquí)
+    </button>
+
+    <div style="background: #EFF6FF; border-left: 4px solid var(--brand-blue); border-radius: 8px; padding: 16px;">
+      <b>📦 Concepto de "Lotes de Producción":</b>
+      <ul style="margin-left: 20px; margin-top: 8px; font-size: 13px; line-height: 1.8;">
+        <li><b>Agrupación por mes:</b> Lote Julio, Lote Agosto, Lote Septiembre</li>
+        <li><b>Brecha de 10 días:</b> Si pasan >10 días sin producir → se marca visualmente</li>
+        <li><b>Totales por lote:</b> Cada lote muestra su propio peso y unidades</li>
+        <li><b>Fácil de auditar:</b> Separar inventario antiguo vs reciente</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE TRAZABILIDAD CON LOTES -->
+<div id="modal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">🔎 Trazabilidad · BOLSA VALV PEGO SPLENDOR 40KG</div>
+      <button class="close-btn" onclick="closeModal()">×</button>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Código</div>
+        <div class="info-value">5020226</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Tipo</div>
+        <div class="info-value">Bolsa valvulada</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Sector</div>
+        <div class="info-value">Construcción</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Peso/und</div>
+        <div class="info-value">0.08 kg</div>
+      </div>
+    </div>
+
+    <div style="font-size: 14px; font-weight: 700; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--line);">
+      📊 Producción agrupada en lotes
+    </div>
+
+    <!-- LOTE JULIO -->
+    <div class="lote-container">
+      <div class="lote-header">
+        <div class="lote-title">🗓️ Lote Julio 2026</div>
+        <div class="lote-stats">
+          <div class="lote-stat">
+            <span class="lote-stat-label">Reportes</span>
+            <span class="lote-stat-value">1</span>
+          </div>
+          <div class="lote-stat">
+            <span class="lote-stat-label">Unidades</span>
+            <span class="lote-stat-value">6,400</span>
+          </div>
+          <div class="lote-stat">
+            <span class="lote-stat-label">Peso</span>
+            <span class="lote-stat-value">512 kg</span>
+          </div>
+        </div>
+      </div>
+      <div class="lote-body">
+        <table style="margin: 0;">
+          <thead>
+            <tr>
+              <th>Fecha turno</th>
+              <th>Turno</th>
+              <th>Máquina</th>
+              <th>Operario</th>
+              <th>Producción</th>
+              <th>Peso (kg)</th>
+              <th>Merma</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono" style="font-size: 11px;">02/07/2026</td>
+              <td>Turno 4 (6am - 6pm)</td>
+              <td>Selladora 1</td>
+              <td>DIEGO GARCIA</td>
+              <td class="mono" style="color: var(--good);">6400 Unidades</td>
+              <td class="mono" style="color: var(--good);">512</td>
+              <td class="mono" style="color: var(--bad);">10 Kg</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BRECHA -->
+    <div class="brecha">
+      <span class="brecha-icon">⚠️</span>
+      <span class="brecha-text">Brecha de 26 días sin producir (02/07 → 28/08)</span>
+    </div>
+
+    <!-- LOTE AGOSTO -->
+    <div class="lote-container">
+      <div class="lote-header">
+        <div class="lote-title">🗓️ Lote Agosto 2026</div>
+        <div class="lote-stats">
+          <div class="lote-stat">
+            <span class="lote-stat-label">Reportes</span>
+            <span class="lote-stat-value">2</span>
+          </div>
+          <div class="lote-stat">
+            <span class="lote-stat-label">Peso</span>
+            <span class="lote-stat-value">1,688 kg</span>
+          </div>
+        </div>
+      </div>
+      <div class="lote-body">
+        <table style="margin: 0;">
+          <thead>
+            <tr>
+              <th>Fecha turno</th>
+              <th>Turno</th>
+              <th>Máquina</th>
+              <th>Operario</th>
+              <th>Producción</th>
+              <th>Peso (kg)</th>
+              <th>Merma</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono" style="font-size: 11px;">28/08/2026</td>
+              <td>Turno 5 (6pm - 6am)</td>
+              <td>Impresora</td>
+              <td>YOM ARCIA</td>
+              <td class="mono" style="color: var(--good);">227 Kg</td>
+              <td class="mono" style="color: var(--good);">227</td>
+              <td class="mono" style="color: var(--bad);">0 Kg</td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size: 11px;">28/08/2026</td>
+              <td>Turno 4 (6am - 6pm)</td>
+              <td>Impresora</td>
+              <td>DANIEL ALVAREZ</td>
+              <td class="mono" style="color: var(--good);">1461 Kg</td>
+              <td class="mono" style="color: var(--good);">1461</td>
+              <td class="mono" style="color: var(--bad);">60 Kg</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LOTE SEPTIEMBRE -->
+    <div class="lote-container">
+      <div class="lote-header">
+        <div class="lote-title">🗓️ Lote Septiembre 2026</div>
+        <div class="lote-stats">
+          <div class="lote-stat">
+            <span class="lote-stat-label">Reportes</span>
+            <span class="lote-stat-value">3</span>
+          </div>
+          <div class="lote-stat">
+            <span class="lote-stat-label">Unidades</span>
+            <span class="lote-stat-value">13,600</span>
+          </div>
+          <div class="lote-stat">
+            <span class="lote-stat-label">Peso</span>
+            <span class="lote-stat-value">1,072 kg</span>
+          </div>
+        </div>
+      </div>
+      <div class="lote-body">
+        <table style="margin: 0;">
+          <thead>
+            <tr>
+              <th>Fecha turno</th>
+              <th>Turno</th>
+              <th>Máquina</th>
+              <th>Operario</th>
+              <th>Producción</th>
+              <th>Peso (kg)</th>
+              <th>Merma</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono" style="font-size: 11px;">03/09/2026</td>
+              <td>Turno 4 (6am - 6pm)</td>
+              <td>Selladora 1</td>
+              <td>DIEGO GARCIA</td>
+              <td class="mono" style="color: var(--good);">6000 Unidades</td>
+              <td class="mono" style="color: var(--good);">480</td>
+              <td class="mono" style="color: var(--bad);">50 Kg</td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size: 11px;">04/09/2026</td>
+              <td>Turno 4 (6am - 6pm)</td>
+              <td>Selladora 1</td>
+              <td>DIEGO GARCIA</td>
+              <td class="mono" style="color: var(--good);">6800 Unidades</td>
+              <td class="mono" style="color: var(--good);">528</td>
+              <td class="mono" style="color: var(--bad);">65 Kg</td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size: 11px;">03/09/2026</td>
+              <td>Turno 5 (6pm - 6am)</td>
+              <td>Selladora 1</td>
+              <td>YESID GIRALDO</td>
+              <td class="mono" style="color: var(--good);">800 Unidades</td>
+              <td class="mono" style="color: var(--good);">64</td>
+              <td class="mono" style="color: var(--bad);">8 Kg</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="margin-top: 24px; padding: 16px; background: var(--panel-2); border-radius: 8px; font-size: 13px;">
+      <b>💡 Ventajas de los lotes:</b>
+      <ul style="margin-left: 20px; margin-top: 8px;">
+        <li>Separar inventario antiguo (Julio) vs reciente (Septiembre)</li>
+        <li>Detectar brechas largas sin producir (alerta de falta de demanda o problemas)</li>
+        <li>Auditar totales por periodo para reportes mensuales</li>
+        <li>Identificar cuándo se produjo cada parte del inventario actual</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const icon = document.getElementById('theme-icon');
+  const text = document.getElementById('theme-text');
+  
+  if (html.getAttribute('data-theme') === 'dark') {
+    html.removeAttribute('data-theme');
+    icon.textContent = '🌙';
+    text.textContent = 'Oscuro';
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    icon.textContent = '☀️';
+    text.textContent = 'Claro';
+  }
+}
+
+function openModal() {
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeModal();
+  }
+});
+</script>
+</body>
+</html>
