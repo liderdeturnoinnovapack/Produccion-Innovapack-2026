@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260827b"></script>
-<script src="../shared/config.js?v=20260827b"></script>
-<script src="../shared/inventario_base.js?v=20260827b"></script>
-<script src="../shared/sku_maestro.js?v=20260827b"></script>
-<script src="../shared/calculos.js?v=20260827b"></script>
+<script src="../shared/data.js?v=20260827c"></script>
+<script src="../shared/config.js?v=20260827c"></script>
+<script src="../shared/inventario_base.js?v=20260827c"></script>
+<script src="../shared/sku_maestro.js?v=20260827c"></script>
+<script src="../shared/calculos.js?v=20260827c"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1197,9 +1197,10 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   const [showPermisos,setShowPermisos]=useState(false);
   const [pesos,setPesos]=useState(loadPesos());
   const [buscar,setBuscar]=useState("");
-  const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:""});
+  const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:"",medida:""});
   const [newMachine,setNewMachine]=useState("");
   const [msg,setMsg]=useState("");
+  const [editando,setEditando]=useState(null); // producto en edición
 
   function setPeso(siesa,val){
     const pz={...loadPesos()};
@@ -1215,7 +1216,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
     e.preventDefault();
     if(!f.siesa||!f.sku||!f.referencia){ setMsg("Siesa, SKU y Referencia son obligatorios."); return; }
     const esProceso = f.bodega==="Producto en Proceso";
-    const nuevo={siesa:f.siesa.trim(),sku:f.sku.trim(),referencia:f.referencia.trim()};
+    const nuevo={siesa:f.siesa.trim(),sku:f.sku.trim(),referencia:f.referencia.trim(),medida:f.medida.trim()};
     const list=[...catalog.filter(c=>c.siesa!==nuevo.siesa),nuevo];
     setCatalog(list); saveCatalog(list);
     // Guardar clasificación del nuevo SKU
@@ -1223,9 +1224,27 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
     extra[nuevo.siesa]={bodega:f.bodega,categoria:f.categoria,sector:esProceso?null:f.sector};
     saveClasificacionExtra(extra);
     if(f.peso!==""&&!isNaN(Number(f.peso))){ const pz={...loadPesos()}; pz[nuevo.siesa]=Number(f.peso); savePesos(pz); setPesos(pz); }
-    setF({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:""});
+    setF({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:"",medida:""});
     setMsg("✓ Producto agregado con su clasificación.");
   }
+  
+  function editCode(e){
+    e.preventDefault();
+    if(!editando||!editando.siesa||!editando.sku||!editando.referencia){ setMsg("Siesa, SKU y Referencia son obligatorios."); return; }
+    const esProceso = editando.bodega==="Producto en Proceso";
+    const actualizado={siesa:editando.siesa.trim(),sku:editando.sku.trim(),referencia:editando.referencia.trim(),medida:editando.medida?editando.medida.trim():""};
+    const list=catalog.map(c=>c.siesa===actualizado.siesa?actualizado:c);
+    setCatalog(list); saveCatalog(list);
+    // Actualizar clasificación
+    const extra=(()=>{try{return JSON.parse(localStorage.getItem('clasificacion-siesa')||"{}");}catch(e){return {};}})();
+    extra[actualizado.siesa]={bodega:editando.bodega,categoria:editando.categoria,sector:esProceso?null:editando.sector};
+    saveClasificacionExtra(extra);
+    if(editando.peso!==""&&!isNaN(Number(editando.peso))){ const pz={...loadPesos()}; pz[actualizado.siesa]=Number(editando.peso); savePesos(pz); setPesos(pz); }
+    else if(editando.peso===""){ const pz={...loadPesos()}; delete pz[actualizado.siesa]; savePesos(pz); setPesos(pz); }
+    setEditando(null);
+    setMsg("✓ Producto actualizado correctamente.");
+  }
+  
   function removeCode(s){ const list=catalog.filter(c=>c.siesa!==s); setCatalog(list); saveCatalog(list); }
   function addMachine(e){ e.preventDefault(); if(!newMachine||machines.includes(newMachine))return; const u=[...machines,newMachine]; setMachines(u); saveMachines(u); setNewMachine(""); }
   function removeMachine(m){ const u=machines.filter(x=>x!==m); setMachines(u); saveMachines(u); }
@@ -1266,7 +1285,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
         </Modal>
       )}
 
-      {showSKU && (
+      {showSKU && !editando && (
         <Modal title="Agregar producto (todos los campos)" onClose={()=>{setShowSKU(false);setMsg("");}}>
           <form onSubmit={addCode} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Código Siesa *</div><input style={inputStyle} value={f.siesa} onChange={e=>setF({...f,siesa:e.target.value})} placeholder="Ej: 5991218"/></div>
@@ -1275,6 +1294,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Bodega *</div><select style={inputStyle} value={f.bodega} onChange={e=>setF({...f,bodega:e.target.value})}>{BODEGAS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Categoría *</div><select style={inputStyle} value={f.categoria} onChange={e=>setF({...f,categoria:e.target.value})}>{CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Sector {esProceso?"(N/A)":"*"}</div><select style={{...inputStyle,opacity:esProceso?0.5:1}} disabled={esProceso} value={f.sector} onChange={e=>setF({...f,sector:e.target.value})}>{SECTORES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Medida (ancho en cm)</div><input style={inputStyle} type="number" step="any" value={f.medida} onChange={e=>setF({...f,medida:e.target.value})} placeholder="Ej: 65 (opcional)"/></div>
             <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Peso por unidad (kg)</div><input style={inputStyle} type="number" step="any" value={f.peso} onChange={e=>setF({...f,peso:e.target.value})} placeholder={autoPeso>0?`Automático: ${autoPeso} kg (déjalo vacío para usarlo)`:"Ej: 0.025 (opcional)"}/></div>
             <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
               <span style={{fontSize:12,color:msg.startsWith("✓")?"var(--good)":"var(--bad)"}}>{msg}</span>
@@ -1286,11 +1306,42 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
             {catalog.slice(0,60).map(c=>(
               <div key={c.siesa} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13}}>
                 <span><b>{c.siesa}</b> · {c.referencia}</span>
-                <button onClick={()=>removeCode(c.siesa)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>{
+                    const extra=(()=>{try{return JSON.parse(localStorage.getItem('clasificacion-siesa')||"{}");}catch(e){return {};}})();
+                    const clas=extra[c.siesa]||{bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción"};
+                    const pesoActual=pesos[c.siesa]||"";
+                    setEditando({...c,bodega:clas.bodega,categoria:clas.categoria,sector:clas.sector||"Construcción",peso:pesoActual,medida:c.medida||""});
+                    setMsg("");
+                  }} style={{background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontSize:13}}>✏️ editar</button>
+                  <button onClick={()=>removeCode(c.siesa)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+                </div>
               </div>
             ))}
             {catalog.length>60 && <div style={{fontSize:12,color:"var(--text-dim)",marginTop:8}}>… y {catalog.length-60} más.</div>}
           </div>
+        </Modal>
+      )}
+      
+      {editando && (
+        <Modal title={`✏️ Editar producto: ${editando.siesa}`} onClose={()=>{setEditando(null);setMsg("");}}>
+          <form onSubmit={editCode} style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Código Siesa (no editable)</div><input style={{...inputStyle,opacity:0.6}} value={editando.siesa} disabled/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>SKU *</div><input style={inputStyle} value={editando.sku} onChange={e=>setEditando({...editando,sku:e.target.value})} placeholder="Ej: 5991218"/></div>
+            <div style={{gridColumn:"1/-1"}}><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Referencia *</div><input style={inputStyle} value={editando.referencia} onChange={e=>setEditando({...editando,referencia:e.target.value})} placeholder="Nombre / descripción del producto"/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Bodega *</div><select style={inputStyle} value={editando.bodega} onChange={e=>setEditando({...editando,bodega:e.target.value})}>{BODEGAS.map(b=><option key={b} value={b}>{b}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Categoría *</div><select style={inputStyle} value={editando.categoria} onChange={e=>setEditando({...editando,categoria:e.target.value})}>{CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Sector {editando.bodega==="Producto en Proceso"?"(N/A)":"*"}</div><select style={{...inputStyle,opacity:editando.bodega==="Producto en Proceso"?0.5:1}} disabled={editando.bodega==="Producto en Proceso"} value={editando.sector} onChange={e=>setEditando({...editando,sector:e.target.value})}>{SECTORES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Medida (ancho en cm)</div><input style={inputStyle} type="number" step="any" value={editando.medida} onChange={e=>setEditando({...editando,medida:e.target.value})} placeholder="Ej: 65"/></div>
+            <div><div style={{fontSize:11,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>Peso por unidad (kg)</div><input style={inputStyle} type="number" step="any" value={editando.peso} onChange={e=>setEditando({...editando,peso:e.target.value})} placeholder="Ej: 0.08 (déjalo vacío para usar el automático)"/></div>
+            <div style={{gridColumn:"1/-1",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+              <span style={{fontSize:12,color:msg.startsWith("✓")?"var(--good)":"var(--bad)"}}>{msg}</span>
+              <div style={{display:"flex",gap:8}}>
+                <button type="button" onClick={()=>{setEditando(null);setMsg("");}} style={{background:"var(--panel-2)",color:"var(--text)",border:"1px solid var(--line)",borderRadius:8,padding:"9px 16px",fontWeight:600,cursor:"pointer"}}>Cancelar</button>
+                <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:700,cursor:"pointer"}}>💾 Guardar cambios</button>
+              </div>
+            </div>
+          </form>
         </Modal>
       )}
       {showMachines && (
