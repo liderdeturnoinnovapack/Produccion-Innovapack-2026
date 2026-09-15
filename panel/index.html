@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260827d"></script>
-<script src="../shared/config.js?v=20260827d"></script>
-<script src="../shared/inventario_base.js?v=20260827d"></script>
-<script src="../shared/sku_maestro.js?v=20260827d"></script>
-<script src="../shared/calculos.js?v=20260827d"></script>
+<script src="../shared/data.js?v=20260827e"></script>
+<script src="../shared/config.js?v=20260827e"></script>
+<script src="../shared/inventario_base.js?v=20260827e"></script>
+<script src="../shared/sku_maestro.js?v=20260827e"></script>
+<script src="../shared/calculos.js?v=20260827e"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1397,6 +1397,7 @@ function TrazabilidadModal({siesa, reports, onClose}){
   const ref=rows.length?rows[0].referencia:siesa;
   const cls=rows.length?clasificarReporte(rows[0]):{};
   const p=loadPesos();
+  const lamInfo=laminaConsumoInfo(reports); // info de consumo de lámina por reporte
   const totalUnd=rows.reduce((s,r)=>{const u=String(r.unidad||"").toLowerCase();return s+(u.indexOf("kg")===0?0:(Number(r.produccion)||0));},0);
   // Peso separado por bodega: NO mezclar producto terminado con producto en proceso.
   const kgPT=rows.filter(r=>clasificarReporte(r).bodega==="Producto Terminado").reduce((s,r)=>s+produccionKg(r,p),0);
@@ -1534,7 +1535,7 @@ function TrazabilidadModal({siesa, reports, onClose}){
                 <div style={{overflowX:"auto",maxWidth:"100%"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                     <thead><tr style={{background:"var(--panel-2)",textAlign:"left"}}>
-                      {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"7px 8px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",fontSize:11}}>{h}</th>)}
+                      {["Fecha turno","Turno","Máquina","Operario","Producción","Peso (kg)","Medida lám.","Merma","Rollos (madre → prod.)","Consecutivo"].map(h=><th key={h} style={{padding:"7px 8px",color:"var(--th-text)",fontWeight:700,whiteSpace:"nowrap",fontSize:11}}>{h}</th>)}
                     </tr></thead>
                     <tbody>
                       {lote.reportes.map((r,i)=>{
@@ -1542,6 +1543,8 @@ function TrazabilidadModal({siesa, reports, onClose}){
                         const madres=rolls.map(x=>x.rolloMadre).filter(Boolean).join(", ");
                         const prods=rolls.map(x=>x.numero).filter(Boolean).join(", ");
                         const traza=[madres?("Madre: "+madres):"",prods?("Prod: #"+prods):""].filter(Boolean).join(" · ")||"-";
+                        const lamConsumo=lamInfo.byReport[reporteId(r)];
+                        const medidaLam=lamConsumo&&lamConsumo.tieneLamina?lamConsumo.medida:null;
                         return (
                           <tr key={i} style={{borderTop:"1px solid var(--line)"}}>
                             <td style={{padding:"6px 8px",whiteSpace:"nowrap",fontFamily:"var(--mono)",fontSize:11.5}}>{fechaLarga(getFechaISO(r))||"-"}</td>
@@ -1550,6 +1553,7 @@ function TrazabilidadModal({siesa, reports, onClose}){
                             <td style={{padding:"6px 8px",fontSize:11.5}}>{r.nombre}</td>
                             <td style={{padding:"6px 8px",whiteSpace:"nowrap",fontFamily:"var(--mono)",color:"var(--good)",fontSize:11.5}}>{r.produccion} {r.unidad}</td>
                             <td style={{padding:"6px 8px",fontFamily:"var(--mono)",color:"var(--good)"}}>{Math.round(produccionKg(r,p)).toLocaleString()}</td>
+                            <td style={{padding:"6px 8px",fontFamily:"var(--mono)",color:medidaLam?"var(--brand-blue)":"var(--text-dim)",fontSize:11.5,whiteSpace:"nowrap"}}>{medidaLam?(medidaLam+" cm"):"—"}</td>
                             <td style={{padding:"6px 8px",color:"var(--bad)",fontFamily:"var(--mono)",fontSize:11.5}}>{r.mermasCantidad||"-"}</td>
                             <td style={{padding:"6px 8px",fontSize:10.5}}>{traza}</td>
                             <td style={{padding:"6px 8px",fontFamily:"var(--mono)",fontSize:10.5,whiteSpace:"nowrap"}}>{r.consecutivo||"-"}</td>
