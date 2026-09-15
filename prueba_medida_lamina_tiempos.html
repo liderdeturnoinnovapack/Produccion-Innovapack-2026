@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba: Medida de lámina + Tiempos completos</title>
+<style>
+:root {
+  --brand-blue: #0091C7;
+  --brand-green: #7CB342;
+  --bg: #F5F5F5;
+  --card: #FFFFFF;
+  --text: #1F2937;
+  --text-dim: #6B7280;
+  --border: #E5E7EB;
+  --good: #10B981;
+  --amber: #F59E0B;
+  --bad: #EF4444;
+}
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+  margin: 0;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+h1 {
+  color: var(--brand-blue);
+  border-bottom: 3px solid var(--brand-green);
+  padding-bottom: 10px;
+}
+.ejemplo {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.ejemplo h2 {
+  margin-top: 0;
+  color: var(--brand-blue);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--brand-blue);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.badge.green {
+  background: var(--brand-green);
+}
+.badge.amber {
+  background: var(--amber);
+}
+.seccion {
+  margin-top: 20px;
+  padding: 15px;
+  background: #F9FAFB;
+  border-radius: 8px;
+  border-left: 4px solid var(--brand-blue);
+}
+.seccion h3 {
+  margin-top: 0;
+  font-size: 14px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 13px;
+}
+th {
+  background: #F3F4F6;
+  padding: 10px;
+  text-align: left;
+  font-weight: 700;
+  border-bottom: 2px solid var(--border);
+}
+td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.numero {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+.verde { color: var(--good); }
+.azul { color: var(--brand-blue); }
+.ambar { color: var(--amber); }
+.rojo { color: var(--bad); }
+.nota {
+  background: #FEF3C7;
+  border-left: 4px solid var(--amber);
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 15px;
+  font-size: 13px;
+}
+.nota strong {
+  color: #92400E;
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 15px;
+}
+.info-item {
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.info-item .label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.info-item .value {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧪 Prueba: Medida de lámina + Tiempos completos de producción</h1>
+  <p style="color: var(--text-dim); margin-bottom: 30px;">
+    Esta prueba muestra cómo se verá el modal de detalle de reportes con la <b>medida correcta de la lámina</b> 
+    (tomada del SKU maestro) y los <b>tiempos de todos los procesos</b> (extrusión, impresión, refilado, sellado).
+  </p>
+
+  <!-- EJEMPLO 1: BOLSA DE AGUA -->
+  <div class="ejemplo">
+    <h2>
+      <span>🔎 Trazabilidad</span>
+      <span class="badge">📏 89 cm</span>
+      <span class="badge green">✓ Lámina transparente</span>
+    </h2>
+    <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">
+      BOLSA AGUA H2O CAMPO ALEGRE 6,5LT CN VAL
+    </div>
+    <div style="font-size: 13px; color: var(--text-dim);">
+      Código SIESA: <span class="numero">5010411</span> | Fecha: 11/09/2026
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="label">Producción</div>
+        <div class="value verde">13,400 Unidades</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Peso estimado</div>
+        <div class="value azul">≈ 348 kg</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Merma</div>
+        <div class="value rojo">≈ 8 kg</div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <h3>⏱️ Cadena productiva completa (tiempos estimados según metas)</h3>
+      <p style="font-size: 12px; color: var(--text-dim); margin: 5px 0;">
+        Medida de lámina: <b class="azul">89 cm</b> (Transparente) | 
+        Base kg = peso estimado + merma (<b>356 kg</b>)
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>PROCESO</th>
+            <th>CANTIDAD</th>
+            <th>META</th>
+            <th>TIEMPO ESTIMADO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Extrusión</td>
+            <td class="numero">356 kg</td>
+            <td class="numero">100 kg/h</td>
+            <td class="numero verde">3.6 h (3h 34m)</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Impresión</td>
+            <td class="numero">356 kg</td>
+            <td class="numero">80 kg/h</td>
+            <td class="numero azul">4.5 h (4h 28m)</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Refilado</td>
+            <td class="numero">13,400 und</td>
+            <td class="numero">1200 und/h</td>
+            <td class="numero azul">11.2 h (11h 10m)</td>
+          </tr>
+          <tr>
+            <td>Sellado</td>
+            <td class="numero">13,400 und</td>
+            <td class="numero">1750 und/h</td>
+            <td class="numero verde">7.7 h (7h 39m)</td>
+          </tr>
+          <tr style="background: #F9FAFB; font-weight: 700;">
+            <td colspan="3">Total estimado</td>
+            <td class="numero">27.0 h (1d 3h)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="nota">
+        <strong>✓ Mejora implementada:</strong> Ahora se muestran los tiempos de <b>impresión</b> y <b>refilado</b> 
+        que antes faltaban. La medida viene del SKU maestro (89 cm) en lugar del reporte.
+      </div>
+    </div>
+  </div>
+
+  <!-- EJEMPLO 2: BOLSA ALIMENTOS -->
+  <div class="ejemplo">
+    <h2>
+      <span>🔎 Trazabilidad</span>
+      <span class="badge">📏 53 cm</span>
+      <span class="badge green">✓ Lámina impresa</span>
+    </h2>
+    <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">
+      BOLSA COCO RALLADO 1KG LEVAPAN
+    </div>
+    <div style="font-size: 13px; color: var(--text-dim);">
+      Código SIESA: <span class="numero">5030XXX</span> | Fecha: 10/09/2026
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="label">Producción</div>
+        <div class="value verde">8,500 Unidades</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Peso estimado</div>
+        <div class="value azul">≈ 102 kg</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Merma</div>
+        <div class="value rojo">≈ 3 kg</div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <h3>⏱️ Cadena productiva completa</h3>
+      <p style="font-size: 12px; color: var(--text-dim); margin: 5px 0;">
+        Medida de lámina: <b class="azul">53 cm</b> (Transparente) | 
+        Base kg = <b>105 kg</b>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>PROCESO</th>
+            <th>CANTIDAD</th>
+            <th>META</th>
+            <th>TIEMPO ESTIMADO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Extrusión</td>
+            <td class="numero">105 kg</td>
+            <td class="numero">100 kg/h</td>
+            <td class="numero verde">1.1 h (1h 3m)</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Impresión</td>
+            <td class="numero">105 kg</td>
+            <td class="numero">80 kg/h</td>
+            <td class="numero azul">1.3 h (1h 19m)</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Refilado</td>
+            <td class="numero">8,500 und</td>
+            <td class="numero">1200 und/h</td>
+            <td class="numero azul">7.1 h (7h 5m)</td>
+          </tr>
+          <tr>
+            <td>Sellado</td>
+            <td class="numero">8,500 und</td>
+            <td class="numero">1750 und/h</td>
+            <td class="numero verde">4.9 h (4h 51m)</td>
+          </tr>
+          <tr style="background: #F9FAFB; font-weight: 700;">
+            <td colspan="3">Total estimado</td>
+            <td class="numero">14.4 h (14h 18m)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EJEMPLO 3: BOLSA ABIERTA CONSTRUCCIÓN -->
+  <div class="ejemplo">
+    <h2>
+      <span>🔎 Trazabilidad</span>
+      <span class="badge">📏 100 cm</span>
+      <span class="badge amber">Semitubular blanco</span>
+    </h2>
+    <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">
+      BOLSA AB PEGANTE 25KG PEGOMAX
+    </div>
+    <div style="font-size: 13px; color: var(--text-dim);">
+      Código SIESA: <span class="numero">5020156</span> | Fecha: 12/09/2026
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="label">Producción</div>
+        <div class="value verde">2,400 Unidades</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Peso estimado</div>
+        <div class="value azul">≈ 120 kg</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Merma</div>
+        <div class="value rojo">≈ 4 kg</div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <h3>⏱️ Cadena productiva completa</h3>
+      <p style="font-size: 12px; color: var(--text-dim); margin: 5px 0;">
+        Medida de lámina: <b class="azul">100 cm</b> (Semitubular blanco) | 
+        Base kg = <b>124 kg</b>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>PROCESO</th>
+            <th>CANTIDAD</th>
+            <th>META</th>
+            <th>TIEMPO ESTIMADO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Extrusión</td>
+            <td class="numero">124 kg</td>
+            <td class="numero">100 kg/h</td>
+            <td class="numero verde">1.2 h (1h 14m)</td>
+          </tr>
+          <tr style="background: #F9FAFB;">
+            <td colspan="3">❌ Sin impresión</td>
+            <td class="numero" style="color: var(--text-dim);">—</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Refilado</td>
+            <td class="numero">2,400 und</td>
+            <td class="numero">1200 und/h</td>
+            <td class="numero azul">2.0 h (2h 0m)</td>
+          </tr>
+          <tr>
+            <td>Sellado</td>
+            <td class="numero">2,400 und</td>
+            <td class="numero">1750 und/h</td>
+            <td class="numero verde">1.4 h (1h 23m)</td>
+          </tr>
+          <tr style="background: #F9FAFB; font-weight: 700;">
+            <td colspan="3">Total estimado</td>
+            <td class="numero">4.6 h (4h 37m)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="nota">
+        <strong>ℹ️ Caso especial:</strong> Bolsa abierta sin impresión. Solo se muestran extrusión, refilado y sellado.
+      </div>
+    </div>
+  </div>
+
+  <!-- EJEMPLO 4: BOLSA VALVULADA -->
+  <div class="ejemplo">
+    <h2>
+      <span>🔎 Trazabilidad</span>
+      <span class="badge">📏 115 cm</span>
+      <span class="badge amber">Semitubular blanco</span>
+    </h2>
+    <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">
+      BOLSA VALVULADA PEGANTE 40KG PEGOMAX
+    </div>
+    <div style="font-size: 13px; color: var(--text-dim);">
+      Código SIESA: <span class="numero">5020226</span> | Fecha: 13/09/2026
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="label">Producción</div>
+        <div class="value verde">1,850 Unidades</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Peso estimado</div>
+        <div class="value azul">≈ 148 kg</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Merma</div>
+        <div class="value rojo">≈ 5 kg</div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <h3>⏱️ Cadena productiva completa</h3>
+      <p style="font-size: 12px; color: var(--text-dim); margin: 5px 0;">
+        Medida de lámina: <b class="azul">115 cm</b> (Semitubular blanco) | 
+        Base kg = <b>153 kg</b>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>PROCESO</th>
+            <th>CANTIDAD</th>
+            <th>META</th>
+            <th>TIEMPO ESTIMADO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Extrusión</td>
+            <td class="numero">153 kg</td>
+            <td class="numero">100 kg/h</td>
+            <td class="numero verde">1.5 h (1h 32m)</td>
+          </tr>
+          <tr style="background: #F9FAFB;">
+            <td colspan="3">❌ Sin impresión</td>
+            <td class="numero" style="color: var(--text-dim);">—</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Refilado</td>
+            <td class="numero">1,850 und</td>
+            <td class="numero">1200 und/h</td>
+            <td class="numero azul">1.5 h (1h 32m)</td>
+          </tr>
+          <tr>
+            <td>Sellado (+ válvula)</td>
+            <td class="numero">1,850 und</td>
+            <td class="numero">1750 und/h</td>
+            <td class="numero verde">1.1 h (1h 4m)</td>
+          </tr>
+          <tr style="background: #F9FAFB; font-weight: 700;">
+            <td colspan="3">Total estimado</td>
+            <td class="numero">4.1 h (4h 8m)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EJEMPLO 5: CASO SIN SKU MAESTRO -->
+  <div class="ejemplo">
+    <h2>
+      <span>🔎 Trazabilidad</span>
+      <span class="badge" style="background: #9CA3AF;">📏 Medida no configurada</span>
+    </h2>
+    <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">
+      PRODUCTO SIN SKU MAESTRO
+    </div>
+    <div style="font-size: 13px; color: var(--text-dim);">
+      Código SIESA: <span class="numero">5999999</span> | Fecha: 14/09/2026
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="label">Producción</div>
+        <div class="value verde">5,000 Unidades</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Peso estimado</div>
+        <div class="value azul">≈ 200 kg</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Merma</div>
+        <div class="value rojo">≈ 6 kg</div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <h3>⏱️ Cadena productiva completa</h3>
+      <p style="font-size: 12px; color: var(--text-dim); margin: 5px 0;">
+        Medida de lámina: <b style="color: var(--text-dim);">No configurada en SKU maestro</b> | 
+        Base kg = <b>206 kg</b>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>PROCESO</th>
+            <th>CANTIDAD</th>
+            <th>META</th>
+            <th>TIEMPO ESTIMADO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Extrusión</td>
+            <td class="numero">206 kg</td>
+            <td class="numero">100 kg/h</td>
+            <td class="numero verde">2.1 h (2h 4m)</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Impresión</td>
+            <td class="numero">206 kg</td>
+            <td class="numero">80 kg/h</td>
+            <td class="numero azul">2.6 h (2h 34m)</td>
+          </tr>
+          <tr style="background: #EFF6FF;">
+            <td>Refilado</td>
+            <td class="numero">5,000 und</td>
+            <td class="numero">1200 und/h</td>
+            <td class="numero azul">4.2 h (4h 10m)</td>
+          </tr>
+          <tr>
+            <td>Sellado</td>
+            <td class="numero">5,000 und</td>
+            <td class="numero">1750 und/h</td>
+            <td class="numero verde">2.9 h (2h 51m)</td>
+          </tr>
+          <tr style="background: #F9FAFB; font-weight: 700;">
+            <td colspan="3">Total estimado</td>
+            <td class="numero">11.8 h (11h 39m)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="nota">
+        <strong>⚠️ Atención:</strong> Este producto no tiene configurada la medida en el SKU maestro. 
+        Se recomienda agregarla en <b>Administración → Códigos SKU</b> para trazabilidad completa.
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUMEN DE CAMBIOS -->
+  <div class="ejemplo" style="background: #F0F9FF; border-color: var(--brand-blue);">
+    <h2 style="color: var(--brand-blue);">
+      ✅ Resumen de mejoras implementadas
+    </h2>
+    <ul style="line-height: 1.8;">
+      <li><strong>Badge visual con medida de lámina</strong> en el título (📏 XX cm)</li>
+      <li><strong>Medida correcta</strong> tomada del SKU maestro en lugar del reporte</li>
+      <li><strong>Tabla completa de tiempos</strong> con todos los procesos (extrusión, impresión, refilado, sellado)</li>
+      <li><strong>Cálculo automático</strong> de tiempos de impresión y refilado que antes faltaban</li>
+      <li><strong>Identificación visual</strong> de procesos que no aplican (sin impresión, sin refilado)</li>
+      <li><strong>Total de tiempo estimado</strong> para completar la cadena productiva</li>
+      <li><strong>Soporte para casos sin SKU maestro</strong> con aviso de configuración pendiente</li>
+    </ul>
+    
+    <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 8px; border: 2px dashed var(--brand-blue);">
+      <h3 style="margin-top: 0; color: var(--brand-blue);">🔧 Cambios técnicos realizados:</h3>
+      <ol style="font-size: 13px; line-height: 1.8;">
+        <li>Modificada función <code>laminaConsumoInfo()</code> en <code>calculos.js</code> para priorizar <code>mm.med</code> del SKU maestro</li>
+        <li>Agregado cálculo de tiempos de impresión y refilado en el modal de detalle</li>
+        <li>Badge visual con la medida en el título del modal</li>
+        <li>Tabla expandida con fila de total</li>
+        <li>Código para detectar productos sin SKU maestro y mostrar aviso</li>
+      </ol>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
