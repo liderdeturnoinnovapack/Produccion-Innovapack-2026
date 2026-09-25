@@ -177,14 +177,14 @@ td {
   try {
     document.getElementById('loading').innerHTML = '⏳ Cargando módulos compartidos...';
     
-    // Cargar módulos en orden
-    await loadScript('../shared/data.js');
+    // Cargar módulos en orden (rutas correctas desde la raíz)
+    await loadScript('shared/data.js');
     console.log('✅ data.js cargado');
     
-    await loadScript('../shared/config.js');
+    await loadScript('shared/config.js');
     console.log('✅ config.js cargado');
     
-    await loadScript('../shared/calculos.js');
+    await loadScript('shared/calculos.js');
     console.log('✅ calculos.js cargado');
     
     // Verificar que la función existe
