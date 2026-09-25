@@ -504,12 +504,13 @@ function inventarioBodegaPT(reports, okSet){
       g.unidades=Math.max(0, g.unidades+signo*cant);
       g.kg=Math.max(0, g.kg+signo*cant*pu2);
     }
-  });  // + toda la producción confirmada (sin filtro de fecha de corte)
+  });  // + toda la producción confirmada (sin filtro de fecha de corte) - TODAS las referencias
   (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;
     if(okSet && !okSet.has(reporteId(r))) return;
     var iso=getFechaISO(r); if(!iso) return;
-    var g=ens(r.siesa||r.sku, r.referencia); if(!g) return;
+    var siesa=r.siesa||r.sku; if(!siesa) return;
+    var g=ens(siesa, r.referencia); if(!g) return;
     var unidad=String(r.unidad||'').toLowerCase(), prod=Number(r.produccion)||0;
     if(unidad.indexOf('kg')===0) g.kg+=prod; else { g.unidades+=prod; g.kg+=produccionKg(r); }
     g.reportes++; if(iso>g.ultima) g.ultima=iso;
