@@ -461,12 +461,10 @@ function laminaConsumoInfo(reports){
   return { byReport: byReport, byRef: agg };
 }
 
-/* Inventario de PRODUCTO TERMINADO en bodega = inventario físico del corte (17/07,
-   TODO lo real a esa fecha) + producción confirmada en SIESA POSTERIOR al corte.
-   Agrupado por referencia. Fuente de la Bodega de Inventario y de la disponibilidad
-   en Despachos. Así aparecen también las referencias que solo están en el corte. */
+/* Inventario de PRODUCTO TERMINADO - HISTORIAL COMPLETO. Muestra TODAS las referencias
+   con código SIESA que se han producido alguna vez (sin filtro de fecha, sin depender
+   del inventario del corte). Agrupado por código SIESA. */
 function inventarioBodegaPT(reports, okSet){
-  var corte=cortePT();
   var P=loadPesos(), cls=loadClasificacion(), map={};
   function ens(siesa, ref){
     var k=String(siesa||'').trim(); if(!k) return null;
@@ -474,37 +472,7 @@ function inventarioBodegaPT(reports, okSet){
     else if(ref && !map[k].referencia) map[k].referencia=ref;
     return map[k];
   }
-  // Base: inventario físico del corte (todo lo real al corte, ya conciliado)
-  ((window.INVENTARIO_BASE||{}).pt||[]).forEach(function(x){
-    var g=ens(x.siesa, x.referencia); if(!g) return;
-    var enKg=/l[aá]mina|rollo|termo/i.test(g.categoria||'');
-    var pu=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:x.referencia},P)||0;
-    if(enKg){ g.kg+=Number(x.und)||0; } else { g.unidades+=Number(x.und)||0; g.kg+=(Number(x.und)||0)*pu; }
-    g.desdeCorte=true; if(!g.ultima) g.ultima=corte;
-  });
-  // Ajustes manuales (solo admin): 'salida' resta, 'entrada' suma. Sin sentido = salida (compat).
-  // Una ENTRADA puede CREAR la referencia si no estaba en bodega (reintegro de producción
-  // anterior al corte no contada). La cantidad se interpreta en KG para productos que se
-  // miden en kg (lámina/rollo/termoencogible) y en UNIDADES para el resto.
-  loadAjustes().forEach(function(a){
-    var sk=String(a.siesa||'').trim(); if(!sk) return;
-    var g=map[sk];
-    if(!g){
-      if(a.sentido!=='entrada') return; // no hay nada que restar de algo inexistente
-      g=ens(sk, a.referencia); if(!g) return;
-      if(a.fecha && a.fecha>g.ultima) g.ultima=a.fecha;
-    }
-    var cant=Number(a.cantidad)||0;
-    var signo=(a.sentido==='entrada')?1:-1;
-    var enKg=/l[aá]mina|rollo|termo/i.test(g.categoria||'');
-    if(enKg){
-      g.kg=Math.max(0, g.kg+signo*cant);            // se mide en kg: la cantidad ES kg
-    } else {
-      var pu2=pesoUnidad({siesa:g.siesa,sku:g.siesa,referencia:g.referencia},P)||0;
-      g.unidades=Math.max(0, g.unidades+signo*cant);
-      g.kg=Math.max(0, g.kg+signo*cant*pu2);
-    }
-  });  // + toda la producción confirmada (sin filtro de fecha de corte) - TODAS las referencias
+  // Recorrer TODOS los reportes con SIESA (historial completo, sin filtro de fecha)
   (reports||[]).forEach(function(r){
     if(!requiereSiesa(r)) return;
     if(okSet && !okSet.has(reporteId(r))) return;
