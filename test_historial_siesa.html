@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEST: Historial SIESA Completo</title>
+<style>
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+  background: #F5F5F5;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+h1 {
+  color: #0091C7;
+  border-bottom: 3px solid #7CB342;
+  padding-bottom: 10px;
+}
+.info {
+  background: #EFF6FF;
+  border-left: 4px solid #0091C7;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 8px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin: 20px 0;
+}
+.stat {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+}
+.stat-label {
+  font-size: 12px;
+  color: #6B7280;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0091C7;
+  font-family: 'Courier New', monospace;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  font-size: 13px;
+}
+th {
+  background: #F3F4F6;
+  padding: 12px 10px;
+  text-align: left;
+  font-weight: 700;
+  border-bottom: 2px solid #E5E7EB;
+  position: sticky;
+  top: 0;
+}
+td {
+  padding: 10px;
+  border-bottom: 1px solid #E5E7EB;
+}
+.numero {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #6B7280;
+  font-size: 18px;
+}
+.error {
+  background: #FEE2E2;
+  border-left: 4px solid #EF4444;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 8px;
+  color: #991B1B;
+}
+.success {
+  background: #D1FAE5;
+  border-left: 4px solid #10B981;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 8px;
+  color: #065F46;
+}
+.scroll-container {
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+.highlight {
+  background: #FEF3C7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧪 TEST: Historial Completo SIESA (sin cache)</h1>
+  
+  <div class="info">
+    <strong>🎯 Propósito:</strong> Cargar los datos directamente desde el servidor 
+    con <code>cache-busting</code> para verificar que la nueva función 
+    <code>historialCompletoSIESA()</code> está funcionando correctamente.
+  </div>
+
+  <div id="loading" class="loading">
+    ⏳ Cargando datos del servidor...
+  </div>
+
+  <div id="content" style="display:none;">
+    <div id="result"></div>
+    
+    <div class="stats" id="stats"></div>
+
+    <div class="scroll-container">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Código SIESA</th>
+            <th>Referencia</th>
+            <th>Categoría</th>
+            <th>Unidades</th>
+            <th>Peso (kg)</th>
+            <th>Reportes</th>
+            <th>Última prod.</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Cargar módulos con cache busting timestamp -->
+<script>
+  const timestamp = new Date().getTime();
+  console.log('🔄 Cache busting timestamp:', timestamp);
+</script>
+<script src="../shared/data.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/calculos.js"></script>
+
+<script>
+(async function(){
+  try {
+    // Esperar a que los módulos carguen
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    console.log('✅ Módulos cargados');
+    console.log('📊 Verificando función historialCompletoSIESA:', typeof historialCompletoSIESA);
+    
+    if(typeof historialCompletoSIESA !== 'function'){
+      throw new Error('La función historialCompletoSIESA() no está disponible');
+    }
+
+    // Cargar reportes desde el servidor
+    const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbx_3uDL5WsMDmGqSuRWz4SJVLUXPBs_PrGBxv3-2vZPkb4DQ5_Xv5eBvVBVz8jFk1oE/exec';
+    
+    document.getElementById('loading').innerHTML = '⏳ Descargando reportes del Google Sheet...';
+    
+    const response = await fetch(SHEETS_URL + '?tipo=reportes&_=' + timestamp);
+    if(!response.ok) throw new Error('Error al cargar reportes: ' + response.status);
+    
+    const data = await response.json();
+    console.log('📥 Reportes recibidos:', data.reportes?.length || 0);
+    
+    const reports = data.reportes || [];
+    
+    // Ejecutar la función
+    console.log('🔧 Ejecutando historialCompletoSIESA...');
+    const resultado = historialCompletoSIESA(reports, null);
+    console.log('✅ Resultado:', resultado.length, 'referencias');
+    
+    // Estadísticas
+    const totalRefs = resultado.length;
+    const totalUnd = resultado.reduce((s,x) => s + (x.unidades||0), 0);
+    const totalKg = resultado.reduce((s,x) => s + (x.kg||0), 0);
+    const totalReportes = resultado.reduce((s,x) => s + (x.reportes||0), 0);
+    
+    // Mostrar resultado
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    
+    if(totalRefs > 122){
+      document.getElementById('result').innerHTML = `
+        <div class="success">
+          <strong>✅ ¡FUNCIONA!</strong> La función está retornando <span class="highlight">${totalRefs} referencias</span>,
+          mucho más que las 122 anteriores. El problema era definitivamente el cache del navegador.
+        </div>
+      `;
+    } else if(totalRefs === 122){
+      document.getElementById('result').innerHTML = `
+        <div class="error">
+          <strong>⚠️ Sigue mostrando solo 122 referencias</strong><br>
+          Esto indica que los reportes en el Google Sheet solo tienen 122 códigos SIESA distintos,
+          o que hay un filtro activo que no hemos identificado.
+        </div>
+      `;
+    } else {
+      document.getElementById('result').innerHTML = `
+        <div class="error">
+          <strong>❌ Error:</strong> La función retorna ${totalRefs} referencias, menos de las esperadas.
+        </div>
+      `;
+    }
+    
+    // Stats
+    document.getElementById('stats').innerHTML = `
+      <div class="stat">
+        <div class="stat-label">Referencias</div>
+        <div class="stat-value">${totalRefs.toLocaleString()}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Unidades</div>
+        <div class="stat-value">${Math.round(totalUnd).toLocaleString()}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Peso (kg)</div>
+        <div class="stat-value">${Math.round(totalKg).toLocaleString()}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Reportes</div>
+        <div class="stat-value">${totalReportes.toLocaleString()}</div>
+      </div>
+    `;
+    
+    // Tabla
+    let html = '';
+    resultado.slice(0, 100).forEach((x, i) => {
+      const fecha = x.ultima ? x.ultima.split('-').reverse().join('/') : '-';
+      html += `
+        <tr>
+          <td>${i+1}</td>
+          <td class="numero">${x.siesa || '-'}</td>
+          <td>${x.referencia || '-'}</td>
+          <td>${x.categoria || '-'}</td>
+          <td class="numero">${(x.unidades||0).toLocaleString()}</td>
+          <td class="numero">${Math.round(x.kg||0).toLocaleString()}</td>
+          <td class="numero">${x.reportes||0}</td>
+          <td class="numero">${fecha}</td>
+        </tr>
+      `;
+    });
+    
+    if(resultado.length > 100){
+      html += `
+        <tr>
+          <td colspan="8" style="text-align:center; padding:20px; color:#6B7280;">
+            <strong>... ${resultado.length - 100} referencias más ...</strong>
+            <br><span style="font-size:12px;">(Mostrando solo las primeras 100)</span>
+          </td>
+        </tr>
+      `;
+    }
+    
+    document.getElementById('tableBody').innerHTML = html;
+    
+    // Log detallado
+    console.log('📊 Detalle de las primeras 10 referencias:');
+    resultado.slice(0, 10).forEach(x => {
+      console.log(`  ${x.siesa} - ${x.referencia}: ${x.unidades} und, ${Math.round(x.kg)} kg (${x.reportes} reportes)`);
+    });
+    
+  } catch(error){
+    console.error('❌ Error:', error);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    document.getElementById('result').innerHTML = `
+      <div class="error">
+        <strong>❌ Error al cargar:</strong><br>
+        ${error.message}
+        <br><br>
+        <small>Revisa la consola del navegador (F12) para más detalles.</small>
+      </div>
+    `;
+  }
+})();
+</script>
+
+</body>
+</html>
