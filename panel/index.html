@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260827h"></script>
-<script src="../shared/config.js?v=20260827h"></script>
-<script src="../shared/inventario_base.js?v=20260827h"></script>
-<script src="../shared/sku_maestro.js?v=20260827h"></script>
-<script src="../shared/calculos.js?v=20260827h"></script>
+<script src="../shared/data.js?v=20260827i"></script>
+<script src="../shared/config.js?v=20260827i"></script>
+<script src="../shared/inventario_base.js?v=20260827i"></script>
+<script src="../shared/sku_maestro.js?v=20260827i"></script>
+<script src="../shared/calculos.js?v=20260827i"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -3160,8 +3160,8 @@ function BodegaInventario({reports, okSet, puedeEditar}){
   const [ver,setVer]=useState(0);
   const sort=useSort('unidades','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
-  // Inventario completo de SIESA (sin filtro de fecha de corte).
-  const invAll=inventarioBodegaPT(reports, okSet); ver;
+  // Historial completo de SIESA (sin filtro de fecha - función dedicada)
+  const invAll=historialCompletoSIESA(reports, okSet);
   const corteTxt=(cortePT()||'').split('-').reverse().slice(0,2).join('/'); // dd/mm del corte de PT vigente
   const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
   const sectores=["Todos",...new Set(invAll.map(x=>x.sector).filter(s=>s&&s!=="-"))].sort();

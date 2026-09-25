@@ -485,6 +485,55 @@ function inventarioBodegaPT(reports, okSet){
   });
   return Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){return b.unidades-a.unidades;});
 }
+/* HISTORIAL COMPLETO de producción SIESA - función dedicada para el panel de Ingresos.
+   Recorre TODOS los reportes con código SIESA sin filtros de fecha ni dependencias.
+   Retorna TODAS las referencias que se han producido alguna vez. */
+function historialCompletoSIESA(reports, okSet){
+  var P=loadPesos(), cls=loadClasificacion(), map={};
+  // Recorrer TODOS los reportes
+  (reports||[]).forEach(function(r){
+    // Solo producto terminado con código SIESA
+    if(!requiereSiesa(r)) return;
+    // Filtro de confirmación (si existe)
+    if(okSet && !okSet.has(reporteId(r))) return;
+    // Obtener fecha y código SIESA
+    var iso=getFechaISO(r); if(!iso) return;
+    var siesa=String(r.siesa||r.sku||'').trim(); if(!siesa) return;
+    
+    // Crear o recuperar la entrada del mapa
+    if(!map[siesa]){
+      var c=cls[siesa]||{};
+      map[siesa]={
+        siesa:siesa, 
+        referencia:r.referencia||'', 
+        categoria:c.categoria||'-', 
+        sector:c.sector||'-', 
+        unidades:0, 
+        kg:0, 
+        reportes:0, 
+        ultima:''
+      };
+    }
+    var g=map[siesa];
+    // Actualizar referencia si no existe
+    if(!g.referencia && r.referencia) g.referencia=r.referencia;
+    
+    // Sumar producción
+    var unidad=String(r.unidad||'').toLowerCase();
+    var prod=Number(r.produccion)||0;
+    if(unidad.indexOf('kg')===0){
+      g.kg+=prod;
+    } else {
+      g.unidades+=prod;
+      g.kg+=produccionKg(r,P);
+    }
+    g.reportes++;
+    if(iso>g.ultima) g.ultima=iso;
+  });
+  
+  // Retornar array ordenado por unidades descendente
+  return Object.keys(map).map(function(k){return map[k];}).sort(function(a,b){return b.unidades-a.unidades;});
+}
 /* Mapa {siesa:{unidades,kg}} de disponibilidad (para Despachos). */
 function inventarioDisponible(reports, okSet){
   var map={};
