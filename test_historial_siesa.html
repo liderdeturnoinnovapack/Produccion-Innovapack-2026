@@ -159,18 +159,35 @@ td {
 <script>
   const timestamp = new Date().getTime();
   console.log('🔄 Cache busting timestamp:', timestamp);
+  
+  // Función para cargar scripts de forma secuencial
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src + '?_=' + timestamp;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
 </script>
-<script src="../shared/data.js"></script>
-<script src="../shared/config.js"></script>
-<script src="../shared/calculos.js"></script>
 
 <script>
 (async function(){
   try {
-    // Esperar a que los módulos carguen
-    await new Promise(resolve => setTimeout(resolve, 500));
+    document.getElementById('loading').innerHTML = '⏳ Cargando módulos compartidos...';
     
-    console.log('✅ Módulos cargados');
+    // Cargar módulos en orden
+    await loadScript('../shared/data.js');
+    console.log('✅ data.js cargado');
+    
+    await loadScript('../shared/config.js');
+    console.log('✅ config.js cargado');
+    
+    await loadScript('../shared/calculos.js');
+    console.log('✅ calculos.js cargado');
+    
+    // Verificar que la función existe
     console.log('📊 Verificando función historialCompletoSIESA:', typeof historialCompletoSIESA);
     
     if(typeof historialCompletoSIESA !== 'function'){
