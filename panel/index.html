@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260827e"></script>
-<script src="../shared/config.js?v=20260827e"></script>
-<script src="../shared/inventario_base.js?v=20260827e"></script>
-<script src="../shared/sku_maestro.js?v=20260827e"></script>
-<script src="../shared/calculos.js?v=20260827e"></script>
+<script src="../shared/data.js?v=20260827f"></script>
+<script src="../shared/config.js?v=20260827f"></script>
+<script src="../shared/inventario_base.js?v=20260827f"></script>
+<script src="../shared/sku_maestro.js?v=20260827f"></script>
+<script src="../shared/calculos.js?v=20260827f"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1705,7 +1705,7 @@ function InventarioFisico({bodega,reports}){
           <div style={{background:"var(--card)",border:"1px solid var(--line)",borderLeft:"4px solid var(--good)",borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:18}}>✅</span>
-              <div style={{fontSize:13,color:"var(--text-dim)"}}>Ingresos a SIESA al día: las <b>{totalPt}</b> referencias del corte ({fecha}) ya están cargadas. Este cuadro reaparece automáticamente cuando quede material por ingresar.</div>
+              <div style={{fontSize:13,color:"var(--text-dim)"}}>Mostrando <b>todas las {totalPt} referencias</b> ingresadas a SIESA (sin filtro de fecha). Actualmente no hay material pendiente por ingresar. Este cuadro reaparece automáticamente cuando haya pendientes.</div>
             </div>
             <button onClick={()=>setSoloPend(false)} style={{background:"var(--panel-2)",color:"var(--text-dim)",border:"1px solid var(--line)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>Ver todas ({totalPt})</button>
           </div>
@@ -1714,10 +1714,10 @@ function InventarioFisico({bodega,reports}){
     }
     return (
       <div style={{marginBottom:26}}>
-        <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📸 Ingresos a SIESA · Producto Terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(corte {fecha})</span></div>
-        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>{soloPend?<span>Solo se muestran las referencias <b>pendientes de ingreso a SIESA</b>; las ya cargadas se ocultan para mantener la vista limpia.</span>:<span>Mostrando <b>todas</b> las referencias del corte (unidades × peso por referencia; láminas/rollos/termoencogibles ya en kg).</span>} Marca <b>✓ En SIESA</b> al confirmar la carga (se guarda para todo el equipo).</div>
+        <div style={{fontSize:15,fontWeight:700,marginBottom:4,fontFamily:"var(--head)"}}>📸 Ingresos a SIESA · Producto Terminado <span style={{fontSize:12,fontWeight:500,color:"var(--text-dim)"}}>(historial completo)</span></div>
+        <div style={{fontSize:12,color:"var(--text-dim)",marginBottom:14}}>{soloPend?<span>Solo se muestran las referencias <b>pendientes de ingreso a SIESA</b>; las ya cargadas se ocultan para mantener la vista limpia.</span>:<span>Mostrando <b>todas</b> las referencias (historial completo, sin filtro de fecha; unidades × peso por referencia; láminas/rollos/termoencogibles ya en kg).</span>} Marca <b>✓ En SIESA</b> al confirmar la carga (se guarda para todo el equipo).</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
-          <InvCard label="Referencias (corte)" value={totalPt.toLocaleString()} color="var(--accent)"/>
+          <InvCard label="Referencias totales" value={totalPt.toLocaleString()} color="var(--accent)"/>
           <InvCard label="Existencia real" value={Math.round(tU).toLocaleString()+" und"} color="var(--good)"/>
           <InvCard label="Peso aprox." value={"≈ "+Math.round(tK).toLocaleString()+" kg"} color="var(--good)"/>
           <InvCard label="Pendientes por ingresar" value={pendCount.toLocaleString()} color={pendCount===0?"var(--good)":"var(--amber)"} sub={pendCount===0?"¡Todo en SIESA!":okCount+" / "+totalPt+" cargados"}/>
@@ -3160,7 +3160,7 @@ function BodegaInventario({reports, okSet, puedeEditar}){
   const [ver,setVer]=useState(0);
   const sort=useSort('unidades','desc');
   const selStyle={...inputStyle,fontSize:12,padding:"7px 10px"};
-  // Inventario físico del corte + producción confirmada posterior al corte.
+  // Inventario completo de SIESA (sin filtro de fecha de corte).
   const invAll=inventarioBodegaPT(reports, okSet); ver;
   const corteTxt=(cortePT()||'').split('-').reverse().slice(0,2).join('/'); // dd/mm del corte de PT vigente
   const categorias=["Todas",...new Set(invAll.map(x=>x.categoria).filter(c=>c&&c!=="-"))].sort();
