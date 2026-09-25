@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260828a"></script>
-<script src="../shared/config.js?v=20260828a"></script>
-<script src="../shared/inventario_base.js?v=20260828a"></script>
-<script src="../shared/sku_maestro.js?v=20260828a"></script>
-<script src="../shared/calculos.js?v=20260828a"></script>
+<script src="../shared/data.js?v=20260828c"></script>
+<script src="../shared/config.js?v=20260828c"></script>
+<script src="../shared/inventario_base.js?v=20260828c"></script>
+<script src="../shared/sku_maestro.js?v=20260828c"></script>
+<script src="../shared/calculos.js?v=20260828c"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -3905,7 +3905,9 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
           ))}
         </div>
         {subBodega==='pt' && <div className="fade-in" key={"spt_"+metasVer}><InventarioFisico bodega="pt" reports={reports}/><InventarioPT reports={reports}/></div>}
-        {subBodega==='pt' && <div style={{marginTop:40}}><BodegaView reports={reports} titulo="Producto Terminado" showFiltros={true}/></div>}
+        {subBodega==='pt' && <div style={{marginTop:40}}>
+          <BodegaView reports={reports} titulo="Producto Terminado" showFiltros={true}/>
+        </div>}
         {subBodega==='pp' && <div className="fade-in" key={"spp_"+metasVer}>
           <PendientesProceso reports={reports} okSet={siesaOk} onToggle={toggleSiesa} onMarcarTodos={marcarTodosSiesa} puedeEditar={perm.editSiesa}/>
           <InventarioRollos reports={reports} okSet={siesaOk}/>
