@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260901"></script>
-<script src="../shared/config.js?v=20260901"></script>
-<script src="../shared/inventario_base.js?v=20260901"></script>
-<script src="../shared/sku_maestro.js?v=20260901"></script>
-<script src="../shared/calculos.js?v=20260901"></script>
+<script src="../shared/data.js?v=20260902a"></script>
+<script src="../shared/config.js?v=20260902a"></script>
+<script src="../shared/inventario_base.js?v=20260902a"></script>
+<script src="../shared/sku_maestro.js?v=20260902a"></script>
+<script src="../shared/calculos.js?v=20260902a"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -1402,7 +1402,16 @@ function TrazabilidadModal({siesa, reports, onClose}){
   // Peso separado por bodega: NO mezclar producto terminado con producto en proceso.
   const kgPT=rows.filter(r=>clasificarReporte(r).bodega==="Producto Terminado").reduce((s,r)=>s+produccionKg(r,p),0);
   const kgPP=rows.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso").reduce((s,r)=>s+produccionKg(r,p),0);
-  const totalMerma=rows.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  
+  // MERMA TOTAL: buscar TODOS los reportes relacionados por referencia (con o sin SIESA)
+  // para sumar las mermas de TODOS los procesos (extrusión, impresión, refilado, sellado)
+  const todosRelacionados = reports.filter(r => {
+    const refR = (r.referencia||'').trim().toUpperCase();
+    const refBuscar = ref.trim().toUpperCase();
+    // Match exacto o inclusión parcial para variantes de nombre
+    return refR && refBuscar && (refR === refBuscar || refR.includes(refBuscar) || refBuscar.includes(refR));
+  });
+  const totalMerma=todosRelacionados.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
   const fechasISO=rows.map(getFechaISO).filter(Boolean).sort();
   const rango=fechasISO.length?`${fechaLarga(fechasISO[0])} → ${fechaLarga(fechasISO[fechasISO.length-1])}`:"-";
   
