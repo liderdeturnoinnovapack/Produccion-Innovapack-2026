@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba: Merma Completa por Referencia</title>
+<style>
+body{font-family:'Segoe UI',sans-serif;padding:20px;background:#f5f5f5;}
+.container{max-width:1000px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+h1{color:#0091C7;border-bottom:3px solid #7CB342;padding-bottom:10px;}
+.ejemplo{background:#EFF6FF;border-left:4px solid #0091C7;padding:15px;margin:20px 0;border-radius:8px;}
+.problema{background:#FEE2E2;border-left:4px solid #EF4444;padding:15px;margin:20px 0;border-radius:8px;}
+.solucion{background:#D1FAE5;border-left:4px solid #10B981;padding:15px;margin:20px 0;border-radius:8px;}
+table{width:100%;border-collapse:collapse;margin:15px 0;font-size:13px;}
+th{background:#F3F4F6;padding:10px;text-align:left;font-weight:700;border-bottom:2px solid #E5E7EB;}
+td{padding:10px;border-bottom:1px solid #E5E7EB;}
+.numero{font-family:'Courier New',monospace;font-weight:600;}
+.merma{color:#EF4444;font-weight:700;}
+.good{color:#10B981;font-weight:700;}
+code{background:#F3F4F6;padding:2px 6px;border-radius:4px;font-size:12px;}
+.highlight{background:#FEF3C7;padding:2px 6px;border-radius:4px;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧪 Prueba: Cálculo Correcto de Merma Total</h1>
+  
+  <div class="ejemplo">
+    <strong>📦 Ejemplo:</strong> BOLSA FLOW PACK BOQUILLA SAN MIGUEL (Código SIESA: 5948094)
+  </div>
+
+  <h2>❌ Problema Actual</h2>
+  <div class="problema">
+    El modal de trazabilidad solo suma las mermas del <strong>producto terminado final</strong> (sellado),
+    pero <strong>NO suma las mermas de los procesos intermedios</strong> (extrusión, impresión, refilado)
+    que NO tienen código SIESA porque son producto en proceso.
+  </div>
+
+  <h3>Reportes de ejemplo (simplificado):</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Proceso</th>
+        <th>Máquina</th>
+        <th>SIESA</th>
+        <th>Referencia</th>
+        <th>Producción</th>
+        <th>Merma (kg)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Extrusión</td>
+        <td>Extrusora 2</td>
+        <td><span style="color:#9CA3AF;">—</span></td>
+        <td>FLOW PACK SAN MIGUEL</td>
+        <td class="numero">770 kg</td>
+        <td class="numero merma">40 kg</td>
+      </tr>
+      <tr>
+        <td>Impresión</td>
+        <td>Impresora</td>
+        <td><span style="color:#9CA3AF;">—</span></td>
+        <td>FLOW PACK SAN MIGUEL</td>
+        <td class="numero">360 kg</td>
+        <td class="numero merma">15 kg</td>
+      </tr>
+      <tr>
+        <td>Refilado</td>
+        <td>Refiladora</td>
+        <td><span style="color:#9CA3AF;">—</span></td>
+        <td>FLOW PACK SAN MIGUEL</td>
+        <td class="numero">302 kg</td>
+        <td class="numero merma">47 kg</td>
+      </tr>
+      <tr style="background:#FEF3C7;">
+        <td><strong>Sellado (PT)</strong></td>
+        <td>Selladora 1</td>
+        <td class="numero"><strong>5948094</strong></td>
+        <td>FLOW PACK SAN MIGUEL</td>
+        <td class="numero">20,000 und</td>
+        <td class="numero merma"><strong>6 kg</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>🔴 Cálculo ACTUAL (incorrecto):</h3>
+  <div style="background:#FEE2E2;padding:15px;border-radius:8px;margin:15px 0;">
+    <code>const totalMerma = rows.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);</code>
+    <br><br>
+    Donde <code>rows = reports.filter(r=>(r.siesa===siesa||r.sku===siesa))</code>
+    <br><br>
+    <strong>Resultado:</strong> Solo suma el reporte con SIESA = 5948094 (sellado)
+    <br>
+    <span class="merma">Merma total mostrada: 6 kg</span> ❌
+  </div>
+
+  <h2>✅ Solución Correcta</h2>
+  <div class="solucion">
+    Buscar <strong>TODOS los reportes relacionados por referencia</strong>, incluso los que NO tienen código SIESA
+    (producto en proceso), y sumar TODAS las mermas.
+  </div>
+
+  <h3>🟢 Cálculo CORRECTO (propuesto):</h3>
+  <div style="background:#D1FAE5;padding:15px;border-radius:8px;margin:15px 0;">
+    <strong>Paso 1:</strong> Obtener la referencia del producto terminado
+    <br>
+    <code>const ref = rows[0].referencia; // "FLOW PACK SAN MIGUEL"</code>
+    <br><br>
+    
+    <strong>Paso 2:</strong> Buscar TODOS los reportes con esa referencia (con o sin SIESA)
+    <br>
+    <code>const todosReportes = reports.filter(r => {
+  const refLimpia = (r.referencia||'').trim().toUpperCase();
+  const buscar = ref.trim().toUpperCase();
+  return refLimpia === buscar || refLimpia.includes(buscar) || buscar.includes(refLimpia);
+});</code>
+    <br><br>
+    
+    <strong>Paso 3:</strong> Sumar SOLO las mermas de todos esos reportes
+    <br>
+    <code>const totalMerma = todosReportes.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);</code>
+    <br><br>
+    
+    <strong>Resultado:</strong>
+    <br>
+    <span class="good">Merma total: 40 + 15 + 47 + 6 = 108 kg</span> ✅
+  </div>
+
+  <h2>📊 Comparación de Resultados</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Método</th>
+        <th>Reportes considerados</th>
+        <th>Merma calculada</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#FEE2E2;">
+        <td><strong>ACTUAL</strong></td>
+        <td class="numero">1 (solo sellado)</td>
+        <td class="numero merma">6 kg</td>
+        <td>❌ Incorrecto</td>
+      </tr>
+      <tr style="background:#D1FAE5;">
+        <td><strong>PROPUESTO</strong></td>
+        <td class="numero">4 (todos los procesos)</td>
+        <td class="numero good">108 kg</td>
+        <td>✅ Correcto</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>⚙️ Implementación</h2>
+  <div style="background:#F3F4F6;padding:15px;border-radius:8px;margin:15px 0;overflow-x:auto;">
+    <strong>Cambio en <code>TrazabilidadModal</code> (línea ~1405):</strong>
+    <pre style="margin:10px 0;"><code>// ❌ ANTES (solo reportes con SIESA)
+const rows = reports.filter(r=>(r.siesa===siesa||r.sku===siesa));
+const totalMerma = rows.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+
+// ✅ DESPUÉS (todos los reportes de la referencia)
+const rows = reports.filter(r=>(r.siesa===siesa||r.sku===siesa));
+const ref = rows.length ? rows[0].referencia : siesa;
+
+// Buscar TODOS los reportes relacionados por referencia (con o sin SIESA)
+const todosRelacionados = reports.filter(r => {
+  const refR = (r.referencia||'').trim().toUpperCase();
+  const refBuscar = ref.trim().toUpperCase();
+  // Match exacto o inclusión parcial para variantes de nombre
+  return refR === refBuscar || 
+         (refR && refBuscar && (refR.includes(refBuscar) || refBuscar.includes(refR)));
+});
+
+// Sumar TODAS las mermas (procesos intermedios + producto terminado)
+const totalMerma = todosRelacionados.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);</code></pre>
+  </div>
+
+  <h2>🎯 Resultado Esperado</h2>
+  <div class="solucion">
+    <strong>✅ El modal mostrará:</strong>
+    <ul style="margin:10px 0;">
+      <li><strong>Merma:</strong> 108 kg (suma de TODOS los procesos)</li>
+      <li><strong>Reportes:</strong> 2 o 4 (dependiendo si solo cuenta PT o todos)</li>
+      <li><strong>Nota:</strong> Los "Reportes" pueden seguir mostrando solo los de PT (con SIESA), pero la MERMA debe sumar TODOS</li>
+    </ul>
+  </div>
+
+  <h2>⚠️ Consideración Importante</h2>
+  <div class="ejemplo">
+    <strong>Los kg producidos NO se suman entre procesos</strong> porque cada proceso transforma el material:
+    <ul style="margin:10px 0;">
+      <li>Extrusión: produce 770 kg de lámina</li>
+      <li>Impresión: consume lámina y produce 360 kg de lámina impresa</li>
+      <li>Refilado: consume lámina impresa y produce 302 kg de lámina doblada</li>
+      <li>Sellado: consume lámina doblada y produce 20,000 bolsas</li>
+    </ul>
+    <br>
+    <strong>Pero las MERMAS SÍ se suman</strong> porque son pérdidas acumuladas en cada etapa:
+    <br>
+    40 kg (extrusión) + 15 kg (impresión) + 47 kg (refilado) + 6 kg (sellado) = <span class="highlight">108 kg de merma total</span>
+  </div>
+
+</div>
+</body>
+</html>
