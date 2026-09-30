@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20260903a</title>
+<title>Panel de Producción · Innovapack v20260903b</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260903a"></script>
-<script src="../shared/config.js?v=20260903a"></script>
-<script src="../shared/inventario_base.js?v=20260903a"></script>
-<script src="../shared/sku_maestro.js?v=20260903a"></script>
-<script src="../shared/calculos.js?v=20260903a"></script>
+<script src="../shared/data.js?v=20260903b"></script>
+<script src="../shared/config.js?v=20260903b"></script>
+<script src="../shared/inventario_base.js?v=20260903b"></script>
+<script src="../shared/sku_maestro.js?v=20260903b"></script>
+<script src="../shared/calculos.js?v=20260903b"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -2092,15 +2092,36 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   }
   
   // Totales de producción, merma y lámina
-  let totalProd = 0, totalProdKg = 0, totalMermaKg = 0, totalLam = 0;
+  let totalProd = 0, totalProdKg = 0, totalLam = 0;
   reportes.forEach(r=>{
     totalProd += Number(r.produccion) || 0;
     totalProdKg += produccionKg(r);
-    totalMermaKg += mermaKg(r);
     const id = reporteId(r);
     const li = lamInfo.byReport[id];
     if(li && li.tieneLamina) totalLam += li.consumoKg || 0;
   });
+  
+  // MERMA TOTAL: buscar TODOS los reportes relacionados por referencia (incluye procesos intermedios)
+  const ref = grupo.ref || r0.referencia || '';
+  const allReports = window.reportesCache || [];
+  const todosRelacionados = allReports.filter(r => {
+    const refR = (r.referencia||'').trim().toUpperCase();
+    const refBuscar = ref.trim().toUpperCase();
+    return refR && refBuscar && (refR === refBuscar || refR.includes(refBuscar) || refBuscar.includes(refR));
+  });
+  const totalMermaKg = todosRelacionados.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  
+  // Desglose de merma por máquina
+  const mermaPorMaq = {};
+  todosRelacionados.forEach(r=>{
+    const maq = r.maquina || 'Sin máquina';
+    const merma = sumNumeros(r.mermasCantidad);
+    if(merma > 0){
+      if(!mermaPorMaq[maq]) mermaPorMaq[maq] = 0;
+      mermaPorMaq[maq] += merma;
+    }
+  });
+  const mermaPorMaqArray = Object.entries(mermaPorMaq).sort((a,b)=>b[1]-a[1]);
   
   // Acumular tiempos por máquina de todos los reportes
   const tiemposPorMaq = {};
@@ -2169,6 +2190,23 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
           </div>
         ))}
       </div>
+      
+      {totalMermaKg > 0 && todosRelacionados.length > 0 && (
+        <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:10}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:10,fontFamily:"var(--head)"}}>📊 Merma por proceso</div>
+          <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>
+            Incluye mermas de <b>todos los procesos</b> relacionados con esta referencia ({todosRelacionados.length} reportes analizados: extrusión, impresión, refilado, sellado).
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:10}}>
+            {mermaPorMaqArray.map(([maq, merma]) => (
+              <div key={maq} style={{background:"var(--card)",borderRadius:8,padding:"10px 12px",border:"1px solid var(--line)"}}>
+                <div style={{fontSize:10,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>{maq}</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:"var(--mono)",color:"var(--bad)"}}>≈ {Math.round(merma).toLocaleString()} kg</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       {procesos.length>0 && (
         <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(124,179,66,0.08)",border:"1px solid rgba(124,179,66,0.3)",borderRadius:10}}>
