@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20260903b</title>
+<title>Panel de Producción · Innovapack v20261001a</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -57,11 +57,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- Módulos compartidos (cargan ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260903b"></script>
-<script src="../shared/config.js?v=20260903b"></script>
-<script src="../shared/inventario_base.js?v=20260903b"></script>
-<script src="../shared/sku_maestro.js?v=20260903b"></script>
-<script src="../shared/calculos.js?v=20260903b"></script>
+<script src="../shared/data.js?v=20261001a"></script>
+<script src="../shared/config.js?v=20261001a"></script>
+<script src="../shared/inventario_base.js?v=20261001a"></script>
+<script src="../shared/sku_maestro.js?v=20261001a"></script>
+<script src="../shared/calculos.js?v=20261001a"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -3872,6 +3872,73 @@ function ConsumosLamina({reports}){
   );
 }
 
+/* Exportación del Informe Mensual a Excel */
+function exportarInformeExcel(datos, filename){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const wb = XLSX.utils.book_new();
+  
+  // Hoja 1: Resumen Ejecutivo
+  const resumen = [
+    ['INFORME MENSUAL DE PRODUCCIÓN'],
+    [''],
+    ['Indicador','Valor','% Cambio vs Mes Anterior'],
+    ['Reportes Generados', datos.reportes, ''],
+    ['Producción Total (kg)', fmt(datos.prodTotalKg), datos.deltaProd.toFixed(1)+'%'],
+    ['Producto Terminado (kg)', fmt(datos.prodPTKg), ''],
+    ['Producto en Proceso (kg)', fmt(datos.prodPPKg), ''],
+    ['Merma Total (kg)', fmt(datos.mermaTotal), datos.deltaMerma.toFixed(1)+'%'],
+    ['% Merma', datos.porcMerma.toFixed(1)+'%', ''],
+    ['Eficiencia Global', datos.eficiencia.toFixed(1)+'%', datos.deltaEfic.toFixed(1)+' pp'],
+    ['Tiempo Productivo (h)', fmt(datos.totalHorasProductivas), ''],
+    ['Tiempos Muertos (h)', fmt(datos.totalTM), ''],
+    ['% Tiempos Muertos', datos.porcTM.toFixed(1)+'%', '']
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(resumen);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
+  
+  // Hoja 2: Por Máquina
+  const maquinas = [['Máquina','Reportes','Prod (kg)','Prod (und)','Merma (kg)','% Merma','Eficiencia %','Rendimiento Real','Meta','% vs Meta','TM (h)','% TM']];
+  Object.values(datos.porMaquina).forEach(m => {
+    maquinas.push([m.maquina, m.reportes, fmt(m.prodKg), fmt(m.prodUnd), fmt(m.merma), m.porcMerma.toFixed(1), m.eficiencia.toFixed(1), m.rendReal.toFixed(1), m.meta, m.porcMeta.toFixed(1), m.tm.toFixed(0), m.porcTM.toFixed(1)]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(maquinas);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Por Máquina');
+  
+  // Hoja 3: Top Operarios
+  const operarios = [['#','Operario','Cargo','Producción (kg)','Eficiencia %','Reportes','Máquina Principal']];
+  datos.porOperario.forEach((op,i) => {
+    operarios.push([i+1, op.nombre, op.cargo, fmt(op.kg), op.efic.toFixed(1), op.reportes, op.maquinaPrincipal]);
+  });
+  const ws3 = XLSX.utils.aoa_to_sheet(operarios);
+  XLSX.utils.book_append_sheet(wb, ws3, 'Top Operarios');
+  
+  // Hoja 4: Motivos TM
+  const tm = [['#','Motivo','Horas','%']];
+  datos.topTMGlobal.forEach(([mot,h],i) => {
+    tm.push([i+1, mot, h.toFixed(1), (h/datos.totalTM*100).toFixed(1)]);
+  });
+  const ws4 = XLSX.utils.aoa_to_sheet(tm);
+  XLSX.utils.book_append_sheet(wb, ws4, 'Motivos TM');
+  
+  // Hoja 5: Motivos Merma
+  const merma = [['#','Motivo','Kg','%']];
+  datos.topMermaGlobal.forEach(([mot,kg],i) => {
+    merma.push([i+1, mot, fmt(kg), (kg/datos.mermaTotal*100).toFixed(1)]);
+  });
+  const ws5 = XLSX.utils.aoa_to_sheet(merma);
+  XLSX.utils.book_append_sheet(wb, ws5, 'Motivos Merma');
+  
+  // Hoja 6: Alertas
+  const alertas = [['Tipo','Descripción']];
+  datos.alertas.criticas.forEach(a => alertas.push(['CRÍTICA', a]));
+  datos.alertas.atencion.forEach(a => alertas.push(['ATENCIÓN', a]));
+  datos.alertas.fortalezas.forEach(a => alertas.push(['FORTALEZA', a]));
+  const ws6 = XLSX.utils.aoa_to_sheet(alertas);
+  XLSX.utils.book_append_sheet(wb, ws6, 'Alertas');
+  
+  XLSX.writeFile(wb, filename);
+}
+
 /* ================== PANEL (ensamblaje) ================== */
 /* Exportación reutilizable: exporta la lista que se le pase (todo o filtrado). */
 function exportReportesXLSX(list, filename){
@@ -3897,6 +3964,940 @@ function LastUpdated({ts}){
   return <span style={{fontSize:11.5,color:"var(--text-dim)",whiteSpace:"nowrap"}}>🕒 Actualizado {txt}</span>;
 }
 
+/* ================== INFORME MENSUAL ================== */
+function InformeMensual({reports}){
+  const hoy = new Date();
+  const mesActual = hoy.getMonth(); // 0-11
+  const anioActual = hoy.getFullYear();
+  const [mes, setMes] = useState(mesActual);
+  const [anio, setAnio] = useState(anioActual);
+  const [seccion, setSeccion] = useState('resumen'); // navegación por secciones
+  
+  // Filtrar reportes del mes seleccionado
+  const reportesMes = reports.filter(r => {
+    const fISO = getFechaISO(r);
+    if (!fISO) return false;
+    const [y, m] = fISO.split('-').map(Number);
+    return y === anio && m === (mes + 1);
+  });
+  
+  // Calcular mes anterior para comparativa
+  const mesAnt = mes === 0 ? 11 : mes - 1;
+  const anioAnt = mes === 0 ? anio - 1 : anio;
+  const reportesMesAnt = reports.filter(r => {
+    const fISO = getFechaISO(r);
+    if (!fISO) return false;
+    const [y, m] = fISO.split('-').map(Number);
+    return y === anioAnt && m === (mesAnt + 1);
+  });
+  
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const anios = Array.from({length: 5}, (_, i) => anioActual - 2 + i);
+  
+  if (reportesMes.length === 0) {
+    return (
+      <div style={{textAlign:'center',padding:'80px 20px'}}>
+        <div style={{fontSize:48,marginBottom:16}}>📊</div>
+        <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>No hay reportes para {meses[mes]} {anio}</div>
+        <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:24}}>Selecciona otro mes o espera a que se registren reportes</div>
+        <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
+          <select value={mes} onChange={e=>setMes(Number(e.target.value))} style={{...inputStyle,maxWidth:180}}>
+            {meses.map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>
+          <select value={anio} onChange={e=>setAnio(Number(e.target.value))} style={{...inputStyle,maxWidth:120}}>
+            {anios.map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+      </div>
+    );
+  }
+  
+  // Calcular datos del informe
+  const datos = calcularDatosInforme(reportesMes, reportesMesAnt);
+  
+  return (
+    <div>
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'20px 24px',marginBottom:24}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:16}}>
+          <div>
+            <h1 style={{margin:0,fontSize:24,fontWeight:900,fontFamily:'var(--head)'}}>📊 Informe Mensual de Producción</h1>
+            <p style={{margin:'4px 0 0',fontSize:13,color:'var(--text-dim)'}}>Análisis detallado de {meses[mes]} {anio} • {reportesMes.length} reportes</p>
+          </div>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <select value={mes} onChange={e=>setMes(Number(e.target.value))} style={{...inputStyle,maxWidth:180}}>
+              {meses.map((m,i)=><option key={i} value={i}>{m}</option>)}
+            </select>
+            <select value={anio} onChange={e=>setAnio(Number(e.target.value))} style={{...inputStyle,maxWidth:120}}>
+              {anios.map(a=><option key={a} value={a}>{a}</option>)}
+            </select>
+            <button onClick={()=>exportarInformeExcel(datos, `Informe_${meses[mes]}_${anio}.xlsx`)} style={{background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              📥 Exportar Excel
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Navegación por secciones */}
+      <div style={{display:'flex',gap:1,background:'var(--panel-2)',borderRadius:10,padding:3,border:'1px solid var(--line)',marginBottom:24,overflowX:'auto'}}>
+        {[
+          ['resumen','📊 Resumen'],
+          ['produccion','🏭 Producción'],
+          ['eficiencia','📈 Eficiencia'],
+          ['mermas','🚨 Mermas'],
+          ['tiempos','⏱️ Tiempos Muertos'],
+          ['inventario','📦 Inventario'],
+          ['comparativa','📊 Comparativa'],
+          ['alertas','⚠️ Alertas']
+        ].map(([k,label])=>(
+          <button key={k} onClick={()=>setSeccion(k)} style={{background:seccion===k?'var(--card)':'transparent',color:seccion===k?'var(--text)':'var(--text-dim)',border:'none',borderRadius:8,padding:'8px 14px',fontWeight:seccion===k?600:500,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',boxShadow:seccion===k?'0 1px 2px rgba(0,0,0,0.06)':'none'}}>{label}</button>
+        ))}
+      </div>
+      
+      <div className="fade-in" key={seccion}>
+        {seccion==='resumen' && <ResumenEjecutivo datos={datos} mes={meses[mes]} anio={anio}/>}
+        {seccion==='produccion' && <ProduccionPorMaquina datos={datos}/>}
+        {seccion==='eficiencia' && <AnalisisEficiencia datos={datos}/>}
+        {seccion==='mermas' && <AnalisisMermas datos={datos}/>}
+        {seccion==='tiempos' && <AnalisisTiemposMuertos datos={datos}/>}
+        {seccion==='inventario' && <InventarioInforme datos={datos}/>}
+        {seccion==='comparativa' && <ComparativaMensual datos={datos} mes={meses[mes]} mesAnt={meses[mesAnt]}/>}
+        {seccion==='alertas' && <AlertasRecomendaciones datos={datos}/>}
+      </div>
+    </div>
+  );
+}
+
+/* ===== SECCIONES DEL INFORME ===== */
+
+// Componente: Resumen Ejecutivo
+function ResumenEjecutivo({datos, mes, anio}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const delta = (val, ant)=> ant > 0 ? ((val - ant) / ant * 100).toFixed(1) : '0.0';
+  const deltaColor = (d)=> d > 0 ? 'var(--good)' : d < 0 ? 'var(--bad)' : 'var(--text-dim)';
+  const deltaIcon = (d)=> d > 0 ? '↗️' : d < 0 ? '↘️' : '—';
+  
+  const kpis = [
+    {label:'Producción Total',valor:fmt(datos.prodTotalKg)+' kg',delta:delta(datos.prodTotalKg,datos.prodAntKg),color:'var(--brand-blue)'},
+    {label:'Producto Terminado',valor:fmt(datos.prodPTKg)+' kg',delta:((datos.prodPTKg/datos.prodTotalKg)*100).toFixed(1)+'%',color:'var(--good)'},
+    {label:'Producto en Proceso',valor:fmt(datos.prodPPKg)+' kg',delta:((datos.prodPPKg/datos.prodTotalKg)*100).toFixed(1)+'%',color:'var(--amber)'},
+    {label:'Merma Total',valor:fmt(datos.mermaTotal)+' kg ('+datos.porcMerma.toFixed(1)+'%)',delta:delta(datos.mermaTotal,datos.mermaAnt),color:'var(--bad)'},
+    {label:'Eficiencia Global',valor:datos.eficiencia.toFixed(1)+'%',delta:datos.deltaEfic.toFixed(1)+' pp',color:'var(--accent)'},
+    {label:'Tiempo Productivo',valor:fmt(datos.totalHorasProductivas)+' h',delta:'—',color:'var(--good)'},
+    {label:'Tiempos Muertos',valor:fmt(datos.totalTM)+' h ('+datos.porcTM.toFixed(1)+'%)',delta:'—',color:'var(--bad)'},
+    {label:'Reportes Generados',valor:fmt(datos.reportes),delta:'—',color:'var(--text)'}
+  ];
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🎯 Resumen Ejecutivo</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))',gap:16,marginBottom:24}}>
+        {kpis.map((k,i)=>(
+          <div key={i} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'16px',borderLeft:'4px solid '+k.color}}>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>{k.label}</div>
+            <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{k.valor}</div>
+            {k.delta !== '—' && <div style={{fontSize:12,color:deltaColor(parseFloat(k.delta))}}>{deltaIcon(parseFloat(k.delta))} {k.delta} vs mes anterior</div>}
+          </div>
+        ))}
+      </div>
+      
+      <div style={{background:'var(--panel-2)',borderRadius:12,padding:20,border:'1px solid var(--line)'}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12,fontFamily:'var(--head)'}}>📈 Conclusión General</div>
+        <p style={{margin:0,fontSize:14,lineHeight:1.6,color:'var(--text)'}}>
+          La producción de <b>{mes} {anio}</b> registró <b>{fmt(datos.prodTotalKg)} kg</b> totales con una eficiencia global del <b>{datos.eficiencia.toFixed(1)}%</b>. 
+          {datos.deltaProd > 0 ? ` Se observa un incremento del ${datos.deltaProd.toFixed(1)}% respecto al mes anterior.` : datos.deltaProd < 0 ? ` Se registra una disminución del ${Math.abs(datos.deltaProd).toFixed(1)}% respecto al mes anterior.` : ' Producción similar al mes anterior.'}
+          {' '}La merma se mantuvo en {datos.porcMerma.toFixed(1)}% ({fmt(datos.mermaTotal)} kg), 
+          {datos.deltaMerma < 0 ? ' mostrando una reducción favorable' : datos.deltaMerma > 0 ? ' con un incremento que requiere atención' : ' manteniéndose estable'}.
+          {' '}Los tiempos muertos representaron el {datos.porcTM.toFixed(1)}% del tiempo disponible.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Producción por Máquina
+function ProduccionPorMaquina({datos}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const maquinas = Object.values(datos.porMaquina).sort((a,b)=>b.prodKg-a.prodKg);
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🏭 Producción por Máquina</div>
+      {maquinas.map(m=>(
+        <div key={m.maquina} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:20}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:12}}>
+            <div>
+              <h3 style={{margin:0,fontSize:18,fontWeight:700}}>{m.maquina}</h3>
+              <p style={{margin:'4px 0 0',fontSize:13,color:'var(--text-dim)'}}>{m.reportes} reportes • {fmt(m.horasProd)} h productivas</p>
+            </div>
+            <div style={{display:'flex',gap:10,alignItems:'center'}}>
+              {m.porcMeta >= 100 ? <span style={{background:'var(--good)',color:'#fff',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:700}}>✅ {m.porcMeta.toFixed(0)}% Meta</span> : <span style={{background:'var(--amber)',color:'#fff',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:700}}>⚠️ {m.porcMeta.toFixed(0)}% Meta</span>}
+              <span style={{background:m.eficiencia >= 75 ? 'rgba(21,128,61,0.1)' : 'rgba(185,28,28,0.1)',color:m.eficiencia >= 75 ? 'var(--good)' : 'var(--bad)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:700}}>🎯 {m.eficiencia.toFixed(1)}% Efic.</span>
+            </div>
+          </div>
+          
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:12,marginBottom:16}}>
+            <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+              <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Producción</div>
+              <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{fmt(m.prodKg)} kg</div>
+              {m.prodUnd > 0 && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>{fmt(m.prodUnd)} und</div>}
+            </div>
+            <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+              <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Rendimiento</div>
+              <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--accent)'}}>{m.rendReal.toFixed(1)} kg/h</div>
+              <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} kg/h</div>
+            </div>
+            <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+              <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Merma</div>
+              <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>{fmt(m.merma)} kg</div>
+              <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>{m.porcMerma.toFixed(1)}% del total</div>
+            </div>
+            <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+              <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Tiempos Muertos</div>
+              <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)'}}>{m.tm.toFixed(0)} h</div>
+              <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>{m.porcTM.toFixed(1)}% del tiempo</div>
+            </div>
+          </div>
+          
+          {m.topRefs.length > 0 && <div style={{marginBottom:16}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>🏆 Top 5 Referencias</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {m.topRefs.map((r,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',background:'var(--panel-2)',borderRadius:6}}>
+                  <span style={{fontSize:12,fontWeight:500}}>{i+1}. {r.ref}</span>
+                  <span style={{fontSize:12,fontFamily:'var(--mono)',fontWeight:700}}>{fmt(r.kg)} kg ({(r.kg/m.prodKg*100).toFixed(1)}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>}
+          
+          {m.topOps.length > 0 && <div style={{marginBottom:16}}>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>👷 Operarios</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {m.topOps.map((op,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',background:'var(--panel-2)',borderRadius:6}}>
+                  <span style={{fontSize:12,fontWeight:500}}>{op.nombre}</span>
+                  <span style={{fontSize:12}}>{fmt(op.kg)} kg • {op.reportes} turnos • {op.efic.toFixed(0)}% efic.</span>
+                </div>
+              ))}
+            </div>
+          </div>}
+          
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {m.topTM.length > 0 && <div>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>⏱️ Top Motivos TM</div>
+              {m.topTM.map(([mot,h],i)=>(
+                <div key={i} style={{fontSize:11,padding:'4px 0',borderBottom:'1px solid var(--line)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between'}}>
+                    <span>{i+1}. {mot.length > 30 ? mot.substring(0,30)+'...' : mot}</span>
+                    <span style={{fontFamily:'var(--mono)',fontWeight:600}}>{h.toFixed(0)}h ({(h/m.tm*100).toFixed(0)}%)</span>
+                  </div>
+                </div>
+              ))}
+            </div>}
+            
+            {m.topMerma.length > 0 && <div>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>❌ Top Motivos Merma</div>
+              {m.topMerma.map(([mot,kg],i)=>(
+                <div key={i} style={{fontSize:11,padding:'4px 0',borderBottom:'1px solid var(--line)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between'}}>
+                    <span>{i+1}. {mot.length > 30 ? mot.substring(0,30)+'...' : mot}</span>
+                    <span style={{fontFamily:'var(--mono)',fontWeight:600}}>{fmt(kg)}kg ({(kg/m.merma*100).toFixed(0)}%)</span>
+                  </div>
+                </div>
+              ))}
+            </div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Componente: Análisis de Eficiencia
+function AnalisisEficiencia({datos}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const turnos = Object.values(datos.porTurno).sort((a,b)=>b.eficiencia-a.eficiencia);
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📈 Análisis de Eficiencia</div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>⏰ Eficiencia por Turno</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
+              <th style={{padding:'10px',fontWeight:700}}>Turno</th>
+              <th style={{padding:'10px',fontWeight:700}}>Prod. Total</th>
+              <th style={{padding:'10px',fontWeight:700}}>Eficiencia</th>
+              <th style={{padding:'10px',fontWeight:700}}>Merma %</th>
+              <th style={{padding:'10px',fontWeight:700}}>TM %</th>
+              <th style={{padding:'10px',fontWeight:700}}>Reportes</th>
+            </tr></thead>
+            <tbody>
+              {turnos.map(t=>(
+                <tr key={t.turno} style={{borderBottom:'1px solid var(--line)'}}>
+                  <td style={{padding:'10px',fontWeight:600}}>{t.turno}</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(t.prodKg)} kg</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:t.eficiencia >= 75 ? 'var(--good)' : 'var(--amber)',fontWeight:700}}>{t.eficiencia.toFixed(1)}%</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:t.porcMerma > 5 ? 'var(--bad)' : 'var(--good)'}}>{t.porcMerma.toFixed(1)}%</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:t.porcTM > 25 ? 'var(--bad)' : 'var(--good)'}}>{t.porcTM.toFixed(1)}%</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{t.reportes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={{fontSize:12,color:'var(--text-dim)',marginTop:12,margin:'12px 0 0'}}>
+          📌 El turno con mejor eficiencia es <b>{turnos[0]?.turno}</b> ({turnos[0]?.eficiencia.toFixed(1)}%)
+        </p>
+      </div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>👷 Top 10 Operarios por Eficiencia</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
+              <th style={{padding:'10px',fontWeight:700}}>#</th>
+              <th style={{padding:'10px',fontWeight:700}}>Operario</th>
+              <th style={{padding:'10px',fontWeight:700}}>Cargo</th>
+              <th style={{padding:'10px',fontWeight:700}}>Producción</th>
+              <th style={{padding:'10px',fontWeight:700}}>Eficiencia</th>
+              <th style={{padding:'10px',fontWeight:700}}>Reportes</th>
+              <th style={{padding:'10px',fontWeight:700}}>Máquina Principal</th>
+            </tr></thead>
+            <tbody>
+              {datos.porOperario.map((op,i)=>(
+                <tr key={i} style={{borderBottom:'1px solid var(--line)',background:i<3?'rgba(124,179,66,0.05)':'transparent'}}>
+                  <td style={{padding:'10px',fontWeight:700,color:i===0?'#FFD700':i===1?'#C0C0C0':i===2?'#CD7F32':'inherit'}}>{i+1}</td>
+                  <td style={{padding:'10px',fontWeight:600}}>{op.nombre}</td>
+                  <td style={{padding:'10px',fontSize:12}}>{op.cargo}</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(op.kg)} kg</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:op.efic >= 80 ? 'var(--good)' : 'var(--amber)',fontWeight:700}}>{op.efic.toFixed(1)}%</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{op.reportes}</td>
+                  <td style={{padding:'10px',fontSize:12}}>{op.maquinaPrincipal}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Análisis de Mermas
+function AnalisisMermas({datos}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const costoKg = 15000; // Costo promedio por kg (ajustable)
+  const maquinas = Object.values(datos.porMaquina).sort((a,b)=>b.merma-a.merma);
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🚨 Análisis de Mermas</div>
+      
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:16,marginBottom:20}}>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--bad)',borderRadius:12,padding:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Merma Total</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>{fmt(datos.mermaTotal)} kg</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>{datos.porcMerma.toFixed(1)}% del total producido</div>
+        </div>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--amber)',borderRadius:12,padding:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Costo Estimado</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)'}}>$ {fmt(datos.mermaTotal * costoKg)}</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Base: ${costoKg.toLocaleString()}/kg</div>
+        </div>
+      </div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>📊 Merma por Máquina</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
+              <th style={{padding:'10px',fontWeight:700}}>Máquina</th>
+              <th style={{padding:'10px',fontWeight:700}}>Merma (kg)</th>
+              <th style={{padding:'10px',fontWeight:700}}>% sobre Prod.</th>
+              <th style={{padding:'10px',fontWeight:700}}>Costo Est.</th>
+              <th style={{padding:'10px',fontWeight:700}}>Estado</th>
+            </tr></thead>
+            <tbody>
+              {maquinas.map(m=>(
+                <tr key={m.maquina} style={{borderBottom:'1px solid var(--line)'}}>
+                  <td style={{padding:'10px',fontWeight:600}}>{m.maquina}</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(m.merma)} kg</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:m.porcMerma > 5 ? 'var(--bad)' : 'var(--good)'}}>{m.porcMerma.toFixed(1)}%</td>
+                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(m.merma * costoKg)}</td>
+                  <td style={{padding:'10px'}}>{m.porcMerma < 4 ? '🟢' : m.porcMerma < 6 ? '🟡' : '🔴'}</td>
+                </tr>
+              ))}
+              <tr style={{borderTop:'2px solid var(--line)',fontWeight:700}}>
+                <td style={{padding:'10px'}}>TOTAL</td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(datos.mermaTotal)} kg</td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{datos.porcMerma.toFixed(1)}%</td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(datos.mermaTotal * costoKg)}</td>
+                <td style={{padding:'10px'}}>{datos.porcMerma < 5 ? '🟢' : '🔴'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>🔝 Top 10 Motivos de Merma</div>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {datos.topMermaGlobal.map(([mot,kg],i)=>{
+            const porc = (kg / datos.mermaTotal * 100).toFixed(1);
+            return (
+              <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'12px',background:'var(--panel-2)',borderRadius:8}}>
+                <div style={{fontSize:18,fontWeight:700,color:'var(--bad)',minWidth:32}}>{i+1}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>{mot}</div>
+                  <div style={{fontSize:11,color:'var(--text-dim)'}}>Costo estimado: ${fmt(kg * costoKg)}</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{fmt(kg)} kg</div>
+                  <div style={{fontSize:11,color:'var(--text-dim)'}}>{porc}%</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Análisis de Tiempos Muertos
+function AnalisisTiemposMuertos({datos}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const costoHora = 15000; // Costo promedio por hora de TM
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>⏱️ Análisis de Tiempos Muertos</div>
+      
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:16,marginBottom:20}}>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--amber)',borderRadius:12,padding:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>TM Total</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)'}}>{fmt(datos.totalTM)} h</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>{datos.porcTM.toFixed(1)}% del tiempo disponible</div>
+        </div>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--good)',borderRadius:12,padding:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Disponibilidad</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{(100 - datos.porcTM).toFixed(1)}%</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>{fmt(datos.totalHorasProductivas)} h productivas</div>
+        </div>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--bad)',borderRadius:12,padding:16}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Costo Estimado TM</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>$ {fmt(datos.totalTM * costoHora)}</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Base: ${costoHora.toLocaleString()}/h</div>
+        </div>
+      </div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>🔝 Top 15 Motivos de Tiempos Muertos</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
+              <th style={{padding:'10px',fontWeight:700}}>#</th>
+              <th style={{padding:'10px',fontWeight:700}}>Motivo</th>
+              <th style={{padding:'10px',fontWeight:700}}>Horas</th>
+              <th style={{padding:'10px',fontWeight:700}}>%</th>
+              <th style={{padding:'10px',fontWeight:700}}>Costo Est.</th>
+            </tr></thead>
+            <tbody>
+              {datos.topTMGlobal.map(([mot,h],i)=>{
+                const porc = (h / datos.totalTM * 100).toFixed(1);
+                return (
+                  <tr key={i} style={{borderBottom:'1px solid var(--line)',background:i<3?'rgba(234,179,8,0.05)':'transparent'}}>
+                    <td style={{padding:'10px',fontWeight:700,color:i<3?'var(--amber)':'inherit'}}>{i+1}</td>
+                    <td style={{padding:'10px'}}>{mot}</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700}}>{h.toFixed(0)} h</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{porc}%</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(h * costoHora)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        
+        <div style={{marginTop:16,padding:12,background:'rgba(234,179,8,0.1)',borderRadius:8}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>💡 Recomendaciones</div>
+          <ul style={{margin:'8px 0',paddingLeft:20,fontSize:12,lineHeight:1.6}}>
+            <li>Los primeros 3 motivos representan {((datos.topTMGlobal.slice(0,3).reduce((s,[_,h])=>s+h,0) / datos.totalTM) * 100).toFixed(0)}% del total de TM</li>
+            <li>Enfoque en optimización de cambios de referencia y mantenimiento preventivo</li>
+            <li>Considerar implementación de metodología SMED para reducción de tiempos de cambio</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Inventario
+function InventarioInforme({datos}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📦 Inventario y Bodega</div>
+      
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>📦 Producto Terminado</div>
+          <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)',marginBottom:8}}>{fmt(datos.prodPTKg)} kg</div>
+          <div style={{fontSize:13,color:'var(--text-dim)'}}>SKUs: {datos.invPT.length}</div>
+        </div>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>⚙️ Producto en Proceso</div>
+          <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)',marginBottom:8}}>{fmt(datos.prodPPKg)} kg</div>
+          <div style={{fontSize:13,color:'var(--text-dim)'}}>SKUs: {datos.invPP.length}</div>
+        </div>
+      </div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>🏆 Top 10 Referencias Producidas</div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {datos.topRefsGlobal.map((r,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px',background:'var(--panel-2)',borderRadius:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <span style={{fontSize:18,fontWeight:700,color:'var(--brand-blue)',minWidth:32}}>{i+1}</span>
+                <span style={{fontSize:13,fontWeight:600}}>{r.ref}</span>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:14,fontWeight:700,fontFamily:'var(--mono)'}}>{fmt(r.kg)} kg</div>
+                {r.und > 0 && <div style={{fontSize:11,color:'var(--text-dim)'}}>{fmt(r.und)} und</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Comparativa Mensual
+function ComparativaMensual({datos, mes, mesAnt}){
+  const fmt = (n)=>Math.round(n).toLocaleString();
+  const comparativas = [
+    {label:'Producción Total',actual:datos.prodTotalKg,anterior:datos.prodAntKg,unidad:'kg',formato:'kg'},
+    {label:'Merma',actual:datos.mermaTotal,anterior:datos.mermaAnt,unidad:'kg',formato:'kg'},
+    {label:'% Merma',actual:datos.porcMerma,anterior:datos.porcMermaAnt,unidad:'%',formato:'%'},
+    {label:'Eficiencia',actual:datos.eficiencia,anterior:datos.eficienciaAnt,unidad:'%',formato:'%'},
+    {label:'TM %',actual:datos.porcTM,anterior:0,unidad:'%',formato:'%'}
+  ];
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📊 Comparativa Mensual</div>
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:16}}>{mes} vs {mesAnt}</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
+              <th style={{padding:'12px',fontWeight:700}}>Indicador</th>
+              <th style={{padding:'12px',fontWeight:700}}>{mesAnt}</th>
+              <th style={{padding:'12px',fontWeight:700}}>{mes}</th>
+              <th style={{padding:'12px',fontWeight:700}}>Δ</th>
+              <th style={{padding:'12px',fontWeight:700}}>Tendencia</th>
+            </tr></thead>
+            <tbody>
+              {comparativas.map((c,i)=>{
+                const delta = c.anterior > 0 ? ((c.actual - c.anterior) / c.anterior * 100) : 0;
+                const deltaColor = c.label.includes('Merma') || c.label.includes('TM') ? (delta < 0 ? 'var(--good)' : 'var(--bad)') : (delta > 0 ? 'var(--good)' : 'var(--bad)');
+                const deltaIcon = delta > 0 ? '↗️' : delta < 0 ? '↘️' : '—';
+                
+                return (
+                  <tr key={i} style={{borderBottom:'1px solid var(--line)'}}>
+                    <td style={{padding:'12px',fontWeight:600}}>{c.label}</td>
+                    <td style={{padding:'12px',fontFamily:'var(--mono)'}}>{c.formato === 'kg' ? fmt(c.anterior) + ' kg' : c.anterior.toFixed(1) + '%'}</td>
+                    <td style={{padding:'12px',fontFamily:'var(--mono)',fontWeight:700}}>{c.formato === 'kg' ? fmt(c.actual) + ' kg' : c.actual.toFixed(1) + '%'}</td>
+                    <td style={{padding:'12px',fontFamily:'var(--mono)',color:deltaColor,fontWeight:700}}>{delta !== 0 ? (delta > 0 ? '+' : '') + delta.toFixed(1) + '%' : '—'}</td>
+                    <td style={{padding:'12px',fontSize:20}}>{deltaIcon}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Alertas y Recomendaciones
+function AlertasRecomendaciones({datos}){
+  const {criticas, atencion, fortalezas} = datos.alertas;
+  
+  return (
+    <div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>⚠️ Alertas y Recomendaciones</div>
+      
+      {criticas.length > 0 && <div style={{background:'rgba(239,68,68,0.08)',border:'1px solid var(--bad)',borderRadius:12,padding:20,marginBottom:16}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12,color:'var(--bad)'}}>🔴 Alertas Críticas</div>
+        <ul style={{margin:0,paddingLeft:20,fontSize:14,lineHeight:1.8}}>
+          {criticas.map((a,i)=><li key={i}>{a}</li>)}
+        </ul>
+      </div>}
+      
+      {atencion.length > 0 && <div style={{background:'rgba(234,179,8,0.08)',border:'1px solid var(--amber)',borderRadius:12,padding:20,marginBottom:16}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12,color:'var(--amber)'}}>🟡 Áreas de Atención</div>
+        <ul style={{margin:0,paddingLeft:20,fontSize:14,lineHeight:1.8}}>
+          {atencion.map((a,i)=><li key={i}>{a}</li>)}
+        </ul>
+      </div>}
+      
+      {fortalezas.length > 0 && <div style={{background:'rgba(21,128,61,0.08)',border:'1px solid var(--good)',borderRadius:12,padding:20,marginBottom:16}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12,color:'var(--good)'}}>🟢 Fortalezas</div>
+        <ul style={{margin:0,paddingLeft:20,fontSize:14,lineHeight:1.8}}>
+          {fortalezas.map((a,i)=><li key={i}>{a}</li>)}
+        </ul>
+      </div>}
+      
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>💡 Recomendaciones</div>
+        
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>⚡ Corto Plazo (Semana 1-2)</div>
+          <ul style={{margin:0,paddingLeft:20,fontSize:13,lineHeight:1.7}}>
+            {criticas.length > 0 && <li>Atender inmediatamente las alertas críticas identificadas</li>}
+            <li>Revisión de equipos con alta incidencia de fallas mecánicas</li>
+            <li>Auditoría de calidad en procesos con merma elevada</li>
+            <li>Plan de acción para máquinas que no cumplieron meta</li>
+          </ul>
+        </div>
+        
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>📅 Mediano Plazo (Mes)</div>
+          <ul style={{margin:0,paddingLeft:20,fontSize:13,lineHeight:1.7}}>
+            <li>Capacitación en metodología SMED para reducción de tiempos de cambio</li>
+            <li>Análisis de causa raíz de los 3 principales motivos de merma</li>
+            <li>Optimización de programación de producción para minimizar cambios</li>
+            <li>Programa de calibración preventiva de equipos</li>
+          </ul>
+        </div>
+        
+        <div>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>🎯 Largo Plazo (Trimestre)</div>
+          <ul style={{margin:0,paddingLeft:20,fontSize:13,lineHeight:1.7}}>
+            <li>Evaluación de automatización en procesos críticos</li>
+            <li>Sistema de monitoreo en tiempo real de indicadores clave</li>
+            <li>Programa de incentivos por desempeño y eficiencia</li>
+            <li>Auditoría completa del programa de mantenimiento preventivo</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Función principal para calcular todos los datos del informe
+function calcularDatosInforme(reportesMes, reportesMesAnt){
+  const metas = loadMetas();
+  const pesos = loadPesos();
+  
+  // Producción total
+  const prodTotalKg = reportesMes.reduce((s,r)=>s+produccionKg(r),0);
+  const prodTotalUnd = reportesMes.reduce((s,r)=>{
+    const u = String(r.unidad||'').toLowerCase();
+    return s + (u.indexOf('kg')===0 ? 0 : (Number(r.produccion)||0));
+  },0);
+  const prodAntKg = reportesMesAnt.reduce((s,r)=>s+produccionKg(r),0);
+  
+  // Producto Terminado vs En Proceso
+  const pt = reportesMes.filter(r=>clasificarReporte(r).bodega==='Producto Terminado');
+  const pp = reportesMes.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso');
+  const prodPTKg = pt.reduce((s,r)=>s+produccionKg(r),0);
+  const prodPPKg = pp.reduce((s,r)=>s+produccionKg(r),0);
+  
+  // Mermas
+  const mermaTotal = reportesMes.reduce((s,r)=>s+mermaKg(r),0);
+  const mermaAnt = reportesMesAnt.reduce((s,r)=>s+mermaKg(r),0);
+  const porcMerma = prodTotalKg > 0 ? (mermaTotal / prodTotalKg) * 100 : 0;
+  const porcMermaAnt = prodAntKg > 0 ? (mermaAnt / prodAntKg) * 100 : 0;
+  
+  // Eficiencia y tiempos
+  let totalHorasDisponibles = 0;
+  let totalHorasProductivas = 0;
+  let totalTM = 0;
+  
+  reportesMes.forEach(r => {
+    const durMin = duracionTurnoMinutos(r.turno);
+    totalHorasDisponibles += durMin / 60;
+    const tm = tiemposMuertosMinutos(r);
+    totalTM += tm;
+    totalHorasProductivas += (durMin - tm) / 60;
+  });
+  
+  const eficiencia = totalHorasDisponibles > 0 ? (totalHorasProductivas / totalHorasDisponibles) * 100 : 0;
+  
+  let totalHorasDisponiblesAnt = 0;
+  let totalHorasProductivasAnt = 0;
+  reportesMesAnt.forEach(r => {
+    const durMin = duracionTurnoMinutos(r.turno);
+    totalHorasDisponiblesAnt += durMin / 60;
+    const tm = tiemposMuertosMinutos(r);
+    totalHorasProductivasAnt += (durMin - tm) / 60;
+  });
+  const eficienciaAnt = totalHorasDisponiblesAnt > 0 ? (totalHorasProductivasAnt / totalHorasDisponiblesAnt) * 100 : 0;
+  
+  // Por máquina
+  const porMaquina = {};
+  const maquinas = [...new Set(reportesMes.map(r=>r.maquina).filter(Boolean))];
+  
+  maquinas.forEach(maq => {
+    const reps = reportesMes.filter(r=>r.maquina===maq);
+    const prodKg = reps.reduce((s,r)=>s+produccionKg(r),0);
+    const prodUnd = reps.reduce((s,r)=>{
+      const u = String(r.unidad||'').toLowerCase();
+      return s + (u.indexOf('kg')===0 ? 0 : (Number(r.produccion)||0));
+    },0);
+    const merma = reps.reduce((s,r)=>s+mermaKg(r),0);
+    
+    let horasDisp = 0;
+    let horasProd = 0;
+    let tm = 0;
+    reps.forEach(r => {
+      const durMin = duracionTurnoMinutos(r.turno);
+      horasDisp += durMin / 60;
+      const tmMin = tiemposMuertosMinutos(r);
+      tm += tmMin;
+      horasProd += (durMin - tmMin) / 60;
+    });
+    
+    const efic = horasDisp > 0 ? (horasProd / horasDisp) * 100 : 0;
+    const rendReal = horasProd > 0 ? prodKg / horasProd : 0;
+    const metaMaq = (metas[maq] || {}).meta || 0;
+    const porcMeta = metaMaq > 0 ? (rendReal / metaMaq) * 100 : 0;
+    
+    // Top 5 referencias
+    const refCounts = {};
+    reps.forEach(r => {
+      const ref = r.referencia || 'Sin referencia';
+      if (!refCounts[ref]) refCounts[ref] = {ref, kg: 0};
+      refCounts[ref].kg += produccionKg(r);
+    });
+    const topRefs = Object.values(refCounts).sort((a,b)=>b.kg-a.kg).slice(0,5);
+    
+    // Motivos de TM
+    const motivosTM = {};
+    reps.forEach(r => {
+      const motivos = String(r.tiemposMuertosMotivo||'').split(';').filter(Boolean);
+      const mins = String(r.tiemposMuertosMinutos||'').split(';').map(Number).filter(x=>x>0);
+      motivos.forEach((mot,i) => {
+        const m = mot.trim();
+        if (!m) return;
+        if (!motivosTM[m]) motivosTM[m] = 0;
+        motivosTM[m] += (mins[i] || 0) / 60;
+      });
+    });
+    const topTM = Object.entries(motivosTM).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    
+    // Motivos de merma
+    const motivosMerma = {};
+    reps.forEach(r => {
+      const motivos = String(r.mermasMotivo||'').split(';').filter(Boolean);
+      const cants = String(r.mermasCantidad||'').split(';').map(Number).filter(x=>x>0);
+      motivos.forEach((mot,i) => {
+        const m = mot.trim();
+        if (!m) return;
+        if (!motivosMerma[m]) motivosMerma[m] = 0;
+        motivosMerma[m] += cants[i] || 0;
+      });
+    });
+    const topMerma = Object.entries(motivosMerma).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    
+    // Operarios
+    const ops = {};
+    reps.forEach(r => {
+      const op = r.nombre || 'Sin nombre';
+      if (!ops[op]) ops[op] = {nombre: op, kg: 0, reportes: 0, horasProd: 0};
+      ops[op].kg += produccionKg(r);
+      ops[op].reportes++;
+      const durMin = duracionTurnoMinutos(r.turno);
+      const tmMin = tiemposMuertosMinutos(r);
+      ops[op].horasProd += (durMin - tmMin) / 60;
+    });
+    Object.values(ops).forEach(op => {
+      op.efic = op.horasProd > 0 ? (op.kg / op.horasProd) / (metaMaq || 1) * 100 : 0;
+    });
+    const topOps = Object.values(ops).sort((a,b)=>b.kg-a.kg).slice(0,3);
+    
+    porMaquina[maq] = {
+      maquina: maq,
+      reportes: reps.length,
+      prodKg,
+      prodUnd,
+      merma,
+      porcMerma: prodKg > 0 ? (merma / prodKg) * 100 : 0,
+      horasDisp,
+      horasProd,
+      tm: tm / 60,
+      porcTM: horasDisp > 0 ? (tm / 60 / horasDisp) * 100 : 0,
+      eficiencia: efic,
+      rendReal,
+      meta: metaMaq,
+      porcMeta,
+      topRefs,
+      topTM,
+      topMerma,
+      topOps
+    };
+  });
+  
+  // Por turno
+  const porTurno = {};
+  const turnos = [...new Set(reportesMes.map(r=>r.turno).filter(Boolean))];
+  turnos.forEach(t => {
+    const reps = reportesMes.filter(r=>r.turno===t);
+    const prodKg = reps.reduce((s,r)=>s+produccionKg(r),0);
+    const merma = reps.reduce((s,r)=>s+mermaKg(r),0);
+    let horasDisp = 0;
+    let horasProd = 0;
+    let tm = 0;
+    reps.forEach(r => {
+      const durMin = duracionTurnoMinutos(r.turno);
+      horasDisp += durMin / 60;
+      const tmMin = tiemposMuertosMinutos(r);
+      tm += tmMin;
+      horasProd += (durMin - tmMin) / 60;
+    });
+    const efic = horasDisp > 0 ? (horasProd / horasDisp) * 100 : 0;
+    porTurno[t] = {
+      turno: t,
+      prodKg,
+      merma,
+      porcMerma: prodKg > 0 ? (merma / prodKg) * 100 : 0,
+      tm: tm / 60,
+      porcTM: horasDisp > 0 ? (tm / 60 / horasDisp) * 100 : 0,
+      eficiencia: efic,
+      reportes: reps.length
+    };
+  });
+  
+  // Por operario (global)
+  const porOperario = {};
+  reportesMes.forEach(r => {
+    const op = r.nombre || 'Sin nombre';
+    if (!porOperario[op]) porOperario[op] = {nombre: op, cargo: r.cargo || '', kg: 0, reportes: 0, horasProd: 0, maquinas: new Set()};
+    porOperario[op].kg += produccionKg(r);
+    porOperario[op].reportes++;
+    const durMin = duracionTurnoMinutos(r.turno);
+    const tmMin = tiemposMuertosMinutos(r);
+    porOperario[op].horasProd += (durMin - tmMin) / 60;
+    porOperario[op].maquinas.add(r.maquina);
+  });
+  Object.values(porOperario).forEach(op => {
+    const maqPrincipal = [...op.maquinas][0] || '';
+    const metaMaq = (metas[maqPrincipal] || {}).meta || 100;
+    op.efic = op.horasProd > 0 ? (op.kg / op.horasProd) / metaMaq * 100 : 0;
+    op.maquinaPrincipal = maqPrincipal;
+  });
+  const topOperarios = Object.values(porOperario).sort((a,b)=>b.efic-a.efic).slice(0,10);
+  
+  // Motivos globales de TM
+  const motivosTMGlobal = {};
+  reportesMes.forEach(r => {
+    const motivos = String(r.tiemposMuertosMotivo||'').split(';').filter(Boolean);
+    const mins = String(r.tiemposMuertosMinutos||'').split(';').map(Number).filter(x=>x>0);
+    motivos.forEach((mot,i) => {
+      const m = mot.trim();
+      if (!m) return;
+      if (!motivosTMGlobal[m]) motivosTMGlobal[m] = 0;
+      motivosTMGlobal[m] += (mins[i] || 0) / 60;
+    });
+  });
+  const topTMGlobal = Object.entries(motivosTMGlobal).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  
+  // Motivos globales de merma
+  const motivosMermaGlobal = {};
+  reportesMes.forEach(r => {
+    const motivos = String(r.mermasMotivo||'').split(';').filter(Boolean);
+    const cants = String(r.mermasCantidad||'').split(';').map(Number).filter(x=>x>0);
+    motivos.forEach((mot,i) => {
+      const m = mot.trim();
+      if (!m) return;
+      if (!motivosMermaGlobal[m]) motivosMermaGlobal[m] = 0;
+      motivosMermaGlobal[m] += cants[i] || 0;
+    });
+  });
+  const topMermaGlobal = Object.entries(motivosMermaGlobal).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  
+  // Top referencias (global)
+  const refCounts = {};
+  reportesMes.forEach(r => {
+    const ref = r.referencia || 'Sin referencia';
+    if (!refCounts[ref]) refCounts[ref] = {ref, kg: 0, und: 0};
+    refCounts[ref].kg += produccionKg(r);
+    const u = String(r.unidad||'').toLowerCase();
+    if (u.indexOf('kg')!==0) refCounts[ref].und += Number(r.produccion)||0;
+  });
+  const topRefsGlobal = Object.values(refCounts).sort((a,b)=>b.kg-a.kg).slice(0,10);
+  
+  // Inventario
+  const invPT = inventarioBodegaPT(reportesMes);
+  const invPP = inventarioBodegaPP(reportesMes);
+  
+  // Alertas
+  const alertas = generarAlertas(porMaquina, porcMerma, totalTM / totalHorasDisponibles * 100, eficiencia);
+  
+  return {
+    reportes: reportesMes.length,
+    prodTotalKg,
+    prodTotalUnd,
+    prodPTKg,
+    prodPPKg,
+    mermaTotal,
+    porcMerma,
+    totalHorasDisponibles,
+    totalHorasProductivas,
+    totalTM: totalTM / 60,
+    porcTM: totalHorasDisponibles > 0 ? (totalTM / 60 / totalHorasDisponibles) * 100 : 0,
+    eficiencia,
+    porMaquina,
+    porTurno,
+    porOperario: topOperarios,
+    topTMGlobal,
+    topMermaGlobal,
+    topRefsGlobal,
+    invPT,
+    invPP,
+    alertas,
+    // Comparativa
+    prodAntKg,
+    deltaProd: prodAntKg > 0 ? ((prodTotalKg - prodAntKg) / prodAntKg) * 100 : 0,
+    mermaAnt,
+    deltaMerma: mermaAnt > 0 ? ((mermaTotal - mermaAnt) / mermaAnt) * 100 : 0,
+    porcMermaAnt,
+    eficienciaAnt,
+    deltaEfic: eficiencia - eficienciaAnt
+  };
+}
+
+function generarAlertas(porMaquina, porcMerma, porcTM, eficiencia){
+  const criticas = [];
+  const atencion = [];
+  const fortalezas = [];
+  
+  Object.values(porMaquina).forEach(m => {
+    if (m.porcMeta < 95) criticas.push(`${m.maquina}: No cumplió meta (${m.porcMeta.toFixed(1)}%)`);
+    if (m.porcMerma > 6) atencion.push(`${m.maquina}: Merma elevada (${m.porcMerma.toFixed(1)}%)`);
+    if (m.porcTM > 25) atencion.push(`${m.maquina}: TM elevados (${m.porcTM.toFixed(1)}%)`);
+    if (m.eficiencia > 80) fortalezas.push(`${m.maquina}: Excelente eficiencia (${m.eficiencia.toFixed(1)}%)`);
+    if (m.porcMeta > 110) fortalezas.push(`${m.maquina}: Superó meta (${m.porcMeta.toFixed(1)}%)`);
+  });
+  
+  if (porcMerma < 5) fortalezas.push(`Merma global bajo control (${porcMerma.toFixed(1)}%)`);
+  else if (porcMerma > 7) criticas.push(`Merma global elevada (${porcMerma.toFixed(1)}%)`);
+  
+  if (eficiencia > 75) fortalezas.push(`Buena eficiencia global (${eficiencia.toFixed(1)}%)`);
+  else if (eficiencia < 70) criticas.push(`Eficiencia global baja (${eficiencia.toFixed(1)}%)`);
+  
+  return {criticas, atencion, fortalezas};
+}
+
 function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,refreshReports,lastUpdated}){
   const perm = permisosDe(rol);
   // Vistas visibles para ESTE usuario: parte del rol y se recorta con el override por usuario
@@ -3907,6 +4908,7 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
   const canView = function(v){ return vistas.indexOf(v)!==-1; };
   const TABS = [
     ['general','📊 General', canView('general')],
+    ['informes','📈 Informes', true], // Informes mensuales: visible para todos
     ['inv','🏬 Bodega Inventario', canView('inv_pt')||canView('inv_pp')],
     ['despachos','🚚 Pedidos y Despachos', canView('despachos')],
     ['bodegas','📦 Producción por bodega', canView('bodegas')]
@@ -3978,6 +4980,7 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
           <CatalogEditor catalog={catalog} setCatalog={setCatalog} machines={machines} setMachines={setMachines} onEditMetas={()=>setShowMetas(true)}/>
         </div>}
       </>}
+      {tab==='informes' && <InformeMensual reports={reports} metasVer={metasVer}/>}
       {tab==='bodegas' && <>
         <div style={{display:"flex",gap:1,background:"var(--panel-2)",borderRadius:10,padding:3,border:"1px solid rgba(0,0,0,0.07)",marginBottom:18,width:"fit-content"}}>
           {[['pt','📦 Producto Terminado'],['pp','⚙️ Producto en Proceso']].map(([k,label])=>(
