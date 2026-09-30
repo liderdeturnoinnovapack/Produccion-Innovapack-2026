@@ -45,10 +45,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
 <!-- Módulos compartidos (deben cargar ANTES del script de la app) -->
-<script src="../shared/data.js?v=20260712z4"></script>
-<script src="../shared/config.js?v=20260712z4"></script>
-<script src="../shared/sku_maestro.js?v=20260712z4"></script>
-<script src="../shared/calculos.js?v=20260723l"></script>
+<script src="../shared/data.js?v=20260827a"></script>
+<script src="../shared/config.js?v=20260827a"></script>
+<script src="../shared/sku_maestro.js?v=20260827a"></script>
+<script src="../shared/calculos.js?v=20260827a"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -284,7 +284,20 @@ function FormView({catalog, machines}){
 
   return (
     <form onSubmit={handleSubmit} style={{maxWidth:560,margin:"0 auto",padding:"28px 20px 60px"}}>
-      <Field label="Nombre"><input style={inputStyle} value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre completo"/></Field>
+      <Field label="Nombre">
+        <select style={inputStyle} value={nombre} onChange={e=>{
+          const selected = e.target.value;
+          setNombre(selected);
+          // Auto-completar cargo según el operario seleccionado
+          if(selected){
+            const operario = (window.OPERARIOS||[]).find(op => op.nombre === selected);
+            if(operario) setCargo(operario.cargo);
+          }
+        }}>
+          <option value="">Selecciona tu nombre</option>
+          {(window.OPERARIOS||[]).map(op=><option key={op.nombre} value={op.nombre}>{op.nombre}</option>)}
+        </select>
+      </Field>
       <Field label="Cargo">
         <select style={inputStyle} value={cargo} onChange={e=>setCargo(e.target.value)}>
           <option value="">Selecciona tu cargo</option>

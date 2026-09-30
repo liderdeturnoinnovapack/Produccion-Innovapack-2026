@@ -113,6 +113,7 @@ function configurarUsuarios() {
 
 function REPARAR_AHORA() { var n = repararReportesCorruptos_(); Logger.log('Filas reparadas: ' + n); return n; }
 function REPARAR_SIESA() { var n = repararSiesaFechas_(); Logger.log('Columnas de codigos reparadas: ' + n); return n; }
+function NORMALIZAR_NOMBRES() { var n = normalizarNombresOperarios_(); Logger.log('Nombres normalizados: ' + n); return n; }
 
 /* -------------------------- USUARIOS -------------------------- */
 function leerUsuarios_() {
@@ -386,6 +387,93 @@ function repararSiesaFechas_() {
     }
   }
   return arregladas;
+}
+
+/* ---------------- NORMALIZACIÓN DE NOMBRES ---------------- */
+// Normaliza todos los nombres de operarios en los reportes existentes.
+// Ejecutar desde el editor: NORMALIZAR_NOMBRES()
+function normalizarNombresOperarios_() {
+  // Mapa de variaciones -> nombre correcto
+  var NOMBRES_CORRECTOS = {
+    'Jaime Taborda': ['jaime taborda', 'JAIME TABORDA', 'Jaime taborda', 'jaime Taborda'],
+    'Alexander Pinto': ['alexander pinto', 'ALEXANDER PINTO', 'Alexander pinto', 'alexander Pinto'],
+    'Adris Rios': ['adris rios', 'ADRIS RIOS', 'Adris rios', 'adris Rios', 'Adris Ríos', 'adris ríos'],
+    'Dilan Ramirez': ['dilan ramirez', 'DILAN RAMIREZ', 'Dilan ramirez', 'dilan Ramirez', 'Dilan Ramírez', 'dilan ramírez'],
+    'Jarol Vargas': ['jarol vargas', 'JAROL VARGAS', 'Jarol vargas', 'jarol Vargas'],
+    'Camilo Passos': ['camilo passos', 'CAMILO PASSOS', 'Camilo passos', 'camilo Passos'],
+    'Diego Garcia': ['diego garcia', 'DIEGO GARCIA', 'Diego garcia', 'diego Garcia', 'Diego García', 'diego garcía'],
+    'Yesid Giraldo': ['yesid giraldo', 'YESID GIRALDO', 'Yesid giraldo', 'yesid Giraldo'],
+    'Giordan Castaño': ['giordan castaño', 'GIORDAN CASTAÑO', 'Giordan castaño', 'giordan Castaño', 'Giordan Castano', 'giordan castano'],
+    'Yom Arcia': ['yom arcia', 'YOM ARCIA', 'Yom arcia', 'yom Arcia'],
+    'Jairo Jimenez': ['jairo jimenez', 'JAIRO JIMENEZ', 'Jairo jimenez', 'jairo Jimenez', 'Jairo Jiménez', 'jairo jiménez'],
+    'Daniel Alvarez': ['daniel alvarez', 'DANIEL ALVAREZ', 'Daniel alvarez', 'daniel Alvarez', 'Daniel Álvarez', 'daniel álvarez'],
+    'Juan David Villarreal': ['juan david villarreal', 'JUAN DAVID VILLARREAL', 'Juan David villarreal', 'juan david Villarreal'],
+    'Jesus Yara': ['jesus yara', 'JESUS YARA', 'Jesus yara', 'jesus Yara', 'Jesús Yara', 'jesús yara'],
+    'Laura Ovalle': ['laura ovalle', 'LAURA OVALLE', 'Laura ovalle', 'laura Ovalle'],
+    'Jesus Ospitia': ['jesus ospitia', 'JESUS OSPITIA', 'Jesus ospitia', 'jesus Ospitia', 'Jesús Ospitia', 'jesús ospitia'],
+    'Edwin Chitiva': ['edwin chitiva', 'EDWIN CHITIVA', 'Edwin chitiva', 'edwin Chitiva']
+  };
+  
+  // Crear mapa inverso: variación -> correcto
+  var mapa = {};
+  for (var correcto in NOMBRES_CORRECTOS) {
+    var variaciones = NOMBRES_CORRECTOS[correcto];
+    for (var i = 0; i < variaciones.length; i++) {
+      mapa[variaciones[i].toLowerCase()] = correcto;
+    }
+    // El correcto también mapea a sí mismo
+    mapa[correcto.toLowerCase()] = correcto;
+  }
+  
+  var hojas = SS.getSheets();
+  var normalizados = 0;
+  
+  for (var s = 0; s < hojas.length; s++) {
+    var sh = hojas[s];
+    if (HOJAS_ESPECIALES.indexOf(sh.getName()) !== -1) continue;
+    
+    var last = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (last < 2) continue;
+    
+    var cab = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var colNombre = -1;
+    
+    // Buscar columna "Nombre"
+    for (var c = 0; c < cab.length; c++) {
+      if (cab[c] === 'Nombre') {
+        colNombre = c;
+        break;
+      }
+    }
+    
+    if (colNombre === -1) continue;
+    
+    // Leer todos los nombres
+    var rng = sh.getRange(2, colNombre + 1, last - 1, 1);
+    var valores = rng.getValues();
+    var cambios = false;
+    
+    for (var i = 0; i < valores.length; i++) {
+      var nombreActual = String(valores[i][0]).trim();
+      if (!nombreActual) continue;
+      
+      var nombreNormalizado = mapa[nombreActual.toLowerCase()];
+      if (nombreNormalizado && nombreNormalizado !== nombreActual) {
+        valores[i][0] = nombreNormalizado;
+        cambios = true;
+        normalizados++;
+      }
+    }
+    
+    // Guardar cambios si hubo
+    if (cambios) {
+      rng.setValues(valores);
+      SpreadsheetApp.flush();
+    }
+  }
+  
+  return normalizados;
 }
 
 /* -------------------------- UTIL ----------------------------- */

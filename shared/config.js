@@ -26,6 +26,27 @@ window.TURNOS_HORAS = {
 
 window.CARGOS = ["Op.Extrusión", "Op.Impresión", "Op.Sellado", "Ax.Integral"];
 
+/* Lista maestra de operarios y auxiliares (evita errores de digitación) */
+window.OPERARIOS = [
+  {nombre: "Jaime Taborda", cargo: "Extrusion-Op"},
+  {nombre: "Alexander Pinto", cargo: "Extrusion-Op"},
+  {nombre: "Adris Rios", cargo: "Aux- Integral"},
+  {nombre: "Dilan Ramirez", cargo: "Aux- Integral"},
+  {nombre: "Jarol Vargas", cargo: "Aux- Integral"},
+  {nombre: "Camilo Passos", cargo: "Aux- Integral"},
+  {nombre: "Diego Garcia", cargo: "Op - sellado"},
+  {nombre: "Yesid Giraldo", cargo: "Op - sellado"},
+  {nombre: "Giordan Castaño", cargo: "Op - sellado"},
+  {nombre: "Yom Arcia", cargo: "Op - Impresión"},
+  {nombre: "Jairo Jimenez", cargo: "Aux- Impresión"},
+  {nombre: "Daniel Alvarez", cargo: "Op - Impresión"},
+  {nombre: "Juan David Villarreal", cargo: "Aux- Impresión"},
+  {nombre: "Jesus Yara", cargo: "Aux- Integral"},
+  {nombre: "Laura Ovalle", cargo: "Aux- Calidad"},
+  {nombre: "Jesus Ospitia", cargo: "Aux- Calidad"},
+  {nombre: "Edwin Chitiva", cargo: "Aux- Logist"}
+];
+
 /* El PIN del panel YA NO vive en el código: se valida en el servidor (Apps Script),
    contra el valor guardado en Script Properties (ADMIN_PIN). */
 
