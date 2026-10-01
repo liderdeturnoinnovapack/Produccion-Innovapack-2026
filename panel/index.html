@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001O</title>
+<title>Panel de Producción · Innovapack v20261001P-debug</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -5022,13 +5022,24 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
     // Motivos de TM
     const motivosTM = {};
     reps.forEach(r => {
-      const motivos = String(r.tiemposMuertosMotivo||'').split(/[;+]/).map(s=>s.trim()).filter(Boolean);
-      // Parsear minutos del formato "30min + 15min" o "30;15"
+      const motivosStr = String(r.tiemposMuertosMotivo||'');
+      const motivos = motivosStr.split(/[;+]/).map(s=>s.trim()).filter(Boolean);
+      // Parsear minutos del formato "15min + 80min + 20min"
       const minsStr = String(r.tiemposMuertosMinutos||'');
       const mins = minsStr.split(/[;+]/).map(s => {
         const match = s.match(/([\d.]+)/);
         return match ? Number(match[1]) : 0;
       }).filter(x => x > 0);
+      
+      // DEBUG: verificar si hay desbalance motivos vs minutos
+      if(motivos.length !== mins.length && mins.length > 0) {
+        console.warn('⚠️ Desbalance TM en', r.maquina, r.fecha, {
+          motivos: motivos.length,
+          mins: mins.length,
+          motivosStr,
+          minsStr
+        });
+      }
       
       motivos.forEach((mot,i) => {
         const m = mot.trim();
@@ -5148,13 +5159,24 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   // Motivos globales de TM
   const motivosTMGlobal = {};
   reportesMes.forEach(r => {
-    const motivos = String(r.tiemposMuertosMotivo||'').split(/[;+]/).map(s=>s.trim()).filter(Boolean);
-    // Parsear minutos del formato "30min + 15min" o "30;15"
+    const motivosStr = String(r.tiemposMuertosMotivo||'');
+    const motivos = motivosStr.split(/[;+]/).map(s=>s.trim()).filter(Boolean);
+    // Parsear minutos del formato "15min + 80min + 20min"
     const minsStr = String(r.tiemposMuertosMinutos||'');
     const mins = minsStr.split(/[;+]/).map(s => {
       const match = s.match(/([\d.]+)/);
       return match ? Number(match[1]) : 0;
     }).filter(x => x > 0);
+    
+    // DEBUG: verificar desbalance
+    if(motivos.length !== mins.length && mins.length > 0) {
+      console.warn('⚠️ Desbalance TM Global:', r.maquina, r.fecha, {
+        motivos: motivos.length,
+        mins: mins.length,
+        motivosStr,
+        minsStr
+      });
+    }
     
     motivos.forEach((mot,i) => {
       const m = mot.trim();
