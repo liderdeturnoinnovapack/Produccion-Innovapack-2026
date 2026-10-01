@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001d</title>
+<title>Panel de Producción · Innovapack v20261001e</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4125,11 +4125,7 @@ function ResumenEjecutivo({datos, mes, anio}){
   const kpis = [
     {label:'Producción Total (PP)',valor:fmt(datos.prodTotalKg)+' kg',delta:delta(datos.prodTotalKg,datos.prodAntKg),color:'var(--brand-blue)',tooltip:'Solo Producto en Proceso (extrusión, impresión, refilado)'},
     {label:'Convertido a PT',valor:fmt(datos.prodPTKg)+' kg',delta:((datos.prodPTKg/datos.prodTotalKg)*100).toFixed(1)+'% del PP',color:'var(--good)',tooltip:'Material que pasó por sellado y se convirtió en Producto Terminado'},
-    {label:'Permanece en PP',valor:fmt(datos.prodPPKg)+' kg',delta:'100%',color:'var(--amber)',tooltip:'Material producido que aún está en proceso'},
     {label:'Merma Total',valor:fmt(datos.mermaTotal)+' kg ('+datos.porcMerma.toFixed(1)+'%)',delta:delta(datos.mermaTotal,datos.mermaAnt),color:'var(--bad)'},
-    {label:'Eficiencia Global',valor:datos.eficiencia.toFixed(1)+'%',delta:datos.deltaEfic.toFixed(1)+' pp',color:'var(--accent)'},
-    {label:'Tiempo Productivo',valor:fmt(datos.totalHorasProductivas)+' h',delta:'—',color:'var(--good)'},
-    {label:'Tiempos Muertos',valor:fmt(datos.totalTM)+' h ('+datos.porcTM.toFixed(1)+'%)',delta:'—',color:'var(--bad)'},
     {label:'Reportes Generados',valor:fmt(datos.reportes),delta:'—',color:'var(--text)'}
   ];
   
@@ -4144,6 +4140,72 @@ function ResumenEjecutivo({datos, mes, anio}){
             {k.delta !== '—' && <div style={{fontSize:12,color:deltaColor(parseFloat(k.delta))}}>{deltaIcon(parseFloat(k.delta))} {k.delta} vs mes anterior</div>}
           </div>
         ))}
+      </div>
+      
+      {/* Tarjetas grandes: Tiempos y Eficiencia */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
+        {/* Tarjeta de Tiempos */}
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:16,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:8}}>
+            <span>⏱️</span>
+            <span>Distribución de Tiempos</span>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,background:'var(--panel-2)',borderRadius:8,borderLeft:'4px solid var(--accent)'}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase'}}>Tiempo Programado</div>
+                <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',marginTop:4}}>{fmt(datos.totalHorasDisponibles)} h</div>
+              </div>
+              <div style={{fontSize:32,opacity:0.3}}>📅</div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,background:'var(--panel-2)',borderRadius:8,borderLeft:'4px solid var(--good)'}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase'}}>Tiempo Productivo</div>
+                <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',marginTop:4,color:'var(--good)'}}>{fmt(datos.totalHorasProductivas)} h</div>
+                <div style={{fontSize:12,color:'var(--text-dim)',marginTop:2}}>{datos.eficiencia.toFixed(1)}% del programado</div>
+              </div>
+              <div style={{fontSize:32,opacity:0.3}}>✅</div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,background:'var(--panel-2)',borderRadius:8,borderLeft:'4px solid var(--bad)'}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase'}}>Tiempos Muertos</div>
+                <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',marginTop:4,color:'var(--bad)'}}>{fmt(datos.totalTM)} h</div>
+                <div style={{fontSize:12,color:'var(--text-dim)',marginTop:2}}>{datos.porcTM.toFixed(1)}% del programado</div>
+              </div>
+              <div style={{fontSize:32,opacity:0.3}}>⛔</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Tarjeta de Eficiencia Global */}
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:16,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:8}}>
+            <span>🎯</span>
+            <span>Eficiencia Global</span>
+          </div>
+          <div style={{textAlign:'center',padding:'20px 0'}}>
+            <div style={{fontSize:56,fontWeight:700,fontFamily:'var(--mono)',color:datos.eficiencia >= 75 ? 'var(--good)' : datos.eficiencia >= 65 ? 'var(--amber)' : 'var(--bad)',marginBottom:8}}>
+              {datos.eficiencia.toFixed(1)}%
+            </div>
+            <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:16}}>
+              Tiempo Productivo ÷ Tiempo Programado
+            </div>
+            <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:16}}>
+              {datos.deltaEfic > 0 && <span style={{background:'rgba(21,128,61,0.1)',color:'var(--good)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:600}}>↗️ +{datos.deltaEfic.toFixed(1)} pp vs mes anterior</span>}
+              {datos.deltaEfic < 0 && <span style={{background:'rgba(185,28,28,0.1)',color:'var(--bad)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:600}}>↘️ {datos.deltaEfic.toFixed(1)} pp vs mes anterior</span>}
+              {datos.deltaEfic === 0 && <span style={{background:'var(--panel-2)',color:'var(--text-dim)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:600}}>— Sin cambio</span>}
+            </div>
+            <div style={{background:'var(--panel-2)',borderRadius:8,padding:12,fontSize:12,textAlign:'left',lineHeight:1.6}}>
+              <b>¿Cómo se calcula?</b><br/>
+              Eficiencia = (Horas Productivas ÷ Horas Programadas) × 100<br/>
+              = ({fmt(datos.totalHorasProductivas)} h ÷ {fmt(datos.totalHorasDisponibles)} h) × 100<br/>
+              <span style={{color:'var(--text-dim)',fontSize:11}}>
+                * Horas Programadas = suma de turnos reportados<br/>
+                * Horas Productivas = Programadas - Tiempos Muertos
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
       
       <div style={{background:'var(--panel-2)',borderRadius:12,padding:20,border:'1px solid var(--line)'}}>
@@ -4263,71 +4325,95 @@ function ProduccionPorMaquina({datos}){
 // Componente: Análisis de Eficiencia
 function AnalisisEficiencia({datos}){
   const fmt = (n)=>Math.round(n).toLocaleString();
-  const turnos = Object.values(datos.porTurno).sort((a,b)=>b.eficiencia-a.eficiencia);
+  const maquinas = Object.values(datos.porMaquina).sort((a,b)=>b.eficiencia-a.eficiencia);
   
   return (
     <div>
       <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📈 Análisis de Eficiencia</div>
       
+      {/* Resumen global */}
       <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:20}}>
-        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>⏰ Eficiencia por Turno</div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
-              <th style={{padding:'10px',fontWeight:700}}>Turno</th>
-              <th style={{padding:'10px',fontWeight:700}}>Prod. Total</th>
-              <th style={{padding:'10px',fontWeight:700}}>Eficiencia</th>
-              <th style={{padding:'10px',fontWeight:700}}>Merma %</th>
-              <th style={{padding:'10px',fontWeight:700}}>TM %</th>
-              <th style={{padding:'10px',fontWeight:700}}>Reportes</th>
-            </tr></thead>
-            <tbody>
-              {turnos.map(t=>(
-                <tr key={t.turno} style={{borderBottom:'1px solid var(--line)'}}>
-                  <td style={{padding:'10px',fontWeight:600}}>{t.turno}</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(t.prodKg)} kg</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:t.eficiencia >= 75 ? 'var(--good)' : 'var(--amber)',fontWeight:700}}>{t.eficiencia.toFixed(1)}%</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:t.porcMerma > 5 ? 'var(--bad)' : 'var(--good)'}}>{t.porcMerma.toFixed(1)}%</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:t.porcTM > 25 ? 'var(--bad)' : 'var(--good)'}}>{t.porcTM.toFixed(1)}%</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{t.reportes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:16}}>🌐 Eficiencia Global del Mes</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:16,marginBottom:16}}>
+          <div style={{background:'var(--panel-2)',borderRadius:8,padding:16,textAlign:'center'}}>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Tiempo Programado</div>
+            <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:'var(--accent)'}}>{fmt(datos.totalHorasDisponibles)} h</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Suma de todos los turnos</div>
+          </div>
+          <div style={{background:'var(--panel-2)',borderRadius:8,padding:16,textAlign:'center'}}>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Tiempo Productivo</div>
+            <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{fmt(datos.totalHorasProductivas)} h</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Programado - Tiempos Muertos</div>
+          </div>
+          <div style={{background:'var(--panel-2)',borderRadius:8,padding:16,textAlign:'center'}}>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Eficiencia</div>
+            <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:datos.eficiencia >= 75 ? 'var(--good)' : datos.eficiencia >= 65 ? 'var(--amber)' : 'var(--bad)'}}>{datos.eficiencia.toFixed(1)}%</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Productivo ÷ Programado</div>
+          </div>
         </div>
-        <p style={{fontSize:12,color:'var(--text-dim)',marginTop:12,margin:'12px 0 0'}}>
-          📌 El turno con mejor eficiencia es <b>{turnos[0]?.turno}</b> ({turnos[0]?.eficiencia.toFixed(1)}%)
-        </p>
+        <div style={{background:'rgba(124,179,66,0.05)',borderLeft:'3px solid var(--brand-green)',padding:12,borderRadius:8,fontSize:13}}>
+          <b>💡 Fórmula:</b> Eficiencia = (Tiempo Productivo ÷ Tiempo Programado) × 100<br/>
+          <b>📊 Cálculo:</b> ({fmt(datos.totalHorasProductivas)} h ÷ {fmt(datos.totalHorasDisponibles)} h) × 100 = {datos.eficiencia.toFixed(1)}%
+        </div>
       </div>
       
-      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
-        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>👷 Top 10 Operarios por Eficiencia</div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
-              <th style={{padding:'10px',fontWeight:700}}>#</th>
-              <th style={{padding:'10px',fontWeight:700}}>Operario</th>
-              <th style={{padding:'10px',fontWeight:700}}>Cargo</th>
-              <th style={{padding:'10px',fontWeight:700}}>Producción</th>
-              <th style={{padding:'10px',fontWeight:700}}>Eficiencia</th>
-              <th style={{padding:'10px',fontWeight:700}}>Reportes</th>
-              <th style={{padding:'10px',fontWeight:700}}>Máquina Principal</th>
-            </tr></thead>
-            <tbody>
-              {datos.porOperario.map((op,i)=>(
-                <tr key={i} style={{borderBottom:'1px solid var(--line)',background:i<3?'rgba(124,179,66,0.05)':'transparent'}}>
-                  <td style={{padding:'10px',fontWeight:700,color:i===0?'#FFD700':i===1?'#C0C0C0':i===2?'#CD7F32':'inherit'}}>{i+1}</td>
-                  <td style={{padding:'10px',fontWeight:600}}>{op.nombre}</td>
-                  <td style={{padding:'10px',fontSize:12}}>{op.cargo}</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(op.kg)} kg</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:op.efic >= 80 ? 'var(--good)' : 'var(--amber)',fontWeight:700}}>{op.efic.toFixed(1)}%</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{op.reportes}</td>
-                  <td style={{padding:'10px',fontSize:12}}>{op.maquinaPrincipal}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Eficiencia por máquina */}
+      <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>🏭 Eficiencia por Máquina</div>
+      <div style={{display:'grid',gap:16,marginBottom:20}}>
+        {maquinas.map(m=>(
+          <div key={m.maquina} style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:12}}>
+              <div>
+                <h3 style={{margin:0,fontSize:18,fontWeight:700}}>{m.maquina}</h3>
+                <p style={{margin:'4px 0 0',fontSize:13,color:'var(--text-dim)'}}>{m.reportes} reportes en el mes</p>
+              </div>
+              <div style={{fontSize:36,fontWeight:700,fontFamily:'var(--mono)',color:m.eficiencia >= 75 ? 'var(--good)' : m.eficiencia >= 65 ? 'var(--amber)' : 'var(--bad)'}}>
+                {m.eficiencia.toFixed(1)}%
+              </div>
+            </div>
+            
+            {/* Barra visual de tiempos */}
+            <div style={{marginBottom:16}}>
+              <div style={{display:'flex',height:40,borderRadius:8,overflow:'hidden',border:'1px solid var(--line)'}}>
+                <div style={{width:`${m.eficiencia}%`,background:'linear-gradient(90deg, var(--good), #7CB342)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700}}>
+                  {m.eficiencia > 15 && `${m.eficiencia.toFixed(1)}% Productivo`}
+                </div>
+                <div style={{width:`${m.porcTM}%`,background:'linear-gradient(90deg, #EF4444, #DC2626)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700}}>
+                  {m.porcTM > 10 && `${m.porcTM.toFixed(1)}% TM`}
+                </div>
+              </div>
+            </div>
+            
+            {/* Métricas detalladas */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))',gap:12}}>
+              <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Tiempo Programado</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{fmt(m.horasDisp)} h</div>
+              </div>
+              <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Tiempo Productivo</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{fmt(m.horasProd)} h</div>
+              </div>
+              <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Tiempos Muertos</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>{m.tm.toFixed(0)} h ({m.porcTM.toFixed(1)}%)</div>
+              </div>
+              <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Producción</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)',color:'var(--brand-blue)'}}>{fmt(m.prodKg)} kg</div>
+              </div>
+              <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Rendimiento Real</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{m.rendReal.toFixed(1)} kg/h</div>
+              </div>
+              <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>% vs Meta</div>
+                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)',color:m.porcMeta >= 100 ? 'var(--good)' : 'var(--amber)'}}>{m.porcMeta.toFixed(0)}%</div>
+                <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} kg/h</div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
