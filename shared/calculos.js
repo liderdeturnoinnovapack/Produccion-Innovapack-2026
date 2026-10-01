@@ -803,8 +803,19 @@ async function loadReports(url, pin){
     const q = "usuario="+encodeURIComponent(window.__AUTH_USER||'')+"&pass="+encodeURIComponent(window.__AUTH_PASS||'');
     const resp = await fetch(url + sep + q);
     const data = await resp.json();
-    if(!Array.isArray(data)) return [];
-    var arr = data.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
+    
+    // El Apps Script devuelve {ok: true, reportes: [...]}
+    let reportes = [];
+    if(data.ok && Array.isArray(data.reportes)) {
+      reportes = data.reportes;
+    } else if(Array.isArray(data)) {
+      // Compatibilidad con formato antiguo (array directo)
+      reportes = data;
+    }
+    
+    if(reportes.length === 0) return [];
+    
+    var arr = reportes.map(normalizarReporte).sort((a,b)=> (b.ts||0) - (a.ts||0));
     /* IDs UNICOS: varios reportes pueden compartir maquina+consecutivo (o venir
        sin consecutivo, quedando como "Maquina_-"). Eso genera keys de React
        repetidas -> filas duplicadas/omitidas y, al marcar una casilla de SIESA,
