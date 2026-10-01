@@ -4630,6 +4630,25 @@ function AlertasRecomendaciones({datos}){
   );
 }
 
+// Función auxiliar para calcular kg de una merma individual
+// Parsea "5 Kg", "3 Unidades", etc. y convierte a kg
+function calcularMermaKgIndividual(cantStr, reporte){
+  const pesos = loadPesos();
+  if(!cantStr || cantStr === "-") return 0;
+  const pu = pesoUnidad(reporte, pesos);
+  const re = /([\d.]+)\s*([a-zA-ZáéíóúÁÉÍÓÚ]+)?/g;
+  const m = re.exec(String(cantStr));
+  if(!m) return 0;
+  const n = Number(m[1]) || 0;
+  const unit = (m[2] || "").toLowerCase();
+  // Si es unidad, convertir con pesoUnidad
+  if(unit.indexOf("unid") === 0 || unit === "und" || unit === "u"){
+    return pu > 0 ? n * pu : 0;
+  }
+  // Kg o sin unidad → se asume kg
+  return n;
+}
+
 // Función principal para calcular todos los datos del informe
 function calcularDatosInforme(reportesMes, reportesMesAnt){
   const metas = loadMetas();
@@ -4736,12 +4755,15 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
     const motivosMerma = {};
     reps.forEach(r => {
       const motivos = String(r.mermasMotivo||'').split(';').filter(Boolean);
-      const cants = String(r.mermasCantidad||'').split(';').map(Number).filter(x=>x>0);
+      const cants = String(r.mermasCantidad||'').split(';').filter(Boolean);
       motivos.forEach((mot,i) => {
         const m = mot.trim();
         if (!m) return;
         if (!motivosMerma[m]) motivosMerma[m] = 0;
-        motivosMerma[m] += cants[i] || 0;
+        // Calcular kg de esta merma específica
+        const cantStr = cants[i] || '';
+        const kg = calcularMermaKgIndividual(cantStr, r);
+        motivosMerma[m] += kg;
       });
     });
     const topMerma = Object.entries(motivosMerma).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -4852,12 +4874,15 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   const motivosMermaGlobal = {};
   reportesMes.forEach(r => {
     const motivos = String(r.mermasMotivo||'').split(';').filter(Boolean);
-    const cants = String(r.mermasCantidad||'').split(';').map(Number).filter(x=>x>0);
+    const cants = String(r.mermasCantidad||'').split(';').filter(Boolean);
     motivos.forEach((mot,i) => {
       const m = mot.trim();
       if (!m) return;
       if (!motivosMermaGlobal[m]) motivosMermaGlobal[m] = 0;
-      motivosMermaGlobal[m] += cants[i] || 0;
+      // Calcular kg de esta merma específica
+      const cantStr = cants[i] || '';
+      const kg = calcularMermaKgIndividual(cantStr, r);
+      motivosMermaGlobal[m] += kg;
     });
   });
   const topMermaGlobal = Object.entries(motivosMermaGlobal).sort((a,b)=>b[1]-a[1]).slice(0,10);
