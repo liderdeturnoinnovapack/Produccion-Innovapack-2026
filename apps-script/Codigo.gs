@@ -232,7 +232,7 @@ function leerReportesMaquina(maquina) {
       };
       
       // Validar que tenga al menos fecha y referencia antes de agregar
-      if (reporte.fecha && reporte.referencia) {
+      if (reporte['Fecha'] && reporte['Referencia']) {
         reportes.push(reporte);
       }
     }
@@ -313,7 +313,7 @@ function leerTodosReportes() {
           };
           
           // Validar que tenga al menos fecha y referencia
-          if (reporte.fecha && reporte.referencia) {
+          if (reporte['Fecha'] && reporte['Referencia']) {
             todosReportes.push(reporte);
           }
         }
