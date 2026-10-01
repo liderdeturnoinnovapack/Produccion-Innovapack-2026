@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001P-debug</title>
+<title>Panel de Producción · Innovapack v20261001Q-debug</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -5403,16 +5403,27 @@ function App(){
   useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-panel',theme);}catch(e){}},[theme]);
 
   async function refreshReports(){
+    console.log('🔄 refreshReports iniciado');
     setLoading(true);
-    const cfg=await loadConfigRemoto(SHEETS_URL_READ); // config compartida desde el Sheet
-    if(window.__AUTH_ROL==='admin') await migrarConfigInicial(cfg); // solo admin sube config al Sheet
-    setCatalog(loadCatalog()); setMachines(loadMachines());
-    const data=await loadReports(SHEETS_URL_READ); // lectura con usuario/clave (window.__AUTH_*)
-    setReports(data);
-    setLastUpdated(Date.now());
+    try {
+      const cfg=await loadConfigRemoto(SHEETS_URL_READ); // config compartida desde el Sheet
+      console.log('✅ Config cargada');
+      if(window.__AUTH_ROL==='admin') await migrarConfigInicial(cfg); // solo admin sube config al Sheet
+      setCatalog(loadCatalog()); setMachines(loadMachines());
+      console.log('🔍 Cargando reportes...');
+      const data=await loadReports(SHEETS_URL_READ); // lectura con usuario/clave (window.__AUTH_*)
+      console.log('✅ Reportes cargados:', data.length);
+      setReports(data);
+      setLastUpdated(Date.now());
+    } catch(err) {
+      console.error('❌ Error en refreshReports:', err);
+    }
     setLoading(false);
   }
-  useEffect(()=>{ if(unlocked) refreshReports(); },[unlocked]);
+  useEffect(()=>{ 
+    console.log('useEffect unlocked:', unlocked);
+    if(unlocked) refreshReports(); 
+  },[unlocked]);
 
   function onLogin(u){ window.__AUTH_USER=u.usuario; window.__AUTH_PASS=u.pass; window.__AUTH_ROL=u.rol; setUser(u); }
   function salir(){ window.__AUTH_USER=null; window.__AUTH_PASS=null; window.__AUTH_ROL=null; setUser(null); setReports([]); }
