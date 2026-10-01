@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001M</title>
+<title>Panel de Producción · Innovapack v20261001N-debug</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4084,13 +4084,27 @@ function tiemposMuertosMinutos(reporte){
   const str = String(reporte.tiemposMuertosMinutos || '');
   if(!str || str === '-') return 0;
   
+  // DEBUG: log para ver qué está llegando
+  if(str && str !== '0') {
+    console.log('TM Debug:', {
+      maq: reporte.maquina,
+      tmStr: str,
+      tmMotivo: reporte.tiemposMuertosMotivo
+    });
+  }
+  
   // Parsear formatos: "30min + 15min" o "30;15" o "30 + 15"
   const mins = str.split(/[+;]/).map(s => {
     const match = s.match(/([\d.]+)/);
     return match ? Number(match[1]) : 0;
   }).filter(x => x > 0);
   
-  return mins.reduce((s,m)=>s+m, 0);
+  const total = mins.reduce((s,m)=>s+m, 0);
+  if(total > 0) {
+    console.log('  → Total:', total, 'min');
+  }
+  
+  return total;
 }
 
 // Inventario Bodega PT (simplificado para el informe)
