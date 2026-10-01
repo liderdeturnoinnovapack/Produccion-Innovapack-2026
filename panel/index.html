@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001S</title>
+<title>Panel de Producción · Innovapack v20261001T</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -73,6 +73,7 @@
 <script src="../shared/inventario_base.js?v=20261001a"></script>
 <script src="../shared/sku_maestro.js?v=20261001a"></script>
 <script src="../shared/calculos.js?v=20261001a"></script>
+<script src="../shared/ia-gemini.js?v=20261001s"></script>
 </head>
 <body>
 <div id="app-root"></div>
@@ -5428,6 +5429,9 @@ function PanelView({rol,usuario,catalog,setCatalog,machines,setMachines,reports,
         </div>}
       </>}
       </div>
+      
+      {/* Asistente IA flotante */}
+      <BotonAsistenteIA reports={reports} />
     </div>
   );
 }
@@ -5497,6 +5501,223 @@ function App(){
     </div>
   );
 }
+
+// ============================================================
+// ASISTENTE IA - COMPONENTES
+// ============================================================
+
+function BotonAsistenteIA({reports}) {
+  const [open, setOpen] = useState(false);
+  
+  if (!window.AsistenteIA?.config.habilitado) return null;
+  
+  return (
+    <>
+      <button 
+        onClick={() => setOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          width: 64,
+          height: 64,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          border: 'none',
+          color: '#fff',
+          fontSize: 32,
+          cursor: 'pointer',
+          boxShadow: '0 8px 24px rgba(102,126,234,0.4)',
+          zIndex: 999,
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+        }}
+        onMouseEnter={e => e.target.style.transform = 'scale(1.1)'}
+        onMouseLeave={e => e.target.style.transform = 'scale(1)'}
+        title="Asistente IA - Pregúntame sobre producción"
+      >
+        🤖
+      </button>
+      
+      {open && <ModalAsistenteIA reports={reports} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function ModalAsistenteIA({reports, onClose}) {
+  const [pregunta, setPregunta] = useState('');
+  const [conversacion, setConversacion] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const chatRef = React.useRef(null);
+  
+  React.useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [conversacion]);
+  
+  async function enviar(textoPregunta) {
+    const txt = textoPregunta || pregunta;
+    if (!txt.trim() || loading) return;
+    
+    setLoading(true);
+    setConversacion([...conversacion, {rol: 'usuario', texto: txt}]);
+    setPregunta('');
+    
+    const result = await window.AsistenteIA.consultar(txt, reports);
+    
+    setConversacion(prev => [
+      ...prev,
+      {rol: 'ia', texto: result.ok ? result.respuesta : '❌ ' + result.error}
+    ]);
+    
+    setLoading(false);
+  }
+  
+  return (
+    <Modal title="🤖 Asistente IA - Innovapack" onClose={onClose}>
+      <div style={{display: 'flex', flexDirection: 'column', height: '70vh', maxHeight: 600}}>
+        
+        {/* Área de conversación */}
+        <div ref={chatRef} style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: 20,
+          background: 'var(--panel-2)',
+          borderRadius: 12,
+          marginBottom: 16
+        }}>
+          {conversacion.length === 0 && (
+            <div style={{textAlign: 'center', color: 'var(--text-dim)', padding: '30px 20px'}}>
+              <div style={{fontSize: 56, marginBottom: 16}}>🤖</div>
+              <div style={{fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text)'}}>
+                ¡Hola! Soy tu asistente de producción
+              </div>
+              <div style={{fontSize: 14, marginBottom: 24, lineHeight: 1.6}}>
+                Puedo ayudarte a analizar reportes, producción,<br/>
+                mermas, tiempos muertos y más...
+              </div>
+              
+              {/* Preguntas sugeridas */}
+              <div style={{display: 'grid', gap: 10, maxWidth: 400, margin: '0 auto'}}>
+                {window.AsistenteIA.preguntasSugeridas.map((p, i) => (
+                  <button 
+                    key={i}
+                    onClick={() => enviar(p)}
+                    style={{
+                      background: 'var(--card)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      color: 'var(--text)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => {
+                      e.target.style.background = 'var(--accent)';
+                      e.target.style.color = '#fff';
+                      e.target.style.transform = 'translateX(4px)';
+                    }}
+                    onMouseLeave={e => {
+                      e.target.style.background = 'var(--card)';
+                      e.target.style.color = 'var(--text)';
+                      e.target.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    💡 {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {conversacion.map((msg, i) => (
+            <div key={i} style={{
+              textAlign: msg.rol === 'usuario' ? 'right' : 'left',
+              marginBottom: 16,
+              animation: 'fadeInUp 0.3s ease'
+            }}>
+              <div style={{
+                display: 'inline-block',
+                background: msg.rol === 'usuario' 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : 'var(--card)',
+                color: msg.rol === 'usuario' ? '#fff' : 'var(--text)',
+                padding: '14px 18px',
+                borderRadius: msg.rol === 'usuario' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                maxWidth: '80%',
+                textAlign: 'left',
+                fontSize: 14,
+                lineHeight: 1.6,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}>
+                {msg.texto}
+              </div>
+            </div>
+          ))}
+          
+          {loading && (
+            <div style={{textAlign: 'left', marginBottom: 16}}>
+              <div style={{
+                display: 'inline-block',
+                background: 'var(--card)',
+                padding: '14px 18px',
+                borderRadius: '16px 16px 16px 4px',
+                fontSize: 14,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+              }}>
+                <span style={{animation: 'pulse 1.5s ease-in-out infinite'}}>
+                  🤖 Analizando datos...
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Input de pregunta */}
+        <div style={{display: 'flex', gap: 12}}>
+          <input
+            value={pregunta}
+            onChange={e => setPregunta(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && !e.shiftKey && enviar()}
+            placeholder="Escribe tu pregunta aquí..."
+            style={{
+              ...inputStyle,
+              flex: 1,
+              fontSize: 14
+            }}
+            disabled={loading}
+            autoFocus
+          />
+          <button
+            onClick={() => enviar()}
+            disabled={loading || !pregunta.trim()}
+            style={{
+              background: loading || !pregunta.trim()
+                ? 'var(--text-dim)'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              padding: '0 24px',
+              fontWeight: 700,
+              cursor: loading || !pregunta.trim() ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              minWidth: 100,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {loading ? '⏳ ...' : '📤 Enviar'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById('app-root')).render(<App/>);
 </script>
 </body>
