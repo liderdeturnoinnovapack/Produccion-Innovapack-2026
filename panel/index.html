@@ -4067,6 +4067,43 @@ function InformeMensual({reports}){
   );
 }
 
+/* ===== FUNCIONES AUXILIARES PARA INFORME ===== */
+
+// Obtener duración del turno en minutos
+function duracionTurnoMinutos(turno){
+  const turnos = window.TURNOS_HORAS || {};
+  const info = turnos[turno];
+  return info ? info.duracion : 480; // default 8h
+}
+
+// Calcular tiempos muertos totales en minutos
+function tiemposMuertosMinutos(reporte){
+  const mins = String(reporte.tiemposMuertosMinutos || '').split(';').map(Number).filter(x=>x>0);
+  return mins.reduce((s,m)=>s+m, 0);
+}
+
+// Inventario Bodega PT (simplificado para el informe)
+function inventarioBodegaPT(reportes){
+  const invMap = {};
+  reportes.filter(r=>clasificarReporte(r).bodega==='Producto Terminado').forEach(r=>{
+    const ref = r.referencia || 'Sin referencia';
+    if(!invMap[ref]) invMap[ref] = {ref, kg: 0};
+    invMap[ref].kg += produccionKg(r);
+  });
+  return Object.values(invMap);
+}
+
+// Inventario Bodega PP (simplificado para el informe)
+function inventarioBodegaPP(reportes){
+  const invMap = {};
+  reportes.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso').forEach(r=>{
+    const ref = r.referencia || 'Sin referencia';
+    if(!invMap[ref]) invMap[ref] = {ref, kg: 0};
+    invMap[ref].kg += produccionKg(r);
+  });
+  return Object.values(invMap);
+}
+
 /* ===== SECCIONES DEL INFORME ===== */
 
 // Componente: Resumen Ejecutivo
