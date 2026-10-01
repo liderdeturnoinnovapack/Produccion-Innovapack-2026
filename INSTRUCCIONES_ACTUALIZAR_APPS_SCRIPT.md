@@ -1,77 +1,103 @@
-# 🔧 Instrucciones para Actualizar el Apps Script
+# 🔧 Instrucciones para Actualizar el Apps Script - VERSIÓN FINAL
 
-## Problema identificado
+## Problema identificado y resuelto
 
-El Apps Script estaba usando nombres de campos **antiguos** que no coincidían con los que envía el formulario actual. Por eso los tiempos muertos (y otros datos) no se estaban guardando correctamente en las columnas O y P del Sheet.
+El Apps Script estaba usando nombres de campos **camelCase** que no coincidían con los que espera el frontend. Esto causaba que:
+- ❌ Los reportes no se cargaban (devolvía 0 reportes)
+- ❌ Las mermas no aparecían
+- ❌ Los tiempos muertos no se mostraban desglosados
 
-## Solución
+## Solución aplicada
 
-Se corrigió el archivo `apps-script/Codigo.gs` para mapear correctamente los campos del formulario a las columnas del Sheet.
+Se actualizó el Apps Script para que envíe los campos con **nombres legibles** que el frontend reconoce correctamente.
 
-### Cambios realizados (líneas 519-547):
-
-**ANTES:**
+**Antes:**
 ```javascript
-params.tiempoMuerto || '',      // ❌ Campo antiguo
-params.motivoTM || '',          // ❌ Campo antiguo
-params.medida || '',            // ❌ Falta prefijo "extra"
+merma: String(row[12])  // ❌ No reconocido
 ```
 
-**DESPUÉS:**
+**Después:**
 ```javascript
-params.tiemposMuertosMinutos || params.tiempoMuerto || '',  // ✅ Nuevo + fallback
-params.tiemposMuertosMotivo || params.motivoTM || '',       // ✅ Nuevo + fallback
-params.extraMedida || params.medida || '',                  // ✅ Con prefijo correcto
+'Merma Cantidad': String(row[12])  // ✅ Reconocido
 ```
 
-## 📋 Pasos para actualizar
+## 📋 Pasos para actualizar (CRÍTICO)
 
-1. Abre el editor de **Google Apps Script**:
+1. **Abre el editor de Google Apps Script:**
    - Ve a https://script.google.com
    - Busca el proyecto "Reportes de Produccion 2026"
    - O desde el Sheet: **Extensiones → Apps Script**
 
-2. Selecciona todo el contenido del archivo `Codigo.gs`
+2. **Selecciona TODO el contenido actual** del archivo `Codigo.gs` (Ctrl+A)
 
-3. **Reemplázalo** con el contenido del archivo actualizado:
-   - Abre el archivo: `apps-script/Codigo.gs` en este repositorio
-   - Copia TODO el contenido
-   - Pégalo en el editor de Apps Script
+3. **Borra todo** y **pega el contenido completo** del archivo:
+   `apps-script/Codigo.gs` (del repositorio actualizado)
 
 4. **Guarda** el proyecto (Ctrl+S o icono 💾)
 
-5. **Implementa** una nueva versión:
+5. **Implementa una nueva versión:**
    - Click en **"Implementar"** → **"Gestionar implementaciones"**
    - Click en el ✏️ (lápiz) de la implementación activa
    - Cambia a **"Nueva versión"**
-   - Agrega descripción: `Fix: Corregir mapeo de campos tiempos muertos`
+   - Descripción: `Fix final: Nombres de campos legibles para mermas y tiempos muertos`
    - Click en **"Implementar"**
 
-6. Espera 1-2 minutos para que los cambios se propaguen
+6. **Espera 2-3 minutos** para que los cambios se propaguen
 
-7. **Prueba** ingresando un nuevo reporte desde el formulario con tiempos muertos
+7. **Recarga el panel** con Ctrl+F5
 
 ## ✅ Qué se corrigió
 
-### Tiempos Muertos
-- **Columna O** ahora guarda correctamente los minutos: `15min + 80min`
-- **Columna P** ahora guarda correctamente los motivos: `01 - Tiempo de almuerzo + 02 - Tiempo de desayuno`
+### Formato de respuesta
+- **Antes**: Devolvía array directo `[...]`
+- **Después**: Devuelve `{ok: true, reportes: [...]}`
+- **Frontend**: Actualizado para soportar ambos formatos
 
-### Otros campos corregidos
-- Operario: `params.operario` → `params.nombre` (fallback)
-- Código Siesa: `params.codigoSiesa` → `params.siesa` (fallback)
-- Mermas: `params.merma` → `params.mermasCantidad` (nuevo formato)
-- Campos extra (medida, calibre, rollos, etc.): ahora con prefijo `extra*`
+### Nombres de campos
+- **Antes**: `merma`, `tiemposMuertosMinutos` (camelCase)
+- **Después**: `"Merma Cantidad"`, `"Tiempo muerto (min)"` (legibles)
 
-## 🔍 Verificación
+### Campos que ahora funcionan correctamente:
+- ✅ `'Tiempo muerto (min)'` → Minutos de TM (columna O)
+- ✅ `'Motivo tiempo muerto'` → Motivos de TM (columna P)
+- ✅ `'Merma Cantidad'` → Cantidad de merma (columna M)
+- ✅ `'Merma Motivo'` → Motivo de merma (columna N)
 
-Después de actualizar, los reportes nuevos deberían:
-- ✅ Mostrar tiempos muertos en la columna O
-- ✅ Mostrar motivos de TM en la columna P
-- ✅ Aparecer desglosados por máquina en el panel
-- ✅ Mostrarse en el Top 15 de motivos de TM
+## 🔍 Verificación post-actualización
+
+Después de actualizar, verifica que:
+
+1. **Panel General:**
+   - ✅ Muestra 583 reportes (o el número actual)
+   - ✅ Tarjeta de "Merma Total" muestra un porcentaje
+   - ✅ Tarjeta de "Tiempos Muertos" muestra horas
+
+2. **Informe Mensual → Producción:**
+   - ✅ Cada máquina muestra sus tiempos muertos individuales
+   - ✅ Sección "Top Motivos TM" lista los motivos con horas
+
+3. **Informe Mensual → Tiempos Muertos:**
+   - ✅ Top 15 Motivos de Tiempos Muertos con horas y porcentajes
+   - ✅ Datos coinciden con el total mostrado en el resumen
+
+4. **Informe Mensual → Mermas:**
+   - ✅ Merma por máquina con porcentajes
+   - ✅ Top motivos de merma
+
+## 🚨 Si algo falla
+
+Si después de actualizar el panel muestra "0 reportes":
+
+1. Abre la consola del navegador (F12 → Console)
+2. Busca errores en rojo
+3. Ejecuta: `fetch('URL_DEL_SCRIPT?usuario=jose.cortes&pass=072026').then(r=>r.json()).then(console.log)`
+4. Si devuelve `{ok: false, error: ...}`, hay un error de sintaxis en el Apps Script
+5. Revisa que hayas copiado **TODO** el contenido del archivo sin truncar
 
 ---
 
-**Versión del fix:** 2026-10-01
-**Archivo corregido:** `apps-script/Codigo.gs` líneas 519-547
+**Versión del fix:** 2026-10-01 (final)
+**Archivos modificados:** 
+- `apps-script/Codigo.gs` (lectura de reportes con nombres legibles)
+- `shared/calculos.js` (soporte para formato `{ok, reportes}`)
+- `panel/index.html` (logs de debug + fix parseo respuesta)

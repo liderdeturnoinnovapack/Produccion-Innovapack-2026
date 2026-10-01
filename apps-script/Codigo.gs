@@ -184,51 +184,51 @@ function leerReportesMaquina(maquina) {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       
-      // Construir objeto reporte con las 43 columnas
+      // Construir objeto reporte con las 43 columnas (nombres legibles para el frontend)
       const reporte = {
-        fecha: parseFecha(row[0]),                    // A: Fecha
-        operario: String(row[1] || '').trim(),        // B: Nombre
-        cargo: String(row[2] || '').trim(),           // C: Cargo
-        maquina: String(row[3] || '').trim(),         // D: Maquina
-        horaInicio: String(row[4] || '').trim(),      // E: Hora inicio
-        horaFinal: String(row[5] || '').trim(),       // F: Hora final
-        turno: String(row[6] || '').trim(),           // G: Turno
-        codigoSiesa: String(row[7] || '').trim(),     // H: Codigo Siesa
-        sku: String(row[8] || '').trim(),             // I: SKU
-        referencia: String(row[9] || '').trim(),      // J: Referencia
-        unidad: String(row[10] || '').trim(),         // K: Unidad
-        produccion: Number(row[11]) || 0,             // L: Produccion
-        merma: String(row[12] || '').trim(),          // M: Merma Cantidad
-        mermaMotivo: String(row[13] || '').trim(),    // N: Merma Motivo
-        tiemposMuertosMinutos: String(row[14] || '').trim(),   // O: Tiempo muerto (min)
-        tiemposMuertosMotivo: String(row[15] || '').trim(),    // P: Motivo tiempo muerto
-        medida: String(row[16] || '').trim(),         // Q: Medida
-        calibre: String(row[17] || '').trim(),        // R: Calibre
-        sentido: String(row[18] || '').trim(),        // S: Sentido
-        rolloInicial: String(row[19] || '').trim(),   // T: Rollo Inicial
-        rolloFinal: String(row[20] || '').trim(),     // U: Rollo Final
-        rollosTotales: String(row[21] || '').trim(),  // V: Rollos Totales
-        rollosProducidos: String(row[22] || '').trim(),// W: Rollos Producidos
-        paqueteInicial: String(row[23] || '').trim(), // X: Paquete Inicial
-        paqueteFinal: String(row[24] || '').trim(),   // Y: Paquete Final
-        unidadesXPaquete: String(row[25] || '').trim(),// Z: Unidades x Paquete
-        saldo: String(row[26] || '').trim(),          // AA: Saldo
-        rollosDetalle: String(row[27] || '').trim(),  // AB: Rollos Detalle
-        fechaTurno: parseFecha(row[28]),              // AC: Fecha Turno
-        consecutivo: String(row[29] || '').trim(),    // AD: Consecutivo
-        observaciones: String(row[30] || '').trim(),  // AE: Observaciones
-        bodega: String(row[31] || '').trim(),         // AF: Bodega
-        categoria: String(row[32] || '').trim(),      // AG: Categoria
-        sector: String(row[33] || '').trim(),         // AH: Sector
-        duracionTurno: String(row[34] || '').trim(),  // AI: Duracion Turno (min)
-        tiempoTrabajado: String(row[35] || '').trim(),// AJ: Tiempo Trabajado (min)
-        tiemposMuertos: String(row[36] || '').trim(), // AK: Tiempos Muertos (min)
-        tiempoProductivo: String(row[37] || '').trim(),// AL: Tiempo Productivo (min)
-        utilizacion: String(row[38] || '').trim(),    // AM: % Utilizacion
-        rendimientoReal: String(row[39] || '').trim(),// AN: Rendimiento Real
-        rendimientoMeta: String(row[40] || '').trim(),// AO: Rendimiento Meta
-        unidadRendimiento: String(row[41] || '').trim(),// AP: Unidad Rendimiento
-        porcentajeRendimiento: String(row[42] || '').trim() // AQ: % Rendimiento
+        'Fecha': parseFecha(row[0]),
+        'Nombre': String(row[1] || '').trim(),
+        'Cargo': String(row[2] || '').trim(),
+        'Maquina': String(row[3] || '').trim(),
+        'Hora inicio': String(row[4] || '').trim(),
+        'Hora final': String(row[5] || '').trim(),
+        'Turno': String(row[6] || '').trim(),
+        'Codigo Siesa': String(row[7] || '').trim(),
+        'SKU': String(row[8] || '').trim(),
+        'Referencia': String(row[9] || '').trim(),
+        'Unidad': String(row[10] || '').trim(),
+        'Produccion': Number(row[11]) || 0,
+        'Merma Cantidad': String(row[12] || '').trim(),
+        'Merma Motivo': String(row[13] || '').trim(),
+        'Tiempo muerto (min)': String(row[14] || '').trim(),
+        'Motivo tiempo muerto': String(row[15] || '').trim(),
+        'Medida': String(row[16] || '').trim(),
+        'Calibre': String(row[17] || '').trim(),
+        'Sentido': String(row[18] || '').trim(),
+        'Rollo Inicial': String(row[19] || '').trim(),
+        'Rollo Final': String(row[20] || '').trim(),
+        'Rollos Totales': String(row[21] || '').trim(),
+        'Rollos Producidos': String(row[22] || '').trim(),
+        'Paquete Inicial': String(row[23] || '').trim(),
+        'Paquete Final': String(row[24] || '').trim(),
+        'Unidades x Paquete': String(row[25] || '').trim(),
+        'Saldo': String(row[26] || '').trim(),
+        'Rollos Detalle': String(row[27] || '').trim(),
+        'Fecha Turno': parseFecha(row[28]),
+        'Consecutivo': String(row[29] || '').trim(),
+        'Observaciones': String(row[30] || '').trim(),
+        'Bodega': String(row[31] || '').trim(),
+        'Categoria': String(row[32] || '').trim(),
+        'Sector': String(row[33] || '').trim(),
+        'Duracion Turno (min)': String(row[34] || '').trim(),
+        'Tiempo Trabajado (min)': String(row[35] || '').trim(),
+        'Tiempos Muertos (min)': String(row[36] || '').trim(),
+        'Tiempo Productivo (min)': String(row[37] || '').trim(),
+        'Utilizacion': String(row[38] || '').trim(),
+        'Rendimiento Real': String(row[39] || '').trim(),
+        'Rendimiento Meta': String(row[40] || '').trim(),
+        'Unidad Rendimiento': String(row[41] || '').trim(),
+        'Porcentaje Rendimiento': String(row[42] || '').trim()
       };
       
       // Validar que tenga al menos fecha y referencia antes de agregar
@@ -265,51 +265,51 @@ function leerTodosReportes() {
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
           
-          // Construir objeto reporte con las 43 columnas
+          // Construir objeto reporte con las 43 columnas (nombres legibles)
           const reporte = {
-            fecha: parseFecha(row[0]),
-            operario: String(row[1] || '').trim(),
-            cargo: String(row[2] || '').trim(),
-            maquina: String(row[3] || '').trim(),
-            horaInicio: String(row[4] || '').trim(),
-            horaFinal: String(row[5] || '').trim(),
-            turno: String(row[6] || '').trim(),
-            codigoSiesa: String(row[7] || '').trim(),
-            sku: String(row[8] || '').trim(),
-            referencia: String(row[9] || '').trim(),
-            unidad: String(row[10] || '').trim(),
-            produccion: Number(row[11]) || 0,
-            merma: String(row[12] || '').trim(),
-            mermaMotivo: String(row[13] || '').trim(),
-            tiemposMuertosMinutos: String(row[14] || '').trim(),
-            tiemposMuertosMotivo: String(row[15] || '').trim(),
-            medida: String(row[16] || '').trim(),
-            calibre: String(row[17] || '').trim(),
-            sentido: String(row[18] || '').trim(),
-            rolloInicial: String(row[19] || '').trim(),
-            rolloFinal: String(row[20] || '').trim(),
-            rollosTotales: String(row[21] || '').trim(),
-            rollosProducidos: String(row[22] || '').trim(),
-            paqueteInicial: String(row[23] || '').trim(),
-            paqueteFinal: String(row[24] || '').trim(),
-            unidadesXPaquete: String(row[25] || '').trim(),
-            saldo: String(row[26] || '').trim(),
-            rollosDetalle: String(row[27] || '').trim(),
-            fechaTurno: parseFecha(row[28]),
-            consecutivo: String(row[29] || '').trim(),
-            observaciones: String(row[30] || '').trim(),
-            bodega: String(row[31] || '').trim(),
-            categoria: String(row[32] || '').trim(),
-            sector: String(row[33] || '').trim(),
-            duracionTurno: String(row[34] || '').trim(),
-            tiempoTrabajado: String(row[35] || '').trim(),
-            tiemposMuertos: String(row[36] || '').trim(),
-            tiempoProductivo: String(row[37] || '').trim(),
-            utilizacion: String(row[38] || '').trim(),
-            rendimientoReal: String(row[39] || '').trim(),
-            rendimientoMeta: String(row[40] || '').trim(),
-            unidadRendimiento: String(row[41] || '').trim(),
-            porcentajeRendimiento: String(row[42] || '').trim()
+            'Fecha': parseFecha(row[0]),
+            'Nombre': String(row[1] || '').trim(),
+            'Cargo': String(row[2] || '').trim(),
+            'Maquina': String(row[3] || '').trim(),
+            'Hora inicio': String(row[4] || '').trim(),
+            'Hora final': String(row[5] || '').trim(),
+            'Turno': String(row[6] || '').trim(),
+            'Codigo Siesa': String(row[7] || '').trim(),
+            'SKU': String(row[8] || '').trim(),
+            'Referencia': String(row[9] || '').trim(),
+            'Unidad': String(row[10] || '').trim(),
+            'Produccion': Number(row[11]) || 0,
+            'Merma Cantidad': String(row[12] || '').trim(),
+            'Merma Motivo': String(row[13] || '').trim(),
+            'Tiempo muerto (min)': String(row[14] || '').trim(),
+            'Motivo tiempo muerto': String(row[15] || '').trim(),
+            'Medida': String(row[16] || '').trim(),
+            'Calibre': String(row[17] || '').trim(),
+            'Sentido': String(row[18] || '').trim(),
+            'Rollo Inicial': String(row[19] || '').trim(),
+            'Rollo Final': String(row[20] || '').trim(),
+            'Rollos Totales': String(row[21] || '').trim(),
+            'Rollos Producidos': String(row[22] || '').trim(),
+            'Paquete Inicial': String(row[23] || '').trim(),
+            'Paquete Final': String(row[24] || '').trim(),
+            'Unidades x Paquete': String(row[25] || '').trim(),
+            'Saldo': String(row[26] || '').trim(),
+            'Rollos Detalle': String(row[27] || '').trim(),
+            'Fecha Turno': parseFecha(row[28]),
+            'Consecutivo': String(row[29] || '').trim(),
+            'Observaciones': String(row[30] || '').trim(),
+            'Bodega': String(row[31] || '').trim(),
+            'Categoria': String(row[32] || '').trim(),
+            'Sector': String(row[33] || '').trim(),
+            'Duracion Turno (min)': String(row[34] || '').trim(),
+            'Tiempo Trabajado (min)': String(row[35] || '').trim(),
+            'Tiempos Muertos (min)': String(row[36] || '').trim(),
+            'Tiempo Productivo (min)': String(row[37] || '').trim(),
+            'Utilizacion': String(row[38] || '').trim(),
+            'Rendimiento Real': String(row[39] || '').trim(),
+            'Rendimiento Meta': String(row[40] || '').trim(),
+            'Unidad Rendimiento': String(row[41] || '').trim(),
+            'Porcentaje Rendimiento': String(row[42] || '').trim()
           };
           
           // Validar que tenga al menos fecha y referencia
