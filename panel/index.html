@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001L</title>
+<title>Panel de Producción · Innovapack v20261001M</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4056,7 +4056,7 @@ function InformeMensual({reports}){
       </div>
       
       <div className="fade-in" key={seccion}>
-        {seccion==='resumen' && <ResumenEjecutivo datos={datos} mes={meses[mes]} anio={anio}/>}
+        {seccion==='resumen' && <ResumenEjecutivo datos={datos} reportes={reportesMes} mes={meses[mes]} anio={anio}/>}
         {seccion==='produccion' && <ProduccionPorMaquina datos={datos}/>}
         {seccion==='eficiencia' && <AnalisisEficiencia datos={datos}/>}
         {seccion==='mermas' && <AnalisisMermas datos={datos}/>}
@@ -4118,7 +4118,7 @@ function inventarioBodegaPP(reportes){
 /* ===== SECCIONES DEL INFORME ===== */
 
 // Componente: Resumen Ejecutivo
-function ResumenEjecutivo({datos, mes, anio}){
+function ResumenEjecutivo({datos, reportes, mes, anio}){
   const fmt = (n)=>Math.round(n).toLocaleString();
   const delta = (val, ant)=> ant > 0 ? ((val - ant) / ant * 100).toFixed(1) : '0.0';
   const deltaColor = (d)=> d > 0 ? 'var(--good)' : d < 0 ? 'var(--bad)' : 'var(--text-dim)';
@@ -4127,13 +4127,11 @@ function ResumenEjecutivo({datos, mes, anio}){
   // Separar producción por área Y por tipo de bodega
   const extrusorasPP = [];
   const extrusorasPT = [];
-  const refiladoraPP = 0;
-  const refiladoraPT = 0;
   
   // Clasificar extrusoras
   Object.values(datos.porMaquina).filter(m => m.maquina.indexOf('Extrusora') === 0).forEach(m => {
     // Necesitamos ver los reportes individuales para clasificar
-    const reps = reportesMes.filter(r => r.maquina === m.maquina);
+    const reps = reportes.filter(r => r.maquina === m.maquina);
     let kgPP = 0, kgPT = 0;
     reps.forEach(r => {
       const cls = clasificarReporte(r);
@@ -4147,7 +4145,7 @@ function ResumenEjecutivo({datos, mes, anio}){
   // Clasificar refiladora
   let refiladoraPPKg = 0, refiladoraPTKg = 0;
   if(datos.porMaquina['Refiladora']){
-    const repsRef = reportesMes.filter(r => r.maquina === 'Refiladora');
+    const repsRef = reportes.filter(r => r.maquina === 'Refiladora');
     repsRef.forEach(r => {
       const cls = clasificarReporte(r);
       if(cls.bodega === 'Producto Terminado') refiladoraPTKg += produccionKg(r);
