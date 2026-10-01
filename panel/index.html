@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001h</title>
+<title>Panel de Producción · Innovapack v20261001i</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4135,6 +4135,10 @@ function ResumenEjecutivo({datos, mes, anio}){
   const prodRefilado = refiladora ? refiladora.prodKg : 0;
   const prodSellado = selladoras.reduce((s,m) => s + m.prodKg, 0);
   
+  // Totales por tipo de bodega
+  const totalPP = datos.prodPPKg; // Total de producto en proceso (extrusión + impresión + refilado)
+  const totalPT = datos.prodPTKg; // Total de producto terminado (sellado)
+  
   return (
     <div>
       <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🎯 Resumen Ejecutivo</div>
@@ -4153,10 +4157,12 @@ function ResumenEjecutivo({datos, mes, anio}){
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina/Tubular producida</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>→ Va a Impresión: {fmt(prodImpresion)} kg</div>
-            <div style={{marginBottom:4}}>→ Va a Refilado: {fmt(prodRefilado)} kg</div>
+            <div style={{marginBottom:4}}>📊 Extrusoras activas: {extrusoras.length}</div>
+            {extrusoras.map((m,i)=>(
+              <div key={i} style={{marginBottom:2}}>• {m.maquina}: {fmt(m.prodKg)} kg</div>
+            ))}
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
-              ⚙️ Residual: {fmt(prodExtrusion - prodImpresion - prodRefilado)} kg
+              ⚙️ Producto en Proceso
             </div>
           </div>
         </div>
@@ -4169,10 +4175,10 @@ function ResumenEjecutivo({datos, mes, anio}){
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina impresa producida</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>← Recibe de Extrusión</div>
-            <div style={{marginBottom:4}}>→ Va a Sellado: {fmt(prodSellado)} kg</div>
+            <div style={{marginBottom:4}}>📊 Recibe lámina de extrusión</div>
+            <div style={{marginBottom:4}}>→ Puede ir a sellado</div>
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
-              ⚙️ Residual: {fmt(prodImpresion - prodSellado)} kg
+              ⚙️ Producto en Proceso
             </div>
           </div>
         </div>
@@ -4185,10 +4191,10 @@ function ResumenEjecutivo({datos, mes, anio}){
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina refilada producida</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>← Recibe de Extrusión</div>
-            <div style={{marginBottom:4}}>→ Puede ir a Sellado</div>
+            <div style={{marginBottom:4}}>📊 Recibe lámina de extrusión</div>
+            <div style={{marginBottom:4}}>→ Genera rollos cortados</div>
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
-              ⚙️ En Proceso: {fmt(prodRefilado)} kg
+              ⚙️ Producto en Proceso
             </div>
           </div>
         </div>
@@ -4201,8 +4207,10 @@ function ResumenEjecutivo({datos, mes, anio}){
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Producto Terminado generado</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>← Recibe de Impresión</div>
-            <div style={{marginBottom:4}}>← Recibe de Refilado</div>
+            <div style={{marginBottom:4}}>📊 Selladoras activas: {selladoras.length}</div>
+            {selladoras.map((m,i)=>(
+              <div key={i} style={{marginBottom:2}}>• {m.maquina}: {fmt(m.prodKg)} kg</div>
+            ))}
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
               📦 Listo para despacho
             </div>
