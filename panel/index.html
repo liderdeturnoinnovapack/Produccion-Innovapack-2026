@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001e</title>
+<title>Panel de Producción · Innovapack v20261001f</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -3899,7 +3899,9 @@ function exportarInformeExcel(datos, filename){
   // Hoja 2: Por Máquina
   const maquinas = [['Máquina','Reportes','Prod (kg)','Prod (und)','Merma (kg)','% Merma','Eficiencia %','Rendimiento Real','Meta','% vs Meta','TM (h)','% TM']];
   Object.values(datos.porMaquina).forEach(m => {
-    maquinas.push([m.maquina, m.reportes, fmt(m.prodKg), fmt(m.prodUnd), fmt(m.merma), m.porcMerma.toFixed(1), m.eficiencia.toFixed(1), m.rendReal.toFixed(1), m.meta, m.porcMeta.toFixed(1), m.tm.toFixed(0), m.porcTM.toFixed(1)]);
+    const rend = m.prodUnd > 0 ? `${m.rendRealUnd.toFixed(0)} und/h` : `${m.rendReal.toFixed(1)} kg/h`;
+    const metaStr = m.prodUnd > 0 ? `${m.meta} und/h` : `${m.meta} kg/h`;
+    maquinas.push([m.maquina, m.reportes, fmt(m.prodKg), fmt(m.prodUnd), fmt(m.merma), m.porcMerma.toFixed(1), m.eficiencia.toFixed(1), rend, metaStr, m.porcMeta.toFixed(1), m.tm.toFixed(0), m.porcTM.toFixed(1)]);
   });
   const ws2 = XLSX.utils.aoa_to_sheet(maquinas);
   XLSX.utils.book_append_sheet(wb, ws2, 'Por Máquina');
@@ -4252,8 +4254,17 @@ function ProduccionPorMaquina({datos}){
             </div>
             <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
               <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Rendimiento</div>
-              <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--accent)'}}>{m.rendReal.toFixed(1)} kg/h</div>
-              <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} kg/h</div>
+              {m.prodUnd > 0 ? (
+                <>
+                  <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--accent)'}}>{(m.prodUnd / m.horasProd).toFixed(0)} und/h</div>
+                  <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} und/h</div>
+                </>
+              ) : (
+                <>
+                  <div style={{fontSize:18,fontWeight:700,fontFamily:'var(--mono)',color:'var(--accent)'}}>{m.rendReal.toFixed(1)} kg/h</div>
+                  <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} kg/h</div>
+                </>
+              )}
             </div>
             <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
               <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Merma</div>
@@ -4404,12 +4415,20 @@ function AnalisisEficiencia({datos}){
               </div>
               <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
                 <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>Rendimiento Real</div>
-                <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{m.rendReal.toFixed(1)} kg/h</div>
+                {m.prodUnd > 0 ? (
+                  <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{m.rendRealUnd.toFixed(0)} und/h</div>
+                ) : (
+                  <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{m.rendReal.toFixed(1)} kg/h</div>
+                )}
               </div>
               <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
                 <div style={{fontSize:10,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:4}}>% vs Meta</div>
                 <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)',color:m.porcMeta >= 100 ? 'var(--good)' : 'var(--amber)'}}>{m.porcMeta.toFixed(0)}%</div>
-                <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} kg/h</div>
+                {m.prodUnd > 0 ? (
+                  <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} und/h</div>
+                ) : (
+                  <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {m.meta} kg/h</div>
+                )}
               </div>
             </div>
           </div>
@@ -4825,8 +4844,10 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
     
     const efic = horasDisp > 0 ? (horasProd / horasDisp) * 100 : 0;
     const rendReal = horasProd > 0 ? prodKg / horasProd : 0;
+    const rendRealUnd = horasProd > 0 ? prodUnd / horasProd : 0;
     const metaMaq = (metas[maq] || {}).meta || 0;
-    const porcMeta = metaMaq > 0 ? (rendReal / metaMaq) * 100 : 0;
+    // Si la máquina tiene producción en unidades, calcular % meta con unidades; si no, con kg
+    const porcMeta = metaMaq > 0 ? (prodUnd > 0 ? (rendRealUnd / metaMaq) * 100 : (rendReal / metaMaq) * 100) : 0;
     
     // Top 5 referencias
     const refCounts = {};
@@ -4897,6 +4918,7 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
       porcTM: horasDisp > 0 ? (tm / 60 / horasDisp) * 100 : 0,
       eficiencia: efic,
       rendReal,
+      rendRealUnd,
       meta: metaMaq,
       porcMeta,
       topRefs,
