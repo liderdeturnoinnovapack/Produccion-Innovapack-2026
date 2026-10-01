@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001i</title>
+<title>Panel de Producción · Innovapack v20261001j</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4124,95 +4124,106 @@ function ResumenEjecutivo({datos, mes, anio}){
   const deltaColor = (d)=> d > 0 ? 'var(--good)' : d < 0 ? 'var(--bad)' : 'var(--text-dim)';
   const deltaIcon = (d)=> d > 0 ? '↗️' : d < 0 ? '↘️' : '—';
   
-  // Separar producción por área
+  // Separar producción por área Y por tipo de bodega
   const extrusoras = Object.values(datos.porMaquina).filter(m => m.maquina.indexOf('Extrusora') === 0);
   const impresora = datos.porMaquina['Impresora'] || null;
   const refiladora = datos.porMaquina['Refiladora'] || null;
   const selladoras = Object.values(datos.porMaquina).filter(m => m.maquina.indexOf('Selladora') === 0);
   
+  // Calcular producción de cada área (suma de todas las máquinas del área)
   const prodExtrusion = extrusoras.reduce((s,m) => s + m.prodKg, 0);
   const prodImpresion = impresora ? impresora.prodKg : 0;
   const prodRefilado = refiladora ? refiladora.prodKg : 0;
   const prodSellado = selladoras.reduce((s,m) => s + m.prodKg, 0);
   
-  // Totales por tipo de bodega
-  const totalPP = datos.prodPPKg; // Total de producto en proceso (extrusión + impresión + refilado)
-  const totalPT = datos.prodPTKg; // Total de producto terminado (sellado)
+  // TOTAL Producto en Proceso (PP): extrusión + impresión + refilado
+  const totalPP = prodExtrusion + prodImpresion + prodRefilado;
+  
+  // TOTAL Producto Terminado (PT): sellado
+  const totalPT = prodSellado;
   
   return (
     <div>
       <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🎯 Resumen Ejecutivo</div>
       
       {/* Título principal */}
-      <div style={{fontSize:16,fontWeight:600,marginBottom:16,color:'var(--text-dim)'}}>📦 Flujo de Producción por Área</div>
+      <div style={{fontSize:16,fontWeight:600,marginBottom:16,color:'var(--text-dim)'}}>📦 Producción por Área del Mes</div>
       
       {/* Grid de 4 áreas */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:16,marginBottom:24}}>
         
-        {/* 1. EXTRUSIÓN */}
+        {/* 1. EXTRUSIÓN (PP) */}
         <div style={{background:'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden'}}>
           <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>🔵</div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>1️⃣ EXTRUSIÓN</div>
+          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>EXTRUSIÓN</div>
           <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodExtrusion)} kg</div>
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina/Tubular producida</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>📊 Extrusoras activas: {extrusoras.length}</div>
             {extrusoras.map((m,i)=>(
               <div key={i} style={{marginBottom:2}}>• {m.maquina}: {fmt(m.prodKg)} kg</div>
             ))}
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
               ⚙️ Producto en Proceso
             </div>
+            <div style={{fontSize:10,opacity:0.8,marginTop:6}}>
+              {((prodExtrusion/totalPP)*100).toFixed(1)}% del PP total
+            </div>
           </div>
         </div>
         
-        {/* 2. IMPRESIÓN */}
+        {/* 2. IMPRESIÓN (PP) */}
         <div style={{background:'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden'}}>
           <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>🟣</div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>2️⃣ IMPRESIÓN</div>
+          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>IMPRESIÓN</div>
           <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodImpresion)} kg</div>
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina impresa producida</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>📊 Recibe lámina de extrusión</div>
-            <div style={{marginBottom:4}}>→ Puede ir a sellado</div>
+            <div style={{marginBottom:2}}>• Impresora: {fmt(prodImpresion)} kg</div>
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
               ⚙️ Producto en Proceso
+            </div>
+            <div style={{fontSize:10,opacity:0.8,marginTop:6}}>
+              {((prodImpresion/totalPP)*100).toFixed(1)}% del PP total
             </div>
           </div>
         </div>
         
-        {/* 3. REFILADO */}
+        {/* 3. REFILADO (PP) */}
         <div style={{background:'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden'}}>
           <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>🔴</div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>3️⃣ REFILADO</div>
+          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>REFILADO</div>
           <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodRefilado)} kg</div>
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina refilada producida</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>📊 Recibe lámina de extrusión</div>
-            <div style={{marginBottom:4}}>→ Genera rollos cortados</div>
+            <div style={{marginBottom:2}}>• Refiladora: {fmt(prodRefilado)} kg</div>
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
               ⚙️ Producto en Proceso
+            </div>
+            <div style={{fontSize:10,opacity:0.8,marginTop:6}}>
+              {((prodRefilado/totalPP)*100).toFixed(1)}% del PP total
             </div>
           </div>
         </div>
         
-        {/* 4. SELLADO */}
+        {/* 4. SELLADO (PT) */}
         <div style={{background:'linear-gradient(135deg, #10B981 0%, #047857 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden'}}>
           <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>✅</div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>4️⃣ SELLADO</div>
+          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>SELLADO</div>
           <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodSellado)} kg</div>
           <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Producto Terminado generado</div>
           <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
           <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:4}}>📊 Selladoras activas: {selladoras.length}</div>
             {selladoras.map((m,i)=>(
               <div key={i} style={{marginBottom:2}}>• {m.maquina}: {fmt(m.prodKg)} kg</div>
             ))}
             <div style={{fontWeight:700,marginTop:8,padding:'6px 10px',background:'rgba(255,255,255,0.15)',borderRadius:6,display:'inline-block'}}>
-              📦 Listo para despacho
+              📦 Producto Terminado
+            </div>
+            <div style={{fontSize:10,opacity:0.8,marginTop:6}}>
+              100% del PT (listo despacho)
             </div>
           </div>
         </div>
@@ -4224,19 +4235,19 @@ function ResumenEjecutivo({datos, mes, anio}){
         <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>📊 Resumen Global del Mes</div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:12}}>
           <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
-            <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Producción Total</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--brand-blue)'}}>{fmt(datos.prodTotalKg)} kg</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>Material procesado</div>
+            <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Producto en Proceso</div>
+            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--brand-blue)'}}>{fmt(totalPP)} kg</div>
+            <div style={{fontSize:11,color:'var(--text-dim)'}}>Ext + Imp + Ref</div>
           </div>
           <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
             <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Producto Terminado</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{fmt(datos.prodPTKg)} kg</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>{((datos.prodPTKg/datos.prodTotalKg)*100).toFixed(1)}% convertido</div>
+            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{fmt(totalPT)} kg</div>
+            <div style={{fontSize:11,color:'var(--text-dim)'}}>Sellado</div>
           </div>
           <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
             <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Merma Total</div>
             <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>{fmt(datos.mermaTotal)} kg</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>{datos.porcMerma.toFixed(1)}% del procesado</div>
+            <div style={{fontSize:11,color:'var(--text-dim)'}}>{datos.porcMerma.toFixed(1)}% del PP</div>
           </div>
           <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
             <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Reportes</div>
