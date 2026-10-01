@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001b</title>
+<title>Panel de Producción · Innovapack v20261001c</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4078,7 +4078,16 @@ function duracionTurnoMinutos(turno){
 
 // Calcular tiempos muertos totales en minutos
 function tiemposMuertosMinutos(reporte){
-  const mins = String(reporte.tiemposMuertosMinutos || '').split(';').map(Number).filter(x=>x>0);
+  // El campo viene del Sheet como "30min + 15min" o "30;15"
+  const str = String(reporte.tiemposMuertosMinutos || '');
+  if(!str || str === '-') return 0;
+  
+  // Parsear formatos: "30min + 15min" o "30;15" o "30 + 15"
+  const mins = str.split(/[+;]/).map(s => {
+    const match = s.match(/([\d.]+)/);
+    return match ? Number(match[1]) : 0;
+  }).filter(x => x > 0);
+  
   return mins.reduce((s,m)=>s+m, 0);
 }
 

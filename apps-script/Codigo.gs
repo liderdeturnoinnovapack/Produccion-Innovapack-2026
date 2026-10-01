@@ -200,8 +200,8 @@ function leerReportesMaquina(maquina) {
         produccion: Number(row[11]) || 0,             // L: Produccion
         merma: String(row[12] || '').trim(),          // M: Merma Cantidad
         mermaMotivo: String(row[13] || '').trim(),    // N: Merma Motivo
-        tiempoMuerto: String(row[14] || '').trim(),   // O: Tiempo muerto (min)
-        motivoTM: String(row[15] || '').trim(),       // P: Motivo tiempo muerto
+        tiemposMuertosMinutos: String(row[14] || '').trim(),   // O: Tiempo muerto (min)
+        tiemposMuertosMotivo: String(row[15] || '').trim(),    // P: Motivo tiempo muerto
         medida: String(row[16] || '').trim(),         // Q: Medida
         calibre: String(row[17] || '').trim(),        // R: Calibre
         sentido: String(row[18] || '').trim(),        // S: Sentido
@@ -281,8 +281,8 @@ function leerTodosReportes() {
             produccion: Number(row[11]) || 0,
             merma: String(row[12] || '').trim(),
             mermaMotivo: String(row[13] || '').trim(),
-            tiempoMuerto: String(row[14] || '').trim(),
-            motivoTM: String(row[15] || '').trim(),
+            tiemposMuertosMinutos: String(row[14] || '').trim(),
+            tiemposMuertosMotivo: String(row[15] || '').trim(),
             medida: String(row[16] || '').trim(),
             calibre: String(row[17] || '').trim(),
             sentido: String(row[18] || '').trim(),
