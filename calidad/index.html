@@ -163,7 +163,7 @@
       D: maqAbrev(r),                 // MAQ
       E: d,                           // FECHA (Date)
       F: MESES[d.getMonth()]||'',     // MES
-      G: r.nombre||'',                // OPERARIO
+      G: (r.nombre||'').toUpperCase(), // OPERARIO (en mayúsculas)
       H: turnoNum(r),                 // TURNO
       I: siesaN,                      // ITEMS (código Siesa)
       J: r.referencia||'',            // REFERENCIA (PRODUCTO)
