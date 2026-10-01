@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001c</title>
+<title>Panel de Producción · Innovapack v20261001d</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4123,9 +4123,9 @@ function ResumenEjecutivo({datos, mes, anio}){
   const deltaIcon = (d)=> d > 0 ? '↗️' : d < 0 ? '↘️' : '—';
   
   const kpis = [
-    {label:'Producción Total',valor:fmt(datos.prodTotalKg)+' kg',delta:delta(datos.prodTotalKg,datos.prodAntKg),color:'var(--brand-blue)'},
-    {label:'Producto Terminado',valor:fmt(datos.prodPTKg)+' kg',delta:((datos.prodPTKg/datos.prodTotalKg)*100).toFixed(1)+'%',color:'var(--good)'},
-    {label:'Producto en Proceso',valor:fmt(datos.prodPPKg)+' kg',delta:((datos.prodPPKg/datos.prodTotalKg)*100).toFixed(1)+'%',color:'var(--amber)'},
+    {label:'Producción Total (PP)',valor:fmt(datos.prodTotalKg)+' kg',delta:delta(datos.prodTotalKg,datos.prodAntKg),color:'var(--brand-blue)',tooltip:'Solo Producto en Proceso (extrusión, impresión, refilado)'},
+    {label:'Convertido a PT',valor:fmt(datos.prodPTKg)+' kg',delta:((datos.prodPTKg/datos.prodTotalKg)*100).toFixed(1)+'% del PP',color:'var(--good)',tooltip:'Material que pasó por sellado y se convirtió en Producto Terminado'},
+    {label:'Permanece en PP',valor:fmt(datos.prodPPKg)+' kg',delta:'100%',color:'var(--amber)',tooltip:'Material producido que aún está en proceso'},
     {label:'Merma Total',valor:fmt(datos.mermaTotal)+' kg ('+datos.porcMerma.toFixed(1)+'%)',delta:delta(datos.mermaTotal,datos.mermaAnt),color:'var(--bad)'},
     {label:'Eficiencia Global',valor:datos.eficiencia.toFixed(1)+'%',delta:datos.deltaEfic.toFixed(1)+' pp',color:'var(--accent)'},
     {label:'Tiempo Productivo',valor:fmt(datos.totalHorasProductivas)+' h',delta:'—',color:'var(--good)'},
@@ -4149,7 +4149,8 @@ function ResumenEjecutivo({datos, mes, anio}){
       <div style={{background:'var(--panel-2)',borderRadius:12,padding:20,border:'1px solid var(--line)'}}>
         <div style={{fontSize:16,fontWeight:700,marginBottom:12,fontFamily:'var(--head)'}}>📈 Conclusión General</div>
         <p style={{margin:0,fontSize:14,lineHeight:1.6,color:'var(--text)'}}>
-          La producción de <b>{mes} {anio}</b> registró <b>{fmt(datos.prodTotalKg)} kg</b> totales con una eficiencia global del <b>{datos.eficiencia.toFixed(1)}%</b>. 
+          La producción de <b>{mes} {anio}</b> procesó <b>{fmt(datos.prodTotalKg)} kg</b> de material (producto en proceso) con una eficiencia global del <b>{datos.eficiencia.toFixed(1)}%</b>. 
+          De este material, <b>{fmt(datos.prodPTKg)} kg ({(datos.prodPTKg/datos.prodTotalKg*100).toFixed(1)}%)</b> se convirtieron en Producto Terminado mediante sellado.
           {datos.deltaProd > 0 ? ` Se observa un incremento del ${datos.deltaProd.toFixed(1)}% respecto al mes anterior.` : datos.deltaProd < 0 ? ` Se registra una disminución del ${Math.abs(datos.deltaProd).toFixed(1)}% respecto al mes anterior.` : ' Producción similar al mes anterior.'}
           {' '}La merma se mantuvo en {datos.porcMerma.toFixed(1)}% ({fmt(datos.mermaTotal)} kg), 
           {datos.deltaMerma < 0 ? ' mostrando una reducción favorable' : datos.deltaMerma > 0 ? ' con un incremento que requiere atención' : ' manteniéndose estable'}.
@@ -4663,21 +4664,25 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   const metas = loadMetas();
   const pesos = loadPesos();
   
-  // Producción total
-  const prodTotalKg = reportesMes.reduce((s,r)=>s+produccionKg(r),0);
-  const prodTotalUnd = reportesMes.reduce((s,r)=>{
-    const u = String(r.unidad||'').toLowerCase();
-    return s + (u.indexOf('kg')===0 ? 0 : (Number(r.produccion)||0));
-  },0);
-  const prodAntKg = reportesMesAnt.reduce((s,r)=>s+produccionKg(r),0);
-  
   // Producto Terminado vs En Proceso
   const pt = reportesMes.filter(r=>clasificarReporte(r).bodega==='Producto Terminado');
   const pp = reportesMes.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso');
   const prodPTKg = pt.reduce((s,r)=>s+produccionKg(r),0);
   const prodPPKg = pp.reduce((s,r)=>s+produccionKg(r),0);
   
-  // Mermas
+  // Producción total = SOLO producto en proceso (no sumar PT porque ya está en el flujo)
+  // Las selladoras convierten PP → PT, no generan kg adicionales
+  const prodTotalKg = prodPPKg;
+  const prodTotalUnd = pp.reduce((s,r)=>{
+    const u = String(r.unidad||'').toLowerCase();
+    return s + (u.indexOf('kg')===0 ? 0 : (Number(r.produccion)||0));
+  },0);
+  
+  // Mes anterior (misma lógica)
+  const ppAnt = reportesMesAnt.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso');
+  const prodAntKg = ppAnt.reduce((s,r)=>s+produccionKg(r),0);
+  
+  // Mermas (de TODOS los reportes, incluye PT y PP)
   const mermaTotal = reportesMes.reduce((s,r)=>s+mermaKg(r),0);
   const mermaAnt = reportesMesAnt.reduce((s,r)=>s+mermaKg(r),0);
   const porcMerma = prodTotalKg > 0 ? (mermaTotal / prodTotalKg) * 100 : 0;
