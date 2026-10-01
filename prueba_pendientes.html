@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba - Pendientes SIESA (PT vs PP)</title>
+<style>
+:root {
+  --card: #ffffff;
+  --panel-2: #f8f9fa;
+  --line: #e5e7eb;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --th-text: #374151;
+  --amber: #f59e0b;
+  --good: #10b981;
+  --bad: #ef4444;
+  --accent: #0091C7;
+  --brand-blue: #0091C7;
+  --brand-green: #7CB342;
+  --head: 'IBM Plex Sans', sans-serif;
+  --sans: 'Inter', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+[data-theme="dark"] {
+  --card: #1f2937;
+  --panel-2: #111827;
+  --line: #374151;
+  --text: #f3f4f6;
+  --text-dim: #9ca3af;
+  --th-text: #e5e7eb;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 24px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-family: var(--head);
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: var(--brand-blue);
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 32px;
+}
+
+.section {
+  margin-bottom: 48px;
+}
+
+.section-title {
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 3px solid var(--brand-blue);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  background: var(--accent);
+  color: white;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--amber);
+  border-left: 4px solid var(--amber);
+  border-radius: 12px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 6px rgba(217,119,6,0.12);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-icon {
+  font-size: 20px;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 14px;
+  font-family: var(--head);
+}
+
+.card-subtitle {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.card-count {
+  background: var(--amber);
+  color: #fff;
+  border-radius: 20px;
+  padding: 1px 9px;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.card-body {
+  padding: 0 16px 14px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+input[type="text"] {
+  font-size: 12px;
+  padding: 7px 10px;
+  max-width: 280px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--sans);
+}
+
+button {
+  background: var(--good);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+.table-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+thead tr {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  padding: 8px 10px;
+  color: var(--th-text);
+  font-weight: 700;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--panel-2);
+}
+
+td {
+  padding: 7px 10px;
+}
+
+tbody tr {
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: rgba(0, 145, 199, 0.05);
+}
+
+.group-first {
+  border-top: 3px solid var(--amber) !important;
+}
+
+.subtotal-row {
+  background: rgba(234, 179, 8, 0.12);
+  border-top: 2px solid var(--line);
+  border-bottom: 3px solid var(--amber);
+  cursor: pointer;
+}
+
+.subtotal-row:hover {
+  background: rgba(234, 179, 8, 0.2);
+}
+
+.subtotal-label {
+  text-align: right;
+  font-weight: 700;
+  color: var(--amber);
+  font-size: 12.5px;
+}
+
+.subtotal-value {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--good);
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.comparison-item {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.comparison-title {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand-blue);
+}
+
+.comparison-list {
+  list-style: none;
+  padding: 0;
+}
+
+.comparison-list li {
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.comparison-list li:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--text-dim);
+  width: 140px;
+  display: inline-block;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .comparison {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <button class="theme-toggle" onclick="toggleTheme()">
+    <span id="theme-icon">🌙</span>
+    <span id="theme-text">Oscuro</span>
+  </button>
+
+  <h1>🧪 Prueba - Pendientes de ingreso a SIESA</h1>
+  <p class="subtitle">Centro de pruebas para revisar el diseño antes de modificar el código principal</p>
+
+  <!-- COMPARACIÓN DE COLUMNAS -->
+  <div class="comparison">
+    <div class="comparison-item">
+      <div class="comparison-title">📦 Producto Terminado</div>
+      <ul class="comparison-list">
+        <li><span class="label">Columnas:</span> 8 columnas</li>
+        <li><span class="label">✓ SIESA</span> Checkbox</li>
+        <li><span class="label">Fecha</span> DD/MM/YYYY</li>
+        <li><span class="label">Máquina</span> Selladora, Refiladora</li>
+        <li><span class="label">Referencia</span> Nombre del producto</li>
+        <li><span class="label">Producción</span> Unidades/Kg</li>
+        <li><span class="label">Lámina (kg)</span> Consumo estimado</li>
+        <li><span class="label">Consecutivo</span> Número de reporte</li>
+        <li><span class="label">Calidad</span> Estado verificación</li>
+      </ul>
+    </div>
+
+    <div class="comparison-item">
+      <div class="comparison-title">⚙️ Producto en Proceso (NUEVO)</div>
+      <ul class="comparison-list">
+        <li><span class="label">Columnas:</span> 7 columnas</li>
+        <li><span class="label">✓ SIESA</span> Checkbox</li>
+        <li><span class="label">Fecha</span> DD/MM/YYYY</li>
+        <li><span class="label">Máquina</span> Extrusora, Impresora</li>
+        <li><span class="label">Referencia</span> Nombre del producto</li>
+        <li><span class="label">Rollos</span> Cantidad de rollos</li>
+        <li><span class="label">Kg producidos</span> Peso total</li>
+        <li><span class="label">Merma (kg)</span> Desperdicio</li>
+        <li style="color: var(--text-dim); font-style: italic;"><span class="label">❌ Sin:</span> Consecutivo, Calidad, Lámina</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- EJEMPLO PRODUCTO TERMINADO -->
+  <div class="section">
+    <div class="section-title">
+      <span>📦 Producto Terminado</span>
+      <span class="badge">ACTUAL</span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <span class="card-icon">⏳</span>
+          <div>
+            <div class="card-title">
+              Pendientes de ingreso a SIESA 
+              <span class="card-count">4</span>
+            </div>
+            <div class="card-subtitle">
+              Reportes de producto terminado en <b>standby</b>. Márcalos cuando los ingreses a SIESA para que pasen a la Bodega de Inventario.
+            </div>
+          </div>
+        </div>
+        <span style="font-size: 13px; color: var(--text-dim);">▲</span>
+      </div>
+
+      <div class="card-body">
+        <div class="controls">
+          <input type="text" placeholder="Buscar referencia, código, máquina…" />
+          <button>✓ Marcar todos como ingresados</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>✓ SIESA</th>
+                <th>Fecha</th>
+                <th>Máquina</th>
+                <th>Referencia</th>
+                <th>Producción</th>
+                <th>Lámina (kg)</th>
+                <th>Consecutivo</th>
+                <th>Calidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Grupo 1: BOLSA VALVULADA 25KG -->
+              <tr class="group-first">
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">26/08/2026</td>
+                <td>Selladora 1</td>
+                <td>BOLSA VALVULADA PEGANTE 25KG</td>
+                <td class="mono">12,500</td>
+                <td class="mono">≈ 625</td>
+                <td class="mono" style="font-size: 11px;">INV-2026-0856</td>
+                <td style="text-align: center;">
+                  <span style="display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--good); color: #fff;">Aprobado</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">26/08/2026</td>
+                <td>Selladora 1</td>
+                <td>BOLSA VALVULADA PEGANTE 25KG</td>
+                <td class="mono">8,200</td>
+                <td class="mono">≈ 410</td>
+                <td class="mono" style="font-size: 11px;">INV-2026-0857</td>
+                <td style="text-align: center;">
+                  <span style="display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--good); color: #fff;">Aprobado</span>
+                </td>
+              </tr>
+              <tr class="subtotal-row">
+                <td></td>
+                <td colspan="3" class="subtotal-label">🔎 Σ Subtotal BOLSA VALVULADA PEGANTE 25KG · 2 reportes</td>
+                <td class="subtotal-value">20,700</td>
+                <td class="subtotal-value">≈ 1,035</td>
+                <td></td>
+                <td></td>
+              </tr>
+
+              <!-- Fila individual -->
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">27/08/2026</td>
+                <td>Selladora 2</td>
+                <td>BOLSA ABIERTA ALIMENTOS 1KG</td>
+                <td class="mono">45,300</td>
+                <td class="mono">≈ 362</td>
+                <td class="mono" style="font-size: 11px;">INV-2026-0858</td>
+                <td style="text-align: center;">
+                  <span style="display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--amber); color: #fff;">Pendiente</span>
+                </td>
+              </tr>
+
+              <!-- Refiladora (PT) -->
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">27/08/2026</td>
+                <td>Refiladora</td>
+                <td>BOLSA TROQUELADA 30X40CM</td>
+                <td class="mono">8,500</td>
+                <td class="mono">—</td>
+                <td class="mono" style="font-size: 11px;">INV-2026-0859</td>
+                <td style="text-align: center;">
+                  <span style="display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--panel-2); color: var(--text-dim); border: 1px dashed var(--line);">+ Verificar</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EJEMPLO PRODUCTO EN PROCESO -->
+  <div class="section">
+    <div class="section-title">
+      <span>⚙️ Producto en Proceso</span>
+      <span class="badge" style="background: var(--brand-green);">NUEVO</span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <span class="card-icon">⏳</span>
+          <div>
+            <div class="card-title">
+              Pendientes de ingreso · Producto en Proceso 
+              <span class="card-count">5</span>
+            </div>
+            <div class="card-subtitle">
+              Reportes de lámina extruida, impresa y refilada en <b>standby</b>. Márcalos cuando los ingreses a SIESA.
+            </div>
+          </div>
+        </div>
+        <span style="font-size: 13px; color: var(--text-dim);">▲</span>
+      </div>
+
+      <div class="card-body">
+        <div class="controls">
+          <input type="text" placeholder="Buscar referencia, código, máquina…" />
+          <button>✓ Marcar todos como ingresados</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>✓ SIESA</th>
+                <th>Fecha</th>
+                <th>Máquina</th>
+                <th>Referencia</th>
+                <th>Rollos</th>
+                <th>Kg producidos</th>
+                <th>Merma (kg)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Grupo 1: SEMITUBULAR TRANSPARENTE -->
+              <tr class="group-first">
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">26/08/2026</td>
+                <td>Extrusora 1</td>
+                <td>SEMITUBULAR TRANSPARENTE 50CM</td>
+                <td class="mono">12</td>
+                <td class="mono">450</td>
+                <td class="mono">15</td>
+              </tr>
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">26/08/2026</td>
+                <td>Extrusora 1</td>
+                <td>SEMITUBULAR TRANSPARENTE 50CM</td>
+                <td class="mono">10</td>
+                <td class="mono">380</td>
+                <td class="mono">12</td>
+              </tr>
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">27/08/2026</td>
+                <td>Extrusora 1</td>
+                <td>SEMITUBULAR TRANSPARENTE 50CM</td>
+                <td class="mono">14</td>
+                <td class="mono">520</td>
+                <td class="mono">18</td>
+              </tr>
+              <tr class="subtotal-row">
+                <td></td>
+                <td colspan="3" class="subtotal-label">🔎 Σ Subtotal SEMITUBULAR TRANSPARENTE 50CM · 3 reportes</td>
+                <td class="subtotal-value">36</td>
+                <td class="subtotal-value">1,350</td>
+                <td class="subtotal-value">45</td>
+              </tr>
+
+              <!-- Impresora -->
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">27/08/2026</td>
+                <td>Impresora</td>
+                <td>LÁMINA IMPRESA LOGO EMPRESA</td>
+                <td class="mono">8</td>
+                <td class="mono">320</td>
+                <td class="mono">8</td>
+              </tr>
+
+              <!-- Extrusora 2 (NO termoencogible = PP) -->
+              <tr>
+                <td style="text-align: center;"><input type="checkbox" /></td>
+                <td class="mono" style="font-size: 12px;">27/08/2026</td>
+                <td>Extrusora 2</td>
+                <td>TUBULAR NEGRO 60CM</td>
+                <td class="mono">6</td>
+                <td class="mono">280</td>
+                <td class="mono">10</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">
+          💡 <b>Nota:</b> La Extrusora 2 con Lámina Termoencogible va a Producto Terminado (excepción especial).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTAS IMPORTANTES -->
+  <div class="section">
+    <div class="section-title">📝 Diferencias clave</div>
+    <div style="background: var(--card); border: 2px solid var(--brand-blue); border-radius: 12px; padding: 20px;">
+      <ul style="list-style: none; padding: 0;">
+        <li style="padding: 8px 0; border-bottom: 1px solid var(--line);">
+          ✅ <b>Mismo comportamiento:</b> Checkbox, agrupación, subtotales, modales de detalle y resumen
+        </li>
+        <li style="padding: 8px 0; border-bottom: 1px solid var(--line);">
+          📊 <b>Columnas PP:</b> Enfoque en producción (Rollos, Kg producidos, Merma)
+        </li>
+        <li style="padding: 8px 0; border-bottom: 1px solid var(--line);">
+          ❌ <b>PP sin:</b> Consecutivo, Calidad, Lámina consumida (no aplica)
+        </li>
+        <li style="padding: 8px 0; border-bottom: 1px solid var(--line);">
+          🔄 <b>Ubicación:</b> Cada componente aparece solo en SU pestaña (PT o PP)
+        </li>
+        <li style="padding: 8px 0;">
+          ⚠️ <b>Clasificación automática:</b> Extrusora 2 + Termoencogible → PT (excepción) | Resto → PP
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const icon = document.getElementById('theme-icon');
+  const text = document.getElementById('theme-text');
+  
+  if (html.getAttribute('data-theme') === 'dark') {
+    html.removeAttribute('data-theme');
+    icon.textContent = '🌙';
+    text.textContent = 'Oscuro';
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    icon.textContent = '☀️';
+    text.textContent = 'Claro';
+  }
+}
+
+// Simular click en filas
+document.querySelectorAll('tbody tr:not(.subtotal-row)').forEach(row => {
+  row.addEventListener('click', (e) => {
+    if (e.target.type !== 'checkbox') {
+      alert('🔍 En el sistema real, esto abriría el modal con información completa del reporte');
+    }
+  });
+});
+
+document.querySelectorAll('.subtotal-row').forEach(row => {
+  row.addEventListener('click', () => {
+    alert('📊 En el sistema real, esto abriría el modal de resumen con todos los reportes del grupo');
+  });
+});
+</script>
+</body>
+</html>

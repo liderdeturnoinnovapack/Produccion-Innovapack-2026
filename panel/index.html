@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001R</title>
+<title>Panel de Producción · Innovapack v20261001S</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -44,12 +44,23 @@
   /* --- animaciones suaves --- */
   @keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
   @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes slideInRight{from{opacity:0;transform:translateX(-20px);}to{opacity:1;transform:none;}}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.8;}}
+  @keyframes shimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
   .fade-in{animation:fadeInUp 0.35s cubic-bezier(0.16,1,0.3,1) both;}
   .fade-in-soft{animation:fadeIn 0.3s ease both;}
+  .slide-in{animation:slideInRight 0.4s cubic-bezier(0.16,1,0.3,1) both;}
   button{transition:background 0.15s ease,color 0.15s ease,box-shadow 0.15s ease,transform 0.1s ease,border-color 0.15s ease;}
   button:active{transform:scale(0.97);}
   select,input{transition:border-color 0.15s ease,box-shadow 0.15s ease,background 0.2s ease;}
   path,rect,circle,line{transition:opacity 0.15s ease;}
+  .card-hover{transition:transform 0.2s ease,box-shadow 0.2s ease;}
+  .card-hover:hover{transform:translateY(-2px);box-shadow:0 8px 16px rgba(0,0,0,0.12);}
+  .metric-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.02em;}
+  .progress-bar{position:relative;height:8px;background:var(--panel-2);border-radius:12px;overflow:hidden;}
+  .progress-fill{height:100%;border-radius:12px;transition:width 0.6s cubic-bezier(0.16,1,0.3,1);}
+  .stat-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--brand-green));}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -4181,205 +4192,245 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
       {/* Título principal */}
       <div style={{fontSize:16,fontWeight:600,marginBottom:16,color:'var(--text-dim)'}}>📦 Producción por Área del Mes</div>
       
-      {/* Grid de 4 áreas */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:16,marginBottom:24}}>
+      {/* Grid de 4 áreas - MEJORADO */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))',gap:20,marginBottom:28}} className="slide-in">
         
-        {/* 1. EXTRUSIÓN */}
-        <div style={{background:'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden',border:'3px solid rgba(124,179,66,0.3)'}}>
-          <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>🔵</div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>EXTRUSIÓN</div>
-          <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodExtrusion)} kg</div>
-          <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina/Tubular producida</div>
-          <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
-          <div style={{fontSize:11,opacity:0.9}}>
-            {prodExtrusionPP > 0 && <>
-              <div style={{fontWeight:700,marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
-                <span style={{background:'rgba(251,191,36,0.25)',padding:'2px 8px',borderRadius:12,fontSize:10}}>⚙️ PP</span>
-                <span>{fmt(prodExtrusionPP)} kg</span>
-              </div>
-              {extrusorasPP.map((m,i)=>(
-                <div key={i} style={{marginBottom:2,marginLeft:20,fontSize:10}}>• {m.maquina}: {fmt(m.kg)} kg</div>
-              ))}
-            </>}
-            {prodExtrusionPT > 0 && <>
-              <div style={{fontWeight:700,marginTop:8,marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
-                <span style={{background:'rgba(255,255,255,0.25)',padding:'2px 8px',borderRadius:12,fontSize:10}}>📦 PT</span>
-                <span>{fmt(prodExtrusionPT)} kg</span>
-              </div>
-              {extrusorasPT.map((m,i)=>(
-                <div key={i} style={{marginBottom:2,marginLeft:20,fontSize:10}}>• {m.maquina}: {fmt(m.kg)} kg (termoencogible)</div>
-              ))}
-            </>}
-          </div>
-        </div>
-        
-        {/* 2. IMPRESIÓN (PP) */}
-        <div style={{background:'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden',border:'3px solid rgba(124,179,66,0.3)'}}>
-          <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>🟣</div>
-          <div style={{position:'absolute',top:10,right:10,background:'rgba(251,191,36,0.95)',color:'#78350F',padding:'4px 12px',borderRadius:20,fontSize:10,fontWeight:700,letterSpacing:0.5,display:'flex',alignItems:'center',gap:4}}>
-            <span>⚙️</span><span>PRODUCTO EN PROCESO</span>
-          </div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>IMPRESIÓN</div>
-          <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodImpresion)} kg</div>
-          <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina impresa producida</div>
-          <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
-          <div style={{fontSize:11,opacity:0.9}}>
-            <div style={{marginBottom:2}}>• Impresora: {fmt(prodImpresion)} kg</div>
-            <div style={{fontSize:10,opacity:0.8,marginTop:6}}>
-              {((prodImpresion/totalPP)*100).toFixed(1)}% del PP total
+        {/* 1. EXTRUSIÓN - MEJORADO */}
+        <div className="card-hover" style={{background:'linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1E40AF 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(59,130,246,0.25)'}}>
+          <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(15deg)'}}>🔵</div>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
+          <div style={{position:'relative',zIndex:1}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>EXTRUSIÓN</div>
+              <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>🏭 Área 1</div>
+            </div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodExtrusion)} kg</div>
+            <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Lámina/Tubular producida</div>
+            <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
+            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+              {prodExtrusionPP > 0 && <>
+                <div style={{fontWeight:700,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{background:'rgba(251,191,36,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>⚙️ PP</span>
+                  <span style={{fontSize:14}}>{fmt(prodExtrusionPP)} kg</span>
+                </div>
+                {extrusorasPP.map((m,i)=>(
+                  <div key={i} style={{marginBottom:3,marginLeft:24,fontSize:10.5,opacity:0.9}}>• {m.maquina}: {fmt(m.kg)} kg</div>
+                ))}
+              </>}
+              {prodExtrusionPT > 0 && <>
+                <div style={{fontWeight:700,marginTop:10,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{background:'rgba(255,255,255,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>📦 PT</span>
+                  <span style={{fontSize:14}}>{fmt(prodExtrusionPT)} kg</span>
+                </div>
+                {extrusorasPT.map((m,i)=>(
+                  <div key={i} style={{marginBottom:3,marginLeft:24,fontSize:10.5,opacity:0.9}}>• {m.maquina}: {fmt(m.kg)} kg (termo)</div>
+                ))}
+              </>}
             </div>
           </div>
         </div>
         
-        {/* 3. REFILADO */}
-        <div style={{background:'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden',border:'3px solid rgba(124,179,66,0.3)'}}>
-          <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>🔴</div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>REFILADO</div>
-          <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodRefilado)} kg</div>
-          <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Lámina refilada producida</div>
-          <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
-          <div style={{fontSize:11,opacity:0.9}}>
-            {prodRefiladoPP > 0 && <>
-              <div style={{fontWeight:700,marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
-                <span style={{background:'rgba(251,191,36,0.25)',padding:'2px 8px',borderRadius:12,fontSize:10}}>⚙️ PP</span>
-                <span>{fmt(prodRefiladoPP)} kg</span>
+        {/* 2. IMPRESIÓN (PP) - MEJORADO */}
+        <div className="card-hover" style={{background:'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 50%, #6D28D9 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(139,92,246,0.25)'}}>
+          <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(-15deg)'}}>🟣</div>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
+          <div style={{position:'absolute',top:12,right:12,background:'rgba(251,191,36,0.95)',color:'#78350F',padding:'5px 14px',borderRadius:24,fontSize:10,fontWeight:800,letterSpacing:0.6,display:'flex',alignItems:'center',gap:5,boxShadow:'0 2px 8px rgba(0,0,0,0.15)',zIndex:2}}>
+            <span>⚙️</span><span>PROD. EN PROCESO</span>
+          </div>
+          <div style={{position:'relative',zIndex:1}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>IMPRESIÓN</div>
+              <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>🎨 Área 2</div>
+            </div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodImpresion)} kg</div>
+            <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Lámina impresa producida</div>
+            <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
+            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+              <div style={{marginBottom:4,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:18}}>•</span>
+                <span>Impresora: <b>{fmt(prodImpresion)} kg</b></span>
               </div>
-              <div style={{marginLeft:20,fontSize:10}}>• Lámina doblada/tubular</div>
-            </>}
-            {prodRefiladoPT > 0 && <>
-              <div style={{fontWeight:700,marginTop:8,marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
-                <span style={{background:'rgba(255,255,255,0.25)',padding:'2px 8px',borderRadius:12,fontSize:10}}>📦 PT</span>
-                <span>{fmt(prodRefiladoPT)} kg</span>
+              <div style={{fontSize:11,opacity:0.85,marginTop:10,padding:'8px 12px',background:'rgba(255,255,255,0.1)',borderRadius:8,backdropFilter:'blur(4px)'}}>
+                <b>{((prodImpresion/totalPP)*100).toFixed(1)}%</b> del PP total
               </div>
-              <div style={{marginLeft:20,fontSize:10}}>• Lámina cortada (ref con "lámina")</div>
-            </>}
+            </div>
           </div>
         </div>
         
-        {/* 4. SELLADO (PT) */}
-        <div style={{background:'linear-gradient(135deg, #10B981 0%, #047857 100%)',borderRadius:12,padding:20,color:'#fff',position:'relative',overflow:'hidden',border:'3px solid rgba(16,185,129,0.5)'}}>
-          <div style={{position:'absolute',top:-20,right:-20,fontSize:100,opacity:0.1,lineHeight:1}}>✅</div>
-          <div style={{position:'absolute',top:10,right:10,background:'rgba(255,255,255,0.95)',color:'#047857',padding:'4px 12px',borderRadius:20,fontSize:10,fontWeight:700,letterSpacing:0.5,display:'flex',alignItems:'center',gap:4}}>
-            <span>📦</span><span>PRODUCTO TERMINADO</span>
+        {/* 3. REFILADO - MEJORADO */}
+        <div className="card-hover" style={{background:'linear-gradient(135deg, #EC4899 0%, #DB2777 50%, #BE185D 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(236,72,153,0.25)'}}>
+          <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(10deg)'}}>🔴</div>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
+          <div style={{position:'relative',zIndex:1}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>REFILADO</div>
+              <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>✂️ Área 3</div>
+            </div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodRefilado)} kg</div>
+            <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Lámina refilada producida</div>
+            <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
+            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+              {prodRefiladoPP > 0 && <>
+                <div style={{fontWeight:700,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{background:'rgba(251,191,36,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>⚙️ PP</span>
+                  <span style={{fontSize:14}}>{fmt(prodRefiladoPP)} kg</span>
+                </div>
+                <div style={{marginLeft:24,fontSize:10.5,opacity:0.9}}>• Lámina doblada/tubular</div>
+              </>}
+              {prodRefiladoPT > 0 && <>
+                <div style={{fontWeight:700,marginTop:10,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{background:'rgba(255,255,255,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>📦 PT</span>
+                  <span style={{fontSize:14}}>{fmt(prodRefiladoPT)} kg</span>
+                </div>
+                <div style={{marginLeft:24,fontSize:10.5,opacity:0.9}}>• Lámina cortada (ref con "lámina")</div>
+              </>}
+            </div>
           </div>
-          <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',marginBottom:8,opacity:0.9,letterSpacing:0.5}}>SELLADO</div>
-          <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',marginBottom:4}}>{fmt(prodSellado)} kg</div>
-          <div style={{fontSize:12,opacity:0.85,marginBottom:12}}>Bolsas selladas y empacadas</div>
-          <div style={{height:1,background:'rgba(255,255,255,0.2)',marginBottom:12}}></div>
-          <div style={{fontSize:11,opacity:0.9}}>
-            {selladoras.map((m,i)=>(
-              <div key={i} style={{marginBottom:2}}>• {m.maquina}: {fmt(m.prodKg)} kg</div>
-            ))}
-            <div style={{fontSize:10,opacity:0.8,marginTop:6}}>
-              {((prodSellado/totalPT)*100).toFixed(1)}% del PT total
+        </div>
+        
+        {/* 4. SELLADO (PT) - MEJORADO */}
+        <div className="card-hover" style={{background:'linear-gradient(135deg, #10B981 0%, #059669 50%, #047857 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(16,185,129,0.25)'}}>
+          <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(-10deg)'}}>✅</div>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
+          <div style={{position:'absolute',top:12,right:12,background:'rgba(255,255,255,0.95)',color:'#047857',padding:'5px 14px',borderRadius:24,fontSize:10,fontWeight:800,letterSpacing:0.6,display:'flex',alignItems:'center',gap:5,boxShadow:'0 2px 8px rgba(0,0,0,0.15)',zIndex:2}}>
+            <span>📦</span><span>PROD. TERMINADO</span>
+          </div>
+          <div style={{position:'relative',zIndex:1}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>SELLADO</div>
+              <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>📦 Área 4</div>
+            </div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodSellado)} kg</div>
+            <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Bolsas selladas y empacadas</div>
+            <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
+            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+              {selladoras.map((m,i)=>(
+                <div key={i} style={{marginBottom:4,display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:18}}>•</span>
+                  <span>{m.maquina}: <b>{fmt(m.prodKg)} kg</b></span>
+                </div>
+              ))}
+              <div style={{fontSize:11,opacity:0.85,marginTop:10,padding:'8px 12px',background:'rgba(255,255,255,0.1)',borderRadius:8,backdropFilter:'blur(4px)'}}>
+                <b>{((prodSellado/totalPT)*100).toFixed(1)}%</b> del PT total
+              </div>
             </div>
           </div>
         </div>
         
       </div>
       
-      {/* Resumen global compacto */}
-      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:24}}>
-        <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>📊 Resumen Global del Mes</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:12}}>
-          <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
-            <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Producto en Proceso</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--brand-blue)'}}>{fmt(totalPP)} kg</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>Ext + Imp + Ref</div>
+      {/* Resumen global compacto - MEJORADO */}
+      <div className="stat-card fade-in" style={{marginBottom:28,boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:16,display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:24}}>📊</span>
+          <span>Resumen Global del Mes</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:14}}>
+          <div style={{background:'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)',borderRadius:12,padding:16,borderLeft:'4px solid var(--brand-blue)',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:-10,right:-10,fontSize:60,opacity:0.05}}>⚙️</div>
+            <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',marginBottom:6,letterSpacing:0.05}}>Producto en Proceso</div>
+            <div style={{fontSize:28,fontWeight:800,fontFamily:'var(--mono)',color:'var(--brand-blue)',marginBottom:4}}>{fmt(totalPP)} kg</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:500}}>Ext + Imp + Ref</div>
           </div>
-          <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
-            <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Producto Terminado</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)'}}>{fmt(totalPT)} kg</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>Sellado</div>
+          <div style={{background:'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)',borderRadius:12,padding:16,borderLeft:'4px solid var(--good)',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:-10,right:-10,fontSize:60,opacity:0.05}}>📦</div>
+            <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',marginBottom:6,letterSpacing:0.05}}>Producto Terminado</div>
+            <div style={{fontSize:28,fontWeight:800,fontFamily:'var(--mono)',color:'var(--good)',marginBottom:4}}>{fmt(totalPT)} kg</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:500}}>Sellado</div>
           </div>
-          <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
-            <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Merma Total</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>{fmt(datos.mermaTotal)} kg</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>{datos.porcMerma.toFixed(1)}% del PP</div>
+          <div style={{background:'linear-gradient(135deg, rgba(185,28,28,0.08) 0%, rgba(185,28,28,0.02) 100%)',borderRadius:12,padding:16,borderLeft:'4px solid var(--bad)',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:-10,right:-10,fontSize:60,opacity:0.05}}>🚨</div>
+            <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',marginBottom:6,letterSpacing:0.05}}>Merma Total</div>
+            <div style={{fontSize:28,fontWeight:800,fontFamily:'var(--mono)',color:'var(--bad)',marginBottom:4}}>{fmt(datos.mermaTotal)} kg</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:500}}>{datos.porcMerma.toFixed(1)}% del PP</div>
           </div>
-          <div style={{background:'var(--panel-2)',borderRadius:8,padding:12}}>
-            <div style={{fontSize:10,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase',marginBottom:4}}>Reportes</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)'}}>{fmt(datos.reportes)}</div>
-            <div style={{fontSize:11,color:'var(--text-dim)'}}>Turnos registrados</div>
+          <div style={{background:'linear-gradient(135deg, rgba(124,179,66,0.08) 0%, rgba(124,179,66,0.02) 100%)',borderRadius:12,padding:16,borderLeft:'4px solid var(--brand-green)',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:-10,right:-10,fontSize:60,opacity:0.05}}>📋</div>
+            <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',marginBottom:6,letterSpacing:0.05}}>Reportes</div>
+            <div style={{fontSize:28,fontWeight:800,fontFamily:'var(--mono)',color:'var(--brand-green)',marginBottom:4}}>{fmt(datos.reportes)}</div>
+            <div style={{fontSize:12,color:'var(--text-dim)',fontWeight:500}}>Turnos registrados</div>
           </div>
         </div>
       </div>
       
-      {/* Tarjetas grandes: Tiempos y Eficiencia */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-        {/* Tarjeta de Tiempos */}
-        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
-          <div style={{fontSize:16,fontWeight:700,marginBottom:16,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:8}}>
-            <span>⏱️</span>
+      {/* Tarjetas grandes: Tiempos y Eficiencia - MEJORADO */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:28}}>
+        {/* Tarjeta de Tiempos - MEJORADA */}
+        <div className="stat-card card-hover" style={{background:'linear-gradient(to bottom right, var(--card), var(--panel-2))',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:20,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:26}}>⏱️</span>
             <span>Distribución de Tiempos</span>
           </div>
-          <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,background:'var(--panel-2)',borderRadius:8,borderLeft:'4px solid var(--accent)'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:16,background:'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)',borderRadius:12,borderLeft:'4px solid var(--accent)',position:'relative',overflow:'hidden'}}>
               <div>
-                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase'}}>Tiempo Programado</div>
-                <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',marginTop:4}}>{fmt(datos.totalHorasDisponibles)} h</div>
+                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',letterSpacing:0.05}}>Tiempo Programado</div>
+                <div style={{fontSize:26,fontWeight:800,fontFamily:'var(--mono)',marginTop:6}}>{fmt(datos.totalHorasDisponibles)} h</div>
               </div>
-              <div style={{fontSize:32,opacity:0.3}}>📅</div>
+              <div style={{fontSize:40,opacity:0.15}}>📅</div>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,background:'var(--panel-2)',borderRadius:8,borderLeft:'4px solid var(--good)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:16,background:'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)',borderRadius:12,borderLeft:'4px solid var(--good)',position:'relative',overflow:'hidden'}}>
               <div>
-                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase'}}>Tiempo Productivo</div>
-                <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',marginTop:4,color:'var(--good)'}}>{fmt(datos.totalHorasProductivas)} h</div>
-                <div style={{fontSize:12,color:'var(--text-dim)',marginTop:2}}>{datos.eficiencia.toFixed(1)}% del programado</div>
+                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',letterSpacing:0.05}}>Tiempo Productivo</div>
+                <div style={{fontSize:26,fontWeight:800,fontFamily:'var(--mono)',marginTop:6,color:'var(--good)'}}>{fmt(datos.totalHorasProductivas)} h</div>
+                <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4,fontWeight:600}}>{datos.eficiencia.toFixed(1)}% del programado</div>
               </div>
-              <div style={{fontSize:32,opacity:0.3}}>✅</div>
+              <div style={{fontSize:40,opacity:0.15}}>✅</div>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,background:'var(--panel-2)',borderRadius:8,borderLeft:'4px solid var(--bad)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:16,background:'linear-gradient(135deg, rgba(185,28,28,0.08) 0%, rgba(185,28,28,0.02) 100%)',borderRadius:12,borderLeft:'4px solid var(--bad)',position:'relative',overflow:'hidden'}}>
               <div>
-                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:600,textTransform:'uppercase'}}>Tiempos Muertos</div>
-                <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--mono)',marginTop:4,color:'var(--bad)'}}>{fmt(datos.totalTM)} h</div>
-                <div style={{fontSize:12,color:'var(--text-dim)',marginTop:2}}>{datos.porcTM.toFixed(1)}% del programado</div>
+                <div style={{fontSize:11,color:'var(--text-dim)',fontWeight:700,textTransform:'uppercase',letterSpacing:0.05}}>Tiempos Muertos</div>
+                <div style={{fontSize:26,fontWeight:800,fontFamily:'var(--mono)',marginTop:6,color:'var(--bad)'}}>{fmt(datos.totalTM)} h</div>
+                <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4,fontWeight:600}}>{datos.porcTM.toFixed(1)}% del programado</div>
               </div>
-              <div style={{fontSize:32,opacity:0.3}}>⛔</div>
+              <div style={{fontSize:40,opacity:0.15}}>⛔</div>
             </div>
           </div>
         </div>
         
-        {/* Tarjeta de Eficiencia Global */}
-        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
-          <div style={{fontSize:16,fontWeight:700,marginBottom:16,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:8}}>
-            <span>🎯</span>
+        {/* Tarjeta de Eficiencia Global - MEJORADA */}
+        <div className="stat-card card-hover" style={{background:'linear-gradient(to bottom right, var(--card), var(--panel-2))',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:20,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:26}}>🎯</span>
             <span>Eficiencia Global</span>
           </div>
-          <div style={{textAlign:'center',padding:'20px 0'}}>
-            <div style={{fontSize:56,fontWeight:700,fontFamily:'var(--mono)',color:datos.eficiencia >= 75 ? 'var(--good)' : datos.eficiencia >= 65 ? 'var(--amber)' : 'var(--bad)',marginBottom:8}}>
+          <div style={{textAlign:'center',padding:'12px 0'}}>
+            <div style={{fontSize:68,fontWeight:800,fontFamily:'var(--mono)',color:datos.eficiencia >= 75 ? 'var(--good)' : datos.eficiencia >= 65 ? 'var(--amber)' : 'var(--bad)',marginBottom:10,letterSpacing:'-0.03em',textShadow:datos.eficiencia >= 75 ? '0 4px 12px rgba(16,185,129,0.2)' : '0 4px 12px rgba(185,28,28,0.2)'}}>
               {datos.eficiencia.toFixed(1)}%
             </div>
-            <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:16}}>
+            <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:18,fontWeight:500}}>
               Tiempo Productivo ÷ Tiempo Programado
             </div>
-            <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:16}}>
-              {datos.deltaEfic > 0 && <span style={{background:'rgba(21,128,61,0.1)',color:'var(--good)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:600}}>↗️ +{datos.deltaEfic.toFixed(1)} pp vs mes anterior</span>}
-              {datos.deltaEfic < 0 && <span style={{background:'rgba(185,28,28,0.1)',color:'var(--bad)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:600}}>↘️ {datos.deltaEfic.toFixed(1)} pp vs mes anterior</span>}
-              {datos.deltaEfic === 0 && <span style={{background:'var(--panel-2)',color:'var(--text-dim)',padding:'4px 12px',borderRadius:20,fontSize:12,fontWeight:600}}>— Sin cambio</span>}
+            <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:18,flexWrap:'wrap'}}>
+              {datos.deltaEfic > 0 && <span className="metric-badge" style={{background:'rgba(21,128,61,0.12)',color:'var(--good)'}}>↗️ +{datos.deltaEfic.toFixed(1)} pp vs mes anterior</span>}
+              {datos.deltaEfic < 0 && <span className="metric-badge" style={{background:'rgba(185,28,28,0.12)',color:'var(--bad)'}}>↘️ {datos.deltaEfic.toFixed(1)} pp vs mes anterior</span>}
+              {datos.deltaEfic === 0 && <span className="metric-badge" style={{background:'var(--panel-2)',color:'var(--text-dim)'}}>— Sin cambio</span>}
             </div>
-            <div style={{background:'var(--panel-2)',borderRadius:8,padding:12,fontSize:12,textAlign:'left',lineHeight:1.6}}>
-              <b>¿Cómo se calcula?</b><br/>
-              Eficiencia = (Horas Productivas ÷ Horas Programadas) × 100<br/>
-              = ({fmt(datos.totalHorasProductivas)} h ÷ {fmt(datos.totalHorasDisponibles)} h) × 100<br/>
-              <span style={{color:'var(--text-dim)',fontSize:11}}>
+            <div style={{background:'linear-gradient(135deg, rgba(124,179,66,0.05) 0%, rgba(124,179,66,0.02) 100%)',borderLeft:'3px solid var(--brand-green)',padding:14,borderRadius:10,fontSize:12,textAlign:'left',lineHeight:1.7}}>
+              <div style={{fontWeight:700,marginBottom:6,fontSize:13}}>💡 ¿Cómo se calcula?</div>
+              <div style={{marginBottom:4}}>Eficiencia = (Horas Productivas ÷ Horas Programadas) × 100</div>
+              <div style={{marginBottom:6}}>= ({fmt(datos.totalHorasProductivas)} h ÷ {fmt(datos.totalHorasDisponibles)} h) × 100</div>
+              <div style={{color:'var(--text-dim)',fontSize:11,borderTop:'1px solid var(--line)',paddingTop:8,marginTop:8}}>
                 * Horas Programadas = suma de turnos reportados<br/>
                 * Horas Productivas = Programadas - Tiempos Muertos
-              </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
       
-      <div style={{background:'var(--panel-2)',borderRadius:12,padding:20,border:'1px solid var(--line)'}}>
-        <div style={{fontSize:16,fontWeight:700,marginBottom:12,fontFamily:'var(--head)'}}>📈 Conclusión General</div>
-        <p style={{margin:0,fontSize:14,lineHeight:1.6,color:'var(--text)'}}>
-          La producción de <b>{mes} {anio}</b> procesó <b>{fmt(datos.prodTotalKg)} kg</b> de material (producto en proceso) con una eficiencia global del <b>{datos.eficiencia.toFixed(1)}%</b>. 
-          De este material, <b>{fmt(datos.prodPTKg)} kg ({(datos.prodPTKg/datos.prodTotalKg*100).toFixed(1)}%)</b> se convirtieron en Producto Terminado mediante sellado.
-          {datos.deltaProd > 0 ? ` Se observa un incremento del ${datos.deltaProd.toFixed(1)}% respecto al mes anterior.` : datos.deltaProd < 0 ? ` Se registra una disminución del ${Math.abs(datos.deltaProd).toFixed(1)}% respecto al mes anterior.` : ' Producción similar al mes anterior.'}
-          {' '}La merma se mantuvo en {datos.porcMerma.toFixed(1)}% ({fmt(datos.mermaTotal)} kg), 
-          {datos.deltaMerma < 0 ? ' mostrando una reducción favorable' : datos.deltaMerma > 0 ? ' con un incremento que requiere atención' : ' manteniéndose estable'}.
-          {' '}Los tiempos muertos representaron el {datos.porcTM.toFixed(1)}% del tiempo disponible.
+      <div className="stat-card fade-in" style={{background:'linear-gradient(135deg, var(--card) 0%, var(--panel-2) 100%)',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+        <div style={{fontSize:18,fontWeight:800,marginBottom:14,fontFamily:'var(--head)',display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:24}}>📈</span>
+          <span>Conclusión General</span>
+        </div>
+        <p style={{margin:0,fontSize:14,lineHeight:1.8,color:'var(--text)'}}>
+          La producción de <b style={{color:'var(--accent)'}}>{mes} {anio}</b> procesó <b style={{color:'var(--good)'}}>{fmt(datos.prodTotalKg)} kg</b> de material (producto en proceso) con una eficiencia global del <b style={{color:datos.eficiencia >= 75 ? 'var(--good)' : datos.eficiencia >= 65 ? 'var(--amber)' : 'var(--bad)'}}>{datos.eficiencia.toFixed(1)}%</b>. 
+          De este material, <b style={{color:'var(--good)'}}>{fmt(datos.prodPTKg)} kg ({(datos.prodPTKg/datos.prodTotalKg*100).toFixed(1)}%)</b> se convirtieron en Producto Terminado mediante sellado.
+          {datos.deltaProd > 0 ? <span> Se observa un <b style={{color:'var(--good)'}}>incremento del {datos.deltaProd.toFixed(1)}%</b> respecto al mes anterior.</span> : datos.deltaProd < 0 ? <span> Se registra una <b style={{color:'var(--bad)'}}>disminución del {Math.abs(datos.deltaProd).toFixed(1)}%</b> respecto al mes anterior.</span> : <span> Producción similar al mes anterior.</span>}
+          {' '}La merma se mantuvo en <b style={{color:datos.porcMerma < 5 ? 'var(--good)' : 'var(--bad)'}}>{datos.porcMerma.toFixed(1)}%</b> ({fmt(datos.mermaTotal)} kg), 
+          {datos.deltaMerma < 0 ? <span style={{color:'var(--good)'}}> mostrando una reducción favorable</span> : datos.deltaMerma > 0 ? <span style={{color:'var(--bad)'}}> con un incremento que requiere atención</span> : ' manteniéndose estable'}.
+          {' '}Los tiempos muertos representaron el <b style={{color:datos.porcTM < 25 ? 'var(--good)' : 'var(--amber)'}}>{datos.porcTM.toFixed(1)}%</b> del tiempo disponible.
         </p>
       </div>
     </div>

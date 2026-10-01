@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba - Inventario PP Agrupado (como PT)</title>
+<style>
+:root {
+  --card: #ffffff;
+  --panel-2: #f8f9fa;
+  --line: #e5e7eb;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --th-text: #374151;
+  --good: #10b981;
+  --bad: #ef4444;
+  --amber: #f59e0b;
+  --accent: #0091C7;
+  --brand-blue: #0091C7;
+  --brand-green: #7CB342;
+  --head: 'IBM Plex Sans', sans-serif;
+  --sans: 'Inter', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 24px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-family: var(--head);
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: var(--brand-blue);
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 32px;
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.panel {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.panel-title {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand-blue);
+}
+
+.panel.before {
+  border-color: var(--bad);
+}
+
+.panel.after {
+  border-color: var(--good);
+}
+
+.panel.before .panel-title {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.panel.after .panel-title {
+  border-color: var(--good);
+  color: var(--good);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+thead {
+  background: var(--panel-2);
+  border-bottom: 2px solid var(--line);
+}
+
+th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--th-text);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+td {
+  padding: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+
+.badge.doblada {
+  background: #10b981;
+}
+
+.badge.impresa {
+  background: #3b82f6;
+}
+
+.badge.error {
+  background: var(--bad);
+}
+
+.badge.success {
+  background: var(--good);
+}
+
+.note {
+  background: #FEF3C7;
+  border-left: 4px solid var(--amber);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.changes {
+  background: var(--card);
+  border: 2px solid var(--brand-blue);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.changes h2 {
+  font-family: var(--head);
+  font-size: 20px;
+  margin-bottom: 16px;
+  color: var(--brand-blue);
+}
+
+.changes ul {
+  list-style: none;
+  padding: 0;
+}
+
+.changes li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.changes li:last-child {
+  border-bottom: none;
+}
+
+.code {
+  background: var(--panel-2);
+  padding: 12px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.example {
+  background: var(--card);
+  border: 2px solid var(--brand-green);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.example h3 {
+  font-family: var(--head);
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--brand-green);
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧪 Prueba - Inventario PP Agrupado (como Producto Terminado)</h1>
+  <p class="subtitle">Comparación: Antes (rollos individuales confusos) vs Después (agrupado por referencia como PT)</p>
+
+  <!-- EJEMPLO DE PRODUCTO TERMINADO (SPLENDOR) -->
+  <div class="example">
+    <h3>📦 Ejemplo de referencia: Producto Terminado (Splendor)</h3>
+    <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
+      Este es el modelo a seguir: agrupado por referencia, columnas relevantes, sin rollos individuales
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Código</th>
+          <th>Referencia</th>
+          <th>Categoría</th>
+          <th>Sector</th>
+          <th>Cantidad (und)</th>
+          <th>Peso (kg)</th>
+          <th>Últ. producción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">1</td>
+          <td class="mono">5020821</td>
+          <td>BOLSA VALV PEGO SPLENDOR 25KG</td>
+          <td><span class="badge" style="background: #6366f1;">Bolsa valvulada</span></td>
+          <td>Construcción</td>
+          <td class="mono">44,193</td>
+          <td class="mono">2,210</td>
+          <td class="mono">hace 2 d</td>
+        </tr>
+        <tr>
+          <td class="mono">2</td>
+          <td class="mono">5028226</td>
+          <td>BOLSA VALV PEGO SPLENDOR 40KG</td>
+          <td><span class="badge" style="background: #6366f1;">Bolsa valvulada</span></td>
+          <td>Construcción</td>
+          <td class="mono">6,808</td>
+          <td class="mono">512</td>
+          <td class="mono">hace 26 d</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="comparison">
+    <!-- ANTES -->
+    <div class="panel before">
+      <div class="panel-title">❌ ANTES - Rollos individuales (confuso)</div>
+      <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
+        Muestra rollos individuales que son parte del MISMO reporte → duplica y confunde
+      </p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th># Rollo</th>
+            <th>Tipo</th>
+            <th>Color</th>
+            <th>Máquina</th>
+            <th>Peso (kg)</th>
+            <th>Código SISA</th>
+            <th>Referencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">-</td>
+            <td><span class="badge doblada">Lámina Doblada</span></td>
+            <td>-</td>
+            <td>Refiladora</td>
+            <td class="mono">125</td>
+            <td class="mono">5018464</td>
+            <td>BOLSA AB AZUCAR MICROPULV...</td>
+          </tr>
+          <tr>
+            <td class="mono">-</td>
+            <td><span class="badge doblada">Lámina Doblada</span></td>
+            <td>-</td>
+            <td>Refiladora</td>
+            <td class="mono">167</td>
+            <td class="mono">5018464</td>
+            <td>BOLSA AB AZUCAR MICROPULV...</td>
+          </tr>
+          <tr>
+            <td class="mono">-</td>
+            <td><span class="badge impresa">Lámina Impresa</span></td>
+            <td>-</td>
+            <td>Impresora</td>
+            <td class="mono">100</td>
+            <td class="mono">5018464</td>
+            <td>BOLSA AB AZUCAR MICROPULV...</td>
+          </tr>
+          <tr>
+            <td class="mono">-</td>
+            <td><span class="badge impresa">Lámina Impresa</span></td>
+            <td>-</td>
+            <td>Impresora</td>
+            <td class="mono">100</td>
+            <td class="mono">5018464</td>
+            <td>BOLSA AB AZUCAR MICROPULV...</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="note">
+        <b>⚠️ Problemas:</b>
+        <ul style="margin-top: 8px; margin-left: 16px;">
+          <li>125 + 167 = 292 kg (de Refiladora) pero el reporte decía 188 kg</li>
+          <li>100 + 100 = 200 kg (de Impresora) duplica información</li>
+          <li>Muestra todos los rollos aunque NO estén ingresados a SIESA</li>
+          <li>Difícil de entender qué hay realmente en inventario</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- DESPUÉS -->
+    <div class="panel after">
+      <div class="panel-title">✅ DESPUÉS - Agrupado por referencia (como PT)</div>
+      <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
+        Agrupa por referencia, solo muestra lo ingresado a SIESA, columnas relevantes
+      </p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Código</th>
+            <th>Referencia</th>
+            <th>Tipo proceso</th>
+            <th>Rollos</th>
+            <th>Peso (kg)</th>
+            <th>Últ. prod.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">1</td>
+            <td class="mono">5018464</td>
+            <td>BOLSA AB AZUCAR MICROPULV...</td>
+            <td><span class="badge doblada">Lámina Doblada</span></td>
+            <td class="mono">2</td>
+            <td class="mono">188</td>
+            <td class="mono">hace 2 h</td>
+          </tr>
+          <tr>
+            <td class="mono">2</td>
+            <td class="mono">5018464</td>
+            <td>BOLSA AB AZUCAR MICROPULV...</td>
+            <td><span class="badge impresa">Lámina Impresa</span></td>
+            <td class="mono">2</td>
+            <td class="mono">200</td>
+            <td class="mono">hace 1 d</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="note" style="background: #D1FAE5; border-color: var(--good);">
+        <b>✅ Ventajas:</b>
+        <ul style="margin-top: 8px; margin-left: 16px;">
+          <li>Una fila por referencia + tipo de proceso (agrupado)</li>
+          <li>El peso coincide con el reporte (188 kg refilado)</li>
+          <li>Solo aparece si ya está ingresado a SIESA</li>
+          <li>Fácil de entender: 2 rollos = 188 kg de Lámina Doblada</li>
+          <li>Mantiene colores por tipo de proceso</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="changes">
+    <h2>📋 Cambios a implementar</h2>
+    <ul>
+      <li>
+        <b>1. Crear función inventarioPP_Agrupado()</b> en shared/calculos.js:
+        <ul style="margin-left: 20px; font-size: 13px; color: var(--text-dim);">
+          <li>Similar a inventarioPT() - agrupa por código SIESA + tipo de proceso</li>
+          <li>Solo cuenta reportes con okSet (ingresados a SIESA)</li>
+          <li>Suma: rollos totales, peso total (kg), reportes</li>
+          <li>Guarda última fecha de producción</li>
+        </ul>
+      </li>
+      <li>
+        <b>2. Modificar InventarioRollos component</b> en panel/index.html:
+        <ul style="margin-left: 20px; font-size: 13px; color: var(--text-dim);">
+          <li>Cambiar de inventarioProceso(base) a inventarioPP_Agrupado(base, okSet)</li>
+          <li>Columnas: # | Código | Referencia | Tipo proceso | Rollos | Peso (kg) | Últ. prod.</li>
+          <li>Quitar filtros innecesarios (# rollo, calibre, medida individual)</li>
+          <li>Mantener: filtro por máquina, tipo de proceso, buscar por código/referencia</li>
+          <li>Chips de resumen por tipo (kg total)</li>
+        </ul>
+      </li>
+      <li>
+        <b>3. Mantener estética:</b>
+        <ul style="margin-left: 20px; font-size: 13px; color: var(--text-dim);">
+          <li>✅ Colores por tipo de proceso (badges)</li>
+          <li>✅ Gráficos de torta y barras por tipo/máquina</li>
+          <li>✅ Diseño actual de tarjetas y layout</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <div style="margin-top: 24px; padding: 16px; background: #EFF6FF; border-radius: 12px; border-left: 4px solid var(--brand-blue);">
+    <h3 style="font-size: 16px; margin-bottom: 8px; font-family: var(--head);">🎯 Resultado esperado:</h3>
+    <ul style="font-size: 13px; line-height: 1.8; margin-left: 20px;">
+      <li>El inventario PP se verá como el de PT (estilo Splendor)</li>
+      <li>Una referencia puede tener múltiples filas (una por tipo de proceso)</li>
+      <li>Ejemplo: "BOLSA AZUCAR" → 1 fila "Lámina Doblada" + 1 fila "Lámina Impresa"</li>
+      <li>Solo muestra lo que YA está ingresado a SIESA (como PT)</li>
+      <li>Los pesos coinciden con los reportes originales (no duplica)</li>
+      <li>Mantiene colores y estética actual</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

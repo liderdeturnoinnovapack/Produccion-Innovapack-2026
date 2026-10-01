@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba - Inventario PP (Antes vs Después)</title>
+<style>
+:root {
+  --card: #ffffff;
+  --panel-2: #f8f9fa;
+  --line: #e5e7eb;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --th-text: #374151;
+  --good: #10b981;
+  --bad: #ef4444;
+  --amber: #f59e0b;
+  --accent: #0091C7;
+  --brand-blue: #0091C7;
+  --head: 'IBM Plex Sans', sans-serif;
+  --sans: 'Inter', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 24px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-family: var(--head);
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: var(--brand-blue);
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 32px;
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.panel {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.panel-title {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand-blue);
+}
+
+.panel.before {
+  border-color: var(--bad);
+}
+
+.panel.after {
+  border-color: var(--good);
+}
+
+.panel.before .panel-title {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.panel.after .panel-title {
+  border-color: var(--good);
+  color: var(--good);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+thead {
+  background: var(--panel-2);
+  border-bottom: 2px solid var(--line);
+}
+
+th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--th-text);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+td {
+  padding: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+
+.badge.error {
+  background: var(--bad);
+}
+
+.badge.success {
+  background: var(--good);
+}
+
+.note {
+  background: #FEF3C7;
+  border-left: 4px solid var(--amber);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.changes {
+  background: var(--card);
+  border: 2px solid var(--brand-blue);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.changes h2 {
+  font-family: var(--head);
+  font-size: 20px;
+  margin-bottom: 16px;
+  color: var(--brand-blue);
+}
+
+.changes ul {
+  list-style: none;
+  padding: 0;
+}
+
+.changes li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.changes li:last-child {
+  border-bottom: none;
+}
+
+.code {
+  background: var(--panel-2);
+  padding: 12px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧪 Prueba - Inventario Producto en Proceso</h1>
+  <p class="subtitle">Comparación del peso mostrado: Antes (rollos madre) vs Después (producción real)</p>
+
+  <div class="comparison">
+    <!-- ANTES -->
+    <div class="panel before">
+      <div class="panel-title">❌ ANTES - Problema actual</div>
+      <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
+        El peso mostrado es del <b>rollo madre usado</b>, no de la producción
+      </p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th># Rollo</th>
+            <th>Tipo</th>
+            <th>Peso (kg)</th>
+            <th>Origen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">123</td>
+            <td>Lámina Doblada</td>
+            <td class="mono">125</td>
+            <td><span class="badge error">Rollo madre</span></td>
+          </tr>
+          <tr>
+            <td class="mono">124</td>
+            <td>Lámina Doblada</td>
+            <td class="mono">167</td>
+            <td><span class="badge error">Rollo madre</span></td>
+          </tr>
+          <tr>
+            <td class="mono">234</td>
+            <td>Lámina Impresa</td>
+            <td class="mono">93</td>
+            <td><span class="badge error">Rollo madre</span></td>
+          </tr>
+          <tr>
+            <td class="mono">235</td>
+            <td>Lámina Impresa</td>
+            <td class="mono">93</td>
+            <td><span class="badge error">Rollo madre</span></td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="note">
+        <b>⚠️ Problema:</b> Los valores 125, 167, 93 son los pesos de los <b>rollos madre consumidos</b>, 
+        NO el peso de la producción nueva. Esto distorsiona el inventario real.
+      </div>
+      
+      <div class="code">
+// calculos.js - línea 1215
+peso: roll.peso || roll.pesoFinal || roll.pesoInicial || ""
+// ↑ Toma el peso del rollo parseado (madre)
+      </div>
+    </div>
+
+    <!-- DESPUÉS -->
+    <div class="panel after">
+      <div class="panel-title">✅ DESPUÉS - Solución propuesta</div>
+      <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">
+        El peso ahora es de la <b>producción real</b> del reporte
+      </p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th># Rollo</th>
+            <th>Tipo</th>
+            <th>Peso (kg)</th>
+            <th>Origen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">123</td>
+            <td>Lámina Doblada</td>
+            <td class="mono">45</td>
+            <td><span class="badge success">Producción</span></td>
+          </tr>
+          <tr>
+            <td class="mono">124</td>
+            <td>Lámina Doblada</td>
+            <td class="mono">42</td>
+            <td><span class="badge success">Producción</span></td>
+          </tr>
+          <tr>
+            <td class="mono">234</td>
+            <td>Lámina Impresa</td>
+            <td class="mono">38</td>
+            <td><span class="badge success">Producción</span></td>
+          </tr>
+          <tr>
+            <td class="mono">235</td>
+            <td>Lámina Impresa</td>
+            <td class="mono">36</td>
+            <td><span class="badge success">Producción</span></td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="note" style="background: #D1FAE5; border-color: var(--good);">
+        <b>✅ Solución:</b> Los valores ahora reflejan el <b>peso real producido</b> en cada rollo,
+        calculado desde la producción del reporte. El inventario será correcto.
+      </div>
+      
+      <div class="code">
+// calculos.js - línea 1215 (nuevo)
+const pesoProducido = produccionKg(r) / (rolls.length || 1);
+peso: roll.peso || pesoProducido
+// ↑ Distribuye el peso producido entre los rollos
+      </div>
+    </div>
+  </div>
+
+  <div class="changes">
+    <h2>📋 Cambios a implementar</h2>
+    <ul>
+      <li>
+        <b>1. Quitar "Inventario Físico"</b> de la sección PP 
+        <span style="color: var(--text-dim); font-size: 12px;">(ya hecho en el código)</span>
+      </li>
+      <li>
+        <b>2. Corregir función inventarioProceso()</b> en shared/calculos.js:
+        <div class="code" style="margin-top: 8px;">
+// Línea ~1213-1216 (ANTES):
+if(rolls.length){
+  rolls.forEach(roll=>{
+    out.push({
+      ...roll, tipo, color, codigo,
+      peso: roll.peso || roll.pesoFinal || roll.pesoInicial || ""  // ❌ PROBLEMA
+    });
+  });
+}
+
+// DESPUÉS (propuesto):
+if(rolls.length){
+  const pesoProducido = produccionKg(r);
+  const pesoPorRollo = pesoProducido / rolls.length;
+  rolls.forEach(roll=>{
+    out.push({
+      ...roll, tipo, color, codigo,
+      peso: roll.peso || Math.round(pesoPorRollo)  // ✅ CORRECTO
+    });
+  });
+}
+        </div>
+      </li>
+      <li>
+        <b>3. Dejar el else sin cambios</b> (línea 1218-1229) - ya funciona bien cuando no hay detalle de rollos
+      </li>
+    </ul>
+  </div>
+
+  <div style="margin-top: 24px; padding: 16px; background: #EFF6FF; border-radius: 12px; border-left: 4px solid var(--brand-blue);">
+    <h3 style="font-size: 16px; margin-bottom: 8px; font-family: var(--head);">🎯 Resultado esperado:</h3>
+    <ul style="font-size: 13px; line-height: 1.8; margin-left: 20px;">
+      <li>El inventario de PP mostrará el <b>peso real producido</b> en cada rollo</li>
+      <li>Si un reporte produjo 120 kg en 3 rollos → cada rollo mostrará ~40 kg</li>
+      <li>Los totales de inventario serán correctos</li>
+      <li>Desaparece el cuadro "Inventario Físico" (quedará solo "Inventario Producto en Proceso")</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
