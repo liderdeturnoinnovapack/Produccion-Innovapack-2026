@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001U</title>
+<title>Panel de Producción · Innovapack v20261001V</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4724,61 +4724,58 @@ function AnalisisEficiencia({datos}){
 function AnalisisMermas({datos}){
   const fmt = (n)=>Math.round(n).toLocaleString();
   
-  // Estado para el costo del kilo (persistido en localStorage)
-  const [costoKg, setCostoKg] = React.useState(() => {
-    const guardado = localStorage.getItem('costoKgMerma');
-    return guardado ? Number(guardado) : 15000;
+  // Costos por máquina (persistidos en localStorage)
+  const [costosPorMaquina, setCostosPorMaquina] = React.useState(() => {
+    const guardado = localStorage.getItem('costoKgMermaMaquinas');
+    return guardado ? JSON.parse(guardado) : {
+      'Extrusora 1': 15000,
+      'Extrusora 2': 15000,
+      'Extrusora 3': 15000,
+      'Impresora': 18000,
+      'Refiladora': 12000,
+      'Selladora 1': 10000,
+      'Selladora 2': 10000,
+      'Selladora 3': 10000
+    };
   });
-  const [editando, setEditando] = React.useState(false);
-  const [tempCosto, setTempCosto] = React.useState(costoKg);
   
-  const guardarCosto = () => {
+  const [editandoMaq, setEditandoMaq] = React.useState(null);
+  const [tempCosto, setTempCosto] = React.useState(0);
+  
+  const guardarCosto = (maquina) => {
     const nuevo = Number(tempCosto);
     if (nuevo > 0 && nuevo < 1000000) {
-      setCostoKg(nuevo);
-      localStorage.setItem('costoKgMerma', nuevo);
-      setEditando(false);
+      const actualizado = {...costosPorMaquina, [maquina]: nuevo};
+      setCostosPorMaquina(actualizado);
+      localStorage.setItem('costoKgMermaMaquinas', JSON.stringify(actualizado));
+      setEditandoMaq(null);
     }
   };
+  
+  // Calcular costo total ponderado por máquina
+  const calcularCostoMermas = () => {
+    let total = 0;
+    Object.values(datos.porMaquina || {}).forEach(m => {
+      const costoMaq = costosPorMaquina[m.maquina] || 15000;
+      total += m.merma * costoMaq;
+    });
+    return total;
+  };
+  
+  const costoTotalMermas = calcularCostoMermas();
+  const costoPromedioKg = datos.mermaTotal > 0 ? costoTotalMermas / datos.mermaTotal : 0;
   
   const maquinas = Object.values(datos.porMaquina).sort((a,b)=>b.merma-a.merma);
   
   return (
     <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:12}}>
         <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--head)'}}>🚨 Análisis de Mermas</div>
         
-        {/* Campo editable de costo */}
+        {/* Indicador de costo promedio */}
         <div style={{display:'flex',alignItems:'center',gap:8,background:'var(--card)',border:'1px solid var(--line)',borderRadius:8,padding:'8px 12px'}}>
-          <span style={{fontSize:12,fontWeight:600,color:'var(--text-dim)'}}>Costo/kg:</span>
-          {!editando ? (
-            <>
-              <span style={{fontSize:14,fontWeight:700,fontFamily:'var(--mono)'}}>$ {costoKg.toLocaleString()}</span>
-              <button 
-                onClick={() => {setEditando(true); setTempCosto(costoKg);}}
-                style={{background:'var(--accent)',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}
-              >✏️ Editar</button>
-            </>
-          ) : (
-            <>
-              <input
-                type="number"
-                value={tempCosto}
-                onChange={(e) => setTempCosto(e.target.value)}
-                style={{width:100,padding:'4px 8px',border:'1px solid var(--line)',borderRadius:4,fontSize:13,fontFamily:'var(--mono)'}}
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && guardarCosto()}
-              />
-              <button 
-                onClick={guardarCosto}
-                style={{background:'var(--good)',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}
-              >✓</button>
-              <button 
-                onClick={() => {setEditando(false); setTempCosto(costoKg);}}
-                style={{background:'var(--bad)',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}
-              >✕</button>
-            </>
-          )}
+          <span style={{fontSize:12,fontWeight:600,color:'var(--text-dim)'}}>Costo promedio/kg:</span>
+          <span style={{fontSize:14,fontWeight:700,fontFamily:'var(--mono)'}}>$ {Math.round(costoPromedioKg).toLocaleString()}</span>
         </div>
       </div>
       
@@ -4790,38 +4787,74 @@ function AnalisisMermas({datos}){
         </div>
         <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--amber)',borderRadius:12,padding:16}}>
           <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Costo Estimado</div>
-          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)'}}>$ {fmt(datos.mermaTotal * costoKg)}</div>
-          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Base: ${costoKg.toLocaleString()}/kg</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)'}}>$ {fmt(costoTotalMermas)}</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Calculado por máquina</div>
         </div>
       </div>
       
+      {/* Tabla de costos por máquina */}
       <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:20}}>
-        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>📊 Merma por Máquina</div>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>📊 Merma y Costos por Máquina</div>
         <div style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
             <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
               <th style={{padding:'10px',fontWeight:700}}>Máquina</th>
               <th style={{padding:'10px',fontWeight:700}}>Merma (kg)</th>
               <th style={{padding:'10px',fontWeight:700}}>% sobre Prod.</th>
-              <th style={{padding:'10px',fontWeight:700}}>Costo Est.</th>
+              <th style={{padding:'10px',fontWeight:700}}>Costo/kg</th>
+              <th style={{padding:'10px',fontWeight:700}}>Costo Merma</th>
               <th style={{padding:'10px',fontWeight:700}}>Estado</th>
+              <th style={{padding:'10px',fontWeight:700}}></th>
             </tr></thead>
             <tbody>
-              {maquinas.map(m=>(
-                <tr key={m.maquina} style={{borderBottom:'1px solid var(--line)'}}>
-                  <td style={{padding:'10px',fontWeight:600}}>{m.maquina}</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(m.merma)} kg</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)',color:m.porcMerma > 5 ? 'var(--bad)' : 'var(--good)'}}>{m.porcMerma.toFixed(1)}%</td>
-                  <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(m.merma * costoKg)}</td>
-                  <td style={{padding:'10px'}}>{m.porcMerma < 4 ? '🟢' : m.porcMerma < 6 ? '🟡' : '🔴'}</td>
-                </tr>
-              ))}
+              {maquinas.map(m=>{
+                const costoMaq = costosPorMaquina[m.maquina] || 15000;
+                const costoMerma = m.merma * costoMaq;
+                
+                return (
+                  <tr key={m.maquina} style={{borderBottom:'1px solid var(--line)'}}>
+                    <td style={{padding:'10px',fontWeight:600}}>{m.maquina}</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(m.merma)} kg</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)',color:m.porcMerma > 5 ? 'var(--bad)' : 'var(--good)'}}>{m.porcMerma.toFixed(1)}%</td>
+                    <td style={{padding:'10px'}}>
+                      {editandoMaq === m.maquina ? (
+                        <div style={{display:'flex',gap:4}}>
+                          <input
+                            type="number"
+                            value={tempCosto}
+                            onChange={(e) => setTempCosto(e.target.value)}
+                            style={{width:90,padding:'4px',border:'1px solid var(--line)',borderRadius:4,fontSize:12,fontFamily:'var(--mono)'}}
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && guardarCosto(m.maquina)}
+                          />
+                          <button onClick={() => guardarCosto(m.maquina)} style={{background:'var(--good)',color:'white',border:'none',borderRadius:4,padding:'2px 6px',fontSize:11,cursor:'pointer'}}>✓</button>
+                          <button onClick={() => setEditandoMaq(null)} style={{background:'var(--bad)',color:'white',border:'none',borderRadius:4,padding:'2px 6px',fontSize:11,cursor:'pointer'}}>✕</button>
+                        </div>
+                      ) : (
+                        <span style={{fontFamily:'var(--mono)',fontWeight:600}}>$ {costoMaq.toLocaleString()}</span>
+                      )}
+                    </td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700,color:'var(--bad)'}}>$ {fmt(costoMerma)}</td>
+                    <td style={{padding:'10px'}}>{m.porcMerma < 4 ? '🟢' : m.porcMerma < 6 ? '🟡' : '🔴'}</td>
+                    <td style={{padding:'10px'}}>
+                      {editandoMaq !== m.maquina && (
+                        <button 
+                          onClick={() => {setEditandoMaq(m.maquina); setTempCosto(costoMaq);}}
+                          style={{background:'var(--accent)',color:'white',border:'none',borderRadius:6,padding:'4px 8px',fontSize:11,fontWeight:600,cursor:'pointer'}}
+                        >✏️</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               <tr style={{borderTop:'2px solid var(--line)',fontWeight:700}}>
                 <td style={{padding:'10px'}}>TOTAL</td>
                 <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(datos.mermaTotal)} kg</td>
                 <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{datos.porcMerma.toFixed(1)}%</td>
-                <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(datos.mermaTotal * costoKg)}</td>
+                <td style={{padding:'10px'}}></td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)',color:'var(--bad)'}}>$ {fmt(costoTotalMermas)}</td>
                 <td style={{padding:'10px'}}>{datos.porcMerma < 5 ? '🟢' : '🔴'}</td>
+                <td style={{padding:'10px'}}></td>
               </tr>
             </tbody>
           </table>
@@ -4833,12 +4866,13 @@ function AnalisisMermas({datos}){
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {datos.topMermaGlobal.map(([mot,kg],i)=>{
             const porc = (kg / datos.mermaTotal * 100).toFixed(1);
+            const costoEst = kg * costoPromedioKg;
             return (
               <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'12px',background:'var(--panel-2)',borderRadius:8}}>
                 <div style={{fontSize:18,fontWeight:700,color:'var(--bad)',minWidth:32}}>{i+1}</div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>{mot}</div>
-                  <div style={{fontSize:11,color:'var(--text-dim)'}}>Costo estimado: ${fmt(kg * costoKg)}</div>
+                  <div style={{fontSize:11,color:'var(--text-dim)'}}>Costo estimado: ${fmt(costoEst)}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
                   <div style={{fontSize:16,fontWeight:700,fontFamily:'var(--mono)'}}>{fmt(kg)} kg</div>
@@ -4856,11 +4890,59 @@ function AnalisisMermas({datos}){
 // Componente: Análisis de Tiempos Muertos
 function AnalisisTiemposMuertos({datos}){
   const fmt = (n)=>Math.round(n).toLocaleString();
-  const costoHora = 15000; // Costo promedio por hora de TM
+  
+  // Costos por máquina (persistidos en localStorage)
+  const [costosPorMaquina, setCostosPorMaquina] = React.useState(() => {
+    const guardado = localStorage.getItem('costoHoraMaquinas');
+    return guardado ? JSON.parse(guardado) : {
+      'Extrusora 1': 50000,
+      'Extrusora 2': 50000,
+      'Extrusora 3': 50000,
+      'Impresora': 80000,
+      'Refiladora': 40000,
+      'Selladora 1': 35000,
+      'Selladora 2': 35000,
+      'Selladora 3': 35000
+    };
+  });
+  
+  const [editandoMaq, setEditandoMaq] = React.useState(null);
+  const [tempCosto, setTempCosto] = React.useState(0);
+  
+  const guardarCosto = (maquina) => {
+    const nuevo = Number(tempCosto);
+    if (nuevo > 0 && nuevo < 10000000) {
+      const actualizado = {...costosPorMaquina, [maquina]: nuevo};
+      setCostosPorMaquina(actualizado);
+      localStorage.setItem('costoHoraMaquinas', JSON.stringify(actualizado));
+      setEditandoMaq(null);
+    }
+  };
+  
+  // Calcular costo total ponderado por máquina
+  const calcularCostoTM = () => {
+    let total = 0;
+    Object.values(datos.porMaquina || {}).forEach(m => {
+      const costoMaq = costosPorMaquina[m.maquina] || 50000;
+      total += m.tm * costoMaq;
+    });
+    return total;
+  };
+  
+  const costoTotalTM = calcularCostoTM();
+  const costoPromedioHora = datos.totalTM > 0 ? costoTotalTM / datos.totalTM : 0;
   
   return (
     <div>
-      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>⏱️ Análisis de Tiempos Muertos</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:12}}>
+        <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--head)'}}>⏱️ Análisis de Tiempos Muertos</div>
+        
+        {/* Indicador de costo promedio */}
+        <div style={{display:'flex',alignItems:'center',gap:8,background:'var(--card)',border:'1px solid var(--line)',borderRadius:8,padding:'8px 12px'}}>
+          <span style={{fontSize:12,fontWeight:600,color:'var(--text-dim)'}}>Costo promedio/h:</span>
+          <span style={{fontSize:14,fontWeight:700,fontFamily:'var(--mono)'}}>$ {Math.round(costoPromedioHora).toLocaleString()}</span>
+        </div>
+      </div>
       
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:16,marginBottom:20}}>
         <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--amber)',borderRadius:12,padding:16}}>
@@ -4875,8 +4957,75 @@ function AnalisisTiemposMuertos({datos}){
         </div>
         <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--bad)',borderRadius:12,padding:16}}>
           <div style={{fontSize:11,fontWeight:600,color:'var(--text-dim)',textTransform:'uppercase',marginBottom:6}}>Costo Estimado TM</div>
-          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>$ {fmt(datos.totalTM * costoHora)}</div>
-          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Base: ${costoHora.toLocaleString()}/h</div>
+          <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--mono)',color:'var(--bad)'}}>$ {fmt(costoTotalTM)}</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:4}}>Calculado por máquina</div>
+        </div>
+      </div>
+      
+      {/* Tabla de costos por máquina */}
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20,marginBottom:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>⚙️ TM y Costos por Máquina</div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{borderBottom:'2px solid var(--line)',textAlign:'left'}}>
+              <th style={{padding:'10px',fontWeight:700}}>Máquina</th>
+              <th style={{padding:'10px',fontWeight:700}}>TM (h)</th>
+              <th style={{padding:'10px',fontWeight:700}}>% TM</th>
+              <th style={{padding:'10px',fontWeight:700}}>Costo/Hora</th>
+              <th style={{padding:'10px',fontWeight:700}}>Costo TM</th>
+              <th style={{padding:'10px',fontWeight:700}}></th>
+            </tr></thead>
+            <tbody>
+              {Object.values(datos.porMaquina || {}).sort((a,b)=>b.tm-a.tm).map(m=>{
+                const costoMaq = costosPorMaquina[m.maquina] || 50000;
+                const costoTM = m.tm * costoMaq;
+                const porcTM = datos.totalTM > 0 ? (m.tm / datos.totalTM * 100) : 0;
+                
+                return (
+                  <tr key={m.maquina} style={{borderBottom:'1px solid var(--line)'}}>
+                    <td style={{padding:'10px',fontWeight:600}}>{m.maquina}</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700}}>{m.tm.toFixed(1)} h</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{porcTM.toFixed(1)}%</td>
+                    <td style={{padding:'10px'}}>
+                      {editandoMaq === m.maquina ? (
+                        <div style={{display:'flex',gap:4}}>
+                          <input
+                            type="number"
+                            value={tempCosto}
+                            onChange={(e) => setTempCosto(e.target.value)}
+                            style={{width:90,padding:'4px',border:'1px solid var(--line)',borderRadius:4,fontSize:12,fontFamily:'var(--mono)'}}
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && guardarCosto(m.maquina)}
+                          />
+                          <button onClick={() => guardarCosto(m.maquina)} style={{background:'var(--good)',color:'white',border:'none',borderRadius:4,padding:'2px 6px',fontSize:11,cursor:'pointer'}}>✓</button>
+                          <button onClick={() => setEditandoMaq(null)} style={{background:'var(--bad)',color:'white',border:'none',borderRadius:4,padding:'2px 6px',fontSize:11,cursor:'pointer'}}>✕</button>
+                        </div>
+                      ) : (
+                        <span style={{fontFamily:'var(--mono)',fontWeight:600}}>$ {costoMaq.toLocaleString()}</span>
+                      )}
+                    </td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700,color:'var(--bad)'}}>$ {fmt(costoTM)}</td>
+                    <td style={{padding:'10px'}}>
+                      {editandoMaq !== m.maquina && (
+                        <button 
+                          onClick={() => {setEditandoMaq(m.maquina); setTempCosto(costoMaq);}}
+                          style={{background:'var(--accent)',color:'white',border:'none',borderRadius:6,padding:'4px 8px',fontSize:11,fontWeight:600,cursor:'pointer'}}
+                        >✏️</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr style={{borderTop:'2px solid var(--line)',fontWeight:700}}>
+                <td style={{padding:'10px'}}>TOTAL</td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{fmt(datos.totalTM)} h</td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)'}}>100%</td>
+                <td style={{padding:'10px'}}></td>
+                <td style={{padding:'10px',fontFamily:'var(--mono)',color:'var(--bad)'}}>$ {fmt(costoTotalTM)}</td>
+                <td style={{padding:'10px'}}></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       
@@ -4894,13 +5043,14 @@ function AnalisisTiemposMuertos({datos}){
             <tbody>
               {datos.topTMGlobal.map(([mot,h],i)=>{
                 const porc = (h / datos.totalTM * 100).toFixed(1);
+                const costoEst = h * costoPromedioHora;
                 return (
                   <tr key={i} style={{borderBottom:'1px solid var(--line)',background:i<3?'rgba(234,179,8,0.05)':'transparent'}}>
                     <td style={{padding:'10px',fontWeight:700,color:i<3?'var(--amber)':'inherit'}}>{i+1}</td>
                     <td style={{padding:'10px'}}>{mot}</td>
                     <td style={{padding:'10px',fontFamily:'var(--mono)',fontWeight:700}}>{h.toFixed(0)} h</td>
                     <td style={{padding:'10px',fontFamily:'var(--mono)'}}>{porc}%</td>
-                    <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(h * costoHora)}</td>
+                    <td style={{padding:'10px',fontFamily:'var(--mono)'}}>$ {fmt(costoEst)}</td>
                   </tr>
                 );
               })}
