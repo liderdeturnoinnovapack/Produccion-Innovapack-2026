@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001W</title>
+<title>Panel de Producción · Innovapack v20261001X</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -5666,9 +5666,14 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
     
     // Clasificar por familia según máquina y referencia
     if (maq.includes('extrusora')) {
-      // Usar campo 'mat' del SKU_MAESTRO si está disponible
-      const sku = window.SKU_MAESTRO?.find(s => (s.ref || '').toLowerCase() === ref);
-      const material = sku?.mat || 'Lámina'; // Default
+      // Buscar en SKU_MAESTRO por referencia (es un objeto, no array)
+      let material = 'Lámina'; // Default
+      if (window.SKU_MAESTRO && r.referencia) {
+        const sku = window.SKU_MAESTRO[r.referencia];
+        if (sku && sku.mat) {
+          material = sku.mat;
+        }
+      }
       
       if (!familias.extrusion[material]) familias.extrusion[material] = 0;
       familias.extrusion[material] += kg;
