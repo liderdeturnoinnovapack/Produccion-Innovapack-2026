@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001X</title>
+<title>Panel de Producción · Innovapack v20261001Y</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -5666,43 +5666,89 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
     
     // Clasificar por familia según máquina y referencia
     if (maq.includes('extrusora')) {
-      // Buscar en SKU_MAESTRO por referencia (es un objeto, no array)
-      let material = 'Lámina'; // Default
+      // Extrusión: Tipo de lámina + Color
+      let material = 'Lámina';
+      let color = 'Transparente';
+      
       if (window.SKU_MAESTRO && r.referencia) {
         const sku = window.SKU_MAESTRO[r.referencia];
-        if (sku && sku.mat) {
-          material = sku.mat;
+        if (sku) {
+          if (sku.mat) material = sku.mat;
+          if (sku.col) color = sku.col;
         }
       }
       
-      if (!familias.extrusion[material]) familias.extrusion[material] = 0;
-      familias.extrusion[material] += kg;
+      // Si no encontró en SKU_MAESTRO, inferir del nombre de referencia
+      if (!window.SKU_MAESTRO || !window.SKU_MAESTRO[r.referencia]) {
+        if (ref.includes('tubular')) material = 'Tubular';
+        else if (ref.includes('semitubular')) material = 'Semitubular';
+        else if (ref.includes('termoencogible')) material = 'Termoencogible';
+        
+        if (ref.includes('blanc')) color = 'Blanco';
+        else if (ref.includes('transp') || ref.includes('cristal')) color = 'Transparente';
+        else if (ref.includes('negro')) color = 'Negro';
+        else if (ref.includes('rojo')) color = 'Rojo';
+        else if (ref.includes('verde')) color = 'Verde';
+      }
+      
+      const clave = `${material} ${color}`;
+      if (!familias.extrusion[clave]) familias.extrusion[clave] = 0;
+      familias.extrusion[clave] += kg;
       
       if (bodega === 'Producto en Proceso') ppPorArea.extrusion += kg;
     }
     else if (maq.includes('impresora')) {
-      const sector = clasificacion.sector || 'Sin clasificar';
+      // Impresión: Sector (Alimentos o Construcción)
+      let sector = clasificacion.sector || 'Sin clasificar';
+      
+      // Inferencia inteligente por palabras clave si no tiene sector
+      if (sector === 'Sin clasificar') {
+        // Palabras clave de Construcción
+        if (ref.includes('pegante') || ref.includes('estuco') || ref.includes('porcelanato') || 
+            ref.includes('ceramico') || ref.includes('cemento') || ref.includes('mortero') ||
+            ref.includes('weber') || ref.includes('sika') || ref.includes('construc')) {
+          sector = 'Construcción';
+        }
+        // Palabras clave de Alimentos
+        else if (ref.includes('alimento') || ref.includes('harina') || ref.includes('azucar') ||
+                 ref.includes('cafe') || ref.includes('arroz') || ref.includes('sal') ||
+                 ref.includes('galleta') || ref.includes('snack') || ref.includes('comida')) {
+          sector = 'Alimentos';
+        }
+      }
+      
       if (!familias.impresion[sector]) familias.impresion[sector] = 0;
       familias.impresion[sector] += kg;
       
       if (bodega === 'Producto en Proceso') ppPorArea.impresion += kg;
     }
     else if (maq.includes('refiladora')) {
-      const tipo = bodega === 'Producto Terminado' ? 'PT' : 'PP';
-      const sector = clasificacion.sector || 'Sin clasificar';
-      const key = `${tipo} - ${sector}`;
-      if (!familias.refilado[key]) familias.refilado[key] = 0;
-      familias.refilado[key] += kg;
+      // Refilado: "Lámina" si es PT, "Lámina Doblada" si es PP
+      const tipo = bodega === 'Producto Terminado' ? 'Lámina' : 'Lámina Doblada';
+      
+      if (!familias.refilado[tipo]) familias.refilado[tipo] = 0;
+      familias.refilado[tipo] += kg;
       
       if (bodega === 'Producto en Proceso') ppPorArea.refilado += kg;
     }
     else if (maq.includes('selladora')) {
+      // Sellado: tipo específico de bolsa
       let tipoBolsa = 'Otra';
-      if (ref.includes('valvulada') && ref.includes('40')) tipoBolsa = 'Valvulada 40kg';
-      else if (ref.includes('valvulada') && (ref.includes('25') || ref.includes('20'))) tipoBolsa = 'Valvulada 25kg';
-      else if (ref.includes('abierta')) tipoBolsa = 'Abierta';
-      else if (ref.includes('agua')) tipoBolsa = 'Agua';
-      else if (ref.includes('flow')) tipoBolsa = 'Flow Pack';
+      
+      if (ref.includes('agua')) {
+        tipoBolsa = 'Agua';
+      }
+      else if (ref.includes('flow')) {
+        tipoBolsa = 'Flow Pack';
+      }
+      else if (ref.includes('valvulada')) {
+        if (ref.includes('40')) tipoBolsa = 'Valvulada 40kg';
+        else if (ref.includes('25') || ref.includes('20')) tipoBolsa = 'Valvulada 25kg';
+        else tipoBolsa = 'Valvulada';
+      }
+      else if (ref.includes('abierta')) {
+        tipoBolsa = 'Abierta';
+      }
       
       if (!familias.sellado[tipoBolsa]) familias.sellado[tipoBolsa] = 0;
       familias.sellado[tipoBolsa] += kg;
