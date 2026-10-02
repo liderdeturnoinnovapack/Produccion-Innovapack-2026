@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001V</title>
+<title>Panel de Producción · Innovapack v20261001W</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -5075,23 +5075,123 @@ function AnalisisTiemposMuertos({datos}){
 function InventarioInforme({datos}){
   const fmt = (n)=>Math.round(n).toLocaleString();
   
+  // PP por área ya viene calculado en datos
+  const ppPorArea = datos.ppPorArea || {extrusion: 0, impresion: 0, refilado: 0};
+  
+  // Familias ya vienen calculadas en datos
+  const familias = datos.familias || {
+    extrusion: {},
+    impresion: {},
+    refilado: {},
+    sellado: {}
+  };
+  
+  // Preparar datos para gráficos de barras
+  const datosGraficoExtrusion = Object.entries(familias.extrusion).map(([tipo, kg]) => ({tipo, kg})).sort((a,b)=>b.kg-a.kg);
+  const datosGraficoImpresion = Object.entries(familias.impresion).map(([tipo, kg]) => ({tipo, kg})).sort((a,b)=>b.kg-a.kg);
+  const datosGraficoSellado = Object.entries(familias.sellado).map(([tipo, kg]) => ({tipo, kg})).sort((a,b)=>b.kg-a.kg);
+  const datosGraficoRefilado = Object.entries(familias.refilado).map(([tipo, kg]) => ({tipo, kg})).sort((a,b)=>b.kg-a.kg);
+  
+  // Función para renderizar gráfico de barras simple
+  const GraficoBarras = ({datos, titulo, color}) => {
+    if (!datos || datos.length === 0) return <div style={{color:'var(--text-dim)',fontSize:13,textAlign:'center',padding:20}}>Sin datos</div>;
+    
+    const maxKg = Math.max(...datos.map(d=>d.kg));
+    const totalKg = datos.reduce((s,d)=>s+d.kg,0);
+    
+    return (
+      <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:16}}>{titulo}</div>
+        <div style={{fontSize:12,color:'var(--text-dim)',marginBottom:12}}>Total: {fmt(totalKg)} kg</div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {datos.map((d,i)=>{
+            const ancho = maxKg > 0 ? (d.kg / maxKg * 100) : 0;
+            const porc = totalKg > 0 ? (d.kg / totalKg * 100) : 0;
+            return (
+              <div key={i}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                  <span style={{fontSize:13,fontWeight:600}}>{d.tipo}</span>
+                  <span style={{fontSize:13,fontWeight:700,fontFamily:'var(--mono)'}}>{fmt(d.kg)} kg</span>
+                </div>
+                <div style={{background:'var(--panel-2)',height:28,borderRadius:6,overflow:'hidden',position:'relative'}}>
+                  <div style={{
+                    background: `linear-gradient(90deg, ${color} 0%, ${color}dd 100%)`,
+                    height:'100%',
+                    width:`${ancho}%`,
+                    transition:'width 0.3s ease',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'flex-end',
+                    paddingRight:8
+                  }}>
+                    <span style={{fontSize:11,fontWeight:700,color:'white',textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                      {porc.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div>
-      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📦 Inventario y Bodega</div>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📦 Inventario y Producción por Familias</div>
       
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
-        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
-          <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>📦 Producto Terminado</div>
-          <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)',marginBottom:8}}>{fmt(datos.prodPTKg)} kg</div>
-          <div style={{fontSize:13,color:'var(--text-dim)'}}>SKUs: {datos.invPT.length}</div>
+      {/* Tarjetas de inventario */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))',gap:16,marginBottom:24}}>
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--good)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:'var(--text-dim)',textTransform:'uppercase'}}>📦 Producto Terminado</div>
+          <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',color:'var(--good)',marginBottom:6}}>{fmt(datos.prodPTKg)} kg</div>
+          <div style={{fontSize:12,color:'var(--text-dim)'}}>SKUs: {datos.invPT.length}</div>
         </div>
-        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
-          <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>⚙️ Producto en Proceso</div>
-          <div style={{fontSize:28,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)',marginBottom:8}}>{fmt(datos.prodPPKg)} kg</div>
-          <div style={{fontSize:13,color:'var(--text-dim)'}}>SKUs: {datos.invPP.length}</div>
+        
+        <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--amber)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:'var(--text-dim)',textTransform:'uppercase'}}>⚙️ Producto en Proceso</div>
+          <div style={{fontSize:32,fontWeight:700,fontFamily:'var(--mono)',color:'var(--amber)',marginBottom:6}}>{fmt(datos.prodPPKg)} kg</div>
+          <div style={{fontSize:11,color:'var(--text-dim)',lineHeight:1.6}}>
+            🏭 Extrusión: <span style={{fontWeight:700}}>{fmt(ppPorArea.extrusion)} kg</span><br/>
+            🎨 Impresión: <span style={{fontWeight:700}}>{fmt(ppPorArea.impresion)} kg</span><br/>
+            ✂️ Refilado: <span style={{fontWeight:700}}>{fmt(ppPorArea.refilado)} kg</span>
+          </div>
         </div>
       </div>
       
+      {/* Gráficos de producción por familias */}
+      <div style={{fontSize:18,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>📊 Producción por Familias del Mes</div>
+      
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(350px, 1fr))',gap:20,marginBottom:20}}>
+        <GraficoBarras 
+          datos={datosGraficoExtrusion} 
+          titulo="🏭 Extrusión por Tipo de Lámina" 
+          color="var(--brand-blue)"
+        />
+        
+        <GraficoBarras 
+          datos={datosGraficoImpresion} 
+          titulo="🎨 Impresión por Sector" 
+          color="var(--brand-green)"
+        />
+        
+        <GraficoBarras 
+          datos={datosGraficoSellado} 
+          titulo="📦 Sellado por Tipo de Bolsa" 
+          color="var(--amber)"
+        />
+        
+        {datosGraficoRefilado.length > 0 && (
+          <GraficoBarras 
+            datos={datosGraficoRefilado} 
+            titulo="✂️ Refilado por Tipo y Sector" 
+            color="#8b5cf6"
+          />
+        )}
+      </div>
+      
+      {/* Top 10 Referencias */}
       <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:20}}>
         <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>🏆 Top 10 Referencias Producidas</div>
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -5542,6 +5642,68 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   const invPT = inventarioBodegaPT(reportesMes);
   const invPP = inventarioBodegaPP(reportesMes);
   
+  // Clasificar producción por familias (usando la lógica del Resumen Ejecutivo)
+  const familias = {
+    extrusion: {},
+    impresion: {},
+    refilado: {},
+    sellado: {}
+  };
+  
+  // PP por área de producción
+  const ppPorArea = {
+    extrusion: 0,
+    impresion: 0,
+    refilado: 0
+  };
+  
+  reportesMes.forEach(r => {
+    const maq = (r.maquina || '').toLowerCase();
+    const ref = (r.referencia || '').toLowerCase();
+    const kg = produccionKg(r);
+    const clasificacion = clasificarReporte(r);
+    const bodega = clasificacion.bodega;
+    
+    // Clasificar por familia según máquina y referencia
+    if (maq.includes('extrusora')) {
+      // Usar campo 'mat' del SKU_MAESTRO si está disponible
+      const sku = window.SKU_MAESTRO?.find(s => (s.ref || '').toLowerCase() === ref);
+      const material = sku?.mat || 'Lámina'; // Default
+      
+      if (!familias.extrusion[material]) familias.extrusion[material] = 0;
+      familias.extrusion[material] += kg;
+      
+      if (bodega === 'Producto en Proceso') ppPorArea.extrusion += kg;
+    }
+    else if (maq.includes('impresora')) {
+      const sector = clasificacion.sector || 'Sin clasificar';
+      if (!familias.impresion[sector]) familias.impresion[sector] = 0;
+      familias.impresion[sector] += kg;
+      
+      if (bodega === 'Producto en Proceso') ppPorArea.impresion += kg;
+    }
+    else if (maq.includes('refiladora')) {
+      const tipo = bodega === 'Producto Terminado' ? 'PT' : 'PP';
+      const sector = clasificacion.sector || 'Sin clasificar';
+      const key = `${tipo} - ${sector}`;
+      if (!familias.refilado[key]) familias.refilado[key] = 0;
+      familias.refilado[key] += kg;
+      
+      if (bodega === 'Producto en Proceso') ppPorArea.refilado += kg;
+    }
+    else if (maq.includes('selladora')) {
+      let tipoBolsa = 'Otra';
+      if (ref.includes('valvulada') && ref.includes('40')) tipoBolsa = 'Valvulada 40kg';
+      else if (ref.includes('valvulada') && (ref.includes('25') || ref.includes('20'))) tipoBolsa = 'Valvulada 25kg';
+      else if (ref.includes('abierta')) tipoBolsa = 'Abierta';
+      else if (ref.includes('agua')) tipoBolsa = 'Agua';
+      else if (ref.includes('flow')) tipoBolsa = 'Flow Pack';
+      
+      if (!familias.sellado[tipoBolsa]) familias.sellado[tipoBolsa] = 0;
+      familias.sellado[tipoBolsa] += kg;
+    }
+  });
+  
   // Alertas
   const alertas = generarAlertas(porMaquina, porcMerma, totalTM / totalHorasDisponibles * 100, eficiencia);
   
@@ -5566,6 +5728,8 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
     topRefsGlobal,
     invPT,
     invPP,
+    familias,
+    ppPorArea,
     alertas,
     // Comparativa
     prodAntKg,
