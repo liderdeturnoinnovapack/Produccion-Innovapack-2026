@@ -5,7 +5,7 @@
 
 window.AsistenteIA = {
   config: {
-    habilitado: true,
+    habilitado: false, // SUSPENDIDO temporalmente
     maxReportes: 30,
     timeout: 15000
   },
