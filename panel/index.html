@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel de Producción · Innovapack v20261001T</title>
+<title>Panel de Producción · Innovapack v20261001U</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   :root{
@@ -4723,12 +4723,64 @@ function AnalisisEficiencia({datos}){
 // Componente: Análisis de Mermas
 function AnalisisMermas({datos}){
   const fmt = (n)=>Math.round(n).toLocaleString();
-  const costoKg = 15000; // Costo promedio por kg (ajustable)
+  
+  // Estado para el costo del kilo (persistido en localStorage)
+  const [costoKg, setCostoKg] = React.useState(() => {
+    const guardado = localStorage.getItem('costoKgMerma');
+    return guardado ? Number(guardado) : 15000;
+  });
+  const [editando, setEditando] = React.useState(false);
+  const [tempCosto, setTempCosto] = React.useState(costoKg);
+  
+  const guardarCosto = () => {
+    const nuevo = Number(tempCosto);
+    if (nuevo > 0 && nuevo < 1000000) {
+      setCostoKg(nuevo);
+      localStorage.setItem('costoKgMerma', nuevo);
+      setEditando(false);
+    }
+  };
+  
   const maquinas = Object.values(datos.porMaquina).sort((a,b)=>b.merma-a.merma);
   
   return (
     <div>
-      <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🚨 Análisis de Mermas</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+        <div style={{fontSize:20,fontWeight:700,fontFamily:'var(--head)'}}>🚨 Análisis de Mermas</div>
+        
+        {/* Campo editable de costo */}
+        <div style={{display:'flex',alignItems:'center',gap:8,background:'var(--card)',border:'1px solid var(--line)',borderRadius:8,padding:'8px 12px'}}>
+          <span style={{fontSize:12,fontWeight:600,color:'var(--text-dim)'}}>Costo/kg:</span>
+          {!editando ? (
+            <>
+              <span style={{fontSize:14,fontWeight:700,fontFamily:'var(--mono)'}}>$ {costoKg.toLocaleString()}</span>
+              <button 
+                onClick={() => {setEditando(true); setTempCosto(costoKg);}}
+                style={{background:'var(--accent)',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}
+              >✏️ Editar</button>
+            </>
+          ) : (
+            <>
+              <input
+                type="number"
+                value={tempCosto}
+                onChange={(e) => setTempCosto(e.target.value)}
+                style={{width:100,padding:'4px 8px',border:'1px solid var(--line)',borderRadius:4,fontSize:13,fontFamily:'var(--mono)'}}
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && guardarCosto()}
+              />
+              <button 
+                onClick={guardarCosto}
+                style={{background:'var(--good)',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}
+              >✓</button>
+              <button 
+                onClick={() => {setEditando(false); setTempCosto(costoKg);}}
+                style={{background:'var(--bad)',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:600,cursor:'pointer'}}
+              >✕</button>
+            </>
+          )}
+        </div>
+      </div>
       
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:16,marginBottom:20}}>
         <div style={{background:'var(--card)',border:'1px solid var(--line)',borderLeft:'4px solid var(--bad)',borderRadius:12,padding:16}}>
