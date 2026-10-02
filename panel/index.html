@@ -4129,14 +4129,88 @@ function inventarioBodegaPP(reportes){
 
 /* ===== SECCIONES DEL INFORME ===== */
 
+// Función auxiliar: clasificar por familia de producto
+function clasificarPorFamilia(reportes) {
+  const familias = {
+    extrusion: {},
+    impresion: {},
+    refilado: {},
+    sellado: {}
+  };
+  
+  reportes.forEach(r => {
+    const maq = r.maquina || r['Maquina'] || '';
+    const ref = String(r.referencia || r['Referencia'] || '').toLowerCase();
+    const kg = produccionKg(r);
+    const cls = clasificarReporte(r);
+    
+    // EXTRUSIÓN: por tipo de material
+    if (maq.indexOf('Extrusora') === 0) {
+      const sku = window.SKU_MAESTRO?.[r.siesa || r.sku];
+      let tipo = sku?.mat || 'Otra';
+      if (tipo === 'Termoencogible') tipo = 'Lámina Termoencogible';
+      if (!familias.extrusion[tipo]) familias.extrusion[tipo] = 0;
+      familias.extrusion[tipo] += kg;
+    }
+    
+    // IMPRESIÓN: por sector (alimentos vs construcción)
+    if (maq === 'Impresora') {
+      const sector = cls.sector || 'Sin clasificar';
+      if (!familias.impresion[sector]) familias.impresion[sector] = 0;
+      familias.impresion[sector] += kg;
+    }
+    
+    // REFILADO: por PT/PP y sector
+    if (maq === 'Refiladora') {
+      const esPT = cls.bodega === 'Producto Terminado';
+      const sector = esPT ? (cls.sector || 'Sin clasificar') : 'Producto en Proceso';
+      const key = esPT ? `PT - ${sector}` : 'PP';
+      if (!familias.refilado[key]) familias.refilado[key] = 0;
+      familias.refilado[key] += kg;
+    }
+    
+    // SELLADO: por tipo de bolsa
+    if (maq.indexOf('Selladora') === 0) {
+      let tipo = 'Otra';
+      if (ref.indexOf('valvulada') >= 0) {
+        if (ref.indexOf('40') >= 0 || ref.indexOf('40kg') >= 0) tipo = 'Bolsa Valvulada 40kg';
+        else if (ref.indexOf('25') >= 0 || ref.indexOf('25kg') >= 0) tipo = 'Bolsa Valvulada 25kg';
+        else tipo = 'Bolsa Valvulada';
+      } else if (ref.indexOf('abierta') >= 0) {
+        tipo = 'Bolsa Abierta';
+      } else if (ref.indexOf('agua') >= 0) {
+        tipo = 'Bolsa de Agua';
+      } else if (ref.indexOf('flow') >= 0 || ref.indexOf('flowpack') >= 0) {
+        tipo = 'Flow Pack';
+      }
+      if (!familias.sellado[tipo]) familias.sellado[tipo] = 0;
+      familias.sellado[tipo] += kg;
+    }
+  });
+  
+  return familias;
+}
+
 // Componente: Resumen Ejecutivo
 function ResumenEjecutivo({datos, reportes, mes, anio}){
   const fmt = (n)=>Math.round(n).toLocaleString();
+  const familias = clasificarPorFamilia(reportes);
   const delta = (val, ant)=> ant > 0 ? ((val - ant) / ant * 100).toFixed(1) : '0.0';
   const deltaColor = (d)=> d > 0 ? 'var(--good)' : d < 0 ? 'var(--bad)' : 'var(--text-dim)';
   const deltaIcon = (d)=> d > 0 ? '↗️' : d < 0 ? '↘️' : '—';
   
-  // Separar producción por área Y por tipo de bodega
+  // Preparar datos de familias para mostrar
+  const extrusionItems = Object.entries(familias.extrusion).sort((a,b)=>b[1]-a[1]);
+  const impresionItems = Object.entries(familias.impresion).sort((a,b)=>b[1]-a[1]);
+  const refiladoItems = Object.entries(familias.refilado).sort((a,b)=>b[1]-a[1]);
+  const selladoItems = Object.entries(familias.sellado).sort((a,b)=>b[1]-a[1]);
+  
+  const totalExtrusion = extrusionItems.reduce((s,[,kg])=>s+kg,0);
+  const totalImpresion = impresionItems.reduce((s,[,kg])=>s+kg,0);
+  const totalRefilado = refiladoItems.reduce((s,[,kg])=>s+kg,0);
+  const totalSellado = selladoItems.reduce((s,[,kg])=>s+kg,0);
+  
+  // Clasificar extrusoras por PP/PT
   const extrusorasPP = [];
   const extrusorasPT = [];
   
@@ -4186,6 +4260,19 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
   // TOTAL Producto Terminado (PT): extrusión PT + refilado PT + sellado
   const totalPT = prodExtrusionPT + prodRefiladoPT + prodSellado;
   
+  const renderFamiliaItem = (nombre, kg, total, icono = '') => {
+    const porc = total > 0 ? (kg / total * 100).toFixed(1) : 0;
+    return (
+      <div key={nombre} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.15)'}}>
+        <span style={{fontSize:11,opacity:0.95}}>{icono} {nombre}</span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:12,fontWeight:700}}>{fmt(kg)} kg</span>
+          <span style={{fontSize:10,opacity:0.7}}>({porc}%)</span>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div>
       <div style={{fontSize:20,fontWeight:700,marginBottom:16,fontFamily:'var(--head)'}}>🎯 Resumen Ejecutivo</div>
@@ -4193,10 +4280,10 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
       {/* Título principal */}
       <div style={{fontSize:16,fontWeight:600,marginBottom:16,color:'var(--text-dim)'}}>📦 Producción por Área del Mes</div>
       
-      {/* Grid de 4 áreas - MEJORADO */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))',gap:20,marginBottom:28}} className="slide-in">
+      {/* Grid de 4 áreas CON DESGLOSE POR FAMILIAS */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))',gap:20,marginBottom:28}} className="slide-in">
         
-        {/* 1. EXTRUSIÓN - MEJORADO */}
+        {/* 1. EXTRUSIÓN - CON FAMILIAS */}
         <div className="card-hover" style={{background:'linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1E40AF 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(59,130,246,0.25)'}}>
           <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(15deg)'}}>🔵</div>
           <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
@@ -4205,33 +4292,21 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
               <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>EXTRUSIÓN</div>
               <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>🏭 Área 1</div>
             </div>
-            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodExtrusion)} kg</div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(totalExtrusion)} kg</div>
             <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Lámina/Tubular producida</div>
             <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
-            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
-              {prodExtrusionPP > 0 && <>
-                <div style={{fontWeight:700,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{background:'rgba(251,191,36,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>⚙️ PP</span>
-                  <span style={{fontSize:14}}>{fmt(prodExtrusionPP)} kg</span>
-                </div>
-                {extrusorasPP.map((m,i)=>(
-                  <div key={i} style={{marginBottom:3,marginLeft:24,fontSize:10.5,opacity:0.9}}>• {m.maquina}: {fmt(m.kg)} kg</div>
-                ))}
-              </>}
-              {prodExtrusionPT > 0 && <>
-                <div style={{fontWeight:700,marginTop:10,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{background:'rgba(255,255,255,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>📦 PT</span>
-                  <span style={{fontSize:14}}>{fmt(prodExtrusionPT)} kg</span>
-                </div>
-                {extrusorasPT.map((m,i)=>(
-                  <div key={i} style={{marginBottom:3,marginLeft:24,fontSize:10.5,opacity:0.9}}>• {m.maquina}: {fmt(m.kg)} kg (termo)</div>
-                ))}
-              </>}
-            </div>
+            
+            {/* DESGLOSE POR TIPO DE MATERIAL */}
+            {extrusionItems.length > 0 && (
+              <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',opacity:0.8,marginBottom:8,letterSpacing:0.5}}>📊 Desglose por Tipo:</div>
+                {extrusionItems.map(([tipo,kg])=>renderFamiliaItem(tipo,kg,totalExtrusion,'•'))}
+              </div>
+            )}
           </div>
         </div>
         
-        {/* 2. IMPRESIÓN (PP) - MEJORADO */}
+        {/* 2. IMPRESIÓN - CON FAMILIAS */}
         <div className="card-hover" style={{background:'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 50%, #6D28D9 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(139,92,246,0.25)'}}>
           <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(-15deg)'}}>🟣</div>
           <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
@@ -4243,22 +4318,24 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
               <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>IMPRESIÓN</div>
               <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>🎨 Área 2</div>
             </div>
-            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodImpresion)} kg</div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(totalImpresion)} kg</div>
             <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Lámina impresa producida</div>
             <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
-            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
-              <div style={{marginBottom:4,display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:18}}>•</span>
-                <span>Impresora: <b>{fmt(prodImpresion)} kg</b></span>
+            
+            {/* DESGLOSE POR SECTOR */}
+            {impresionItems.length > 0 && (
+              <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',opacity:0.8,marginBottom:8,letterSpacing:0.5}}>📊 Desglose por Sector:</div>
+                {impresionItems.map(([sector,kg])=>{
+                  const icono = sector === 'Alimentos' ? '🍕' : sector === 'Construcción' ? '🏗️' : '•';
+                  return renderFamiliaItem(sector,kg,totalImpresion,icono);
+                })}
               </div>
-              <div style={{fontSize:11,opacity:0.85,marginTop:10,padding:'8px 12px',background:'rgba(255,255,255,0.1)',borderRadius:8,backdropFilter:'blur(4px)'}}>
-                <b>{((prodImpresion/totalPP)*100).toFixed(1)}%</b> del PP total
-              </div>
-            </div>
+            )}
           </div>
         </div>
         
-        {/* 3. REFILADO - MEJORADO */}
+        {/* 3. REFILADO - CON FAMILIAS */}
         <div className="card-hover" style={{background:'linear-gradient(135deg, #EC4899 0%, #DB2777 50%, #BE185D 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(236,72,153,0.25)'}}>
           <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(10deg)'}}>🔴</div>
           <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
@@ -4267,29 +4344,24 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
               <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>REFILADO</div>
               <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>✂️ Área 3</div>
             </div>
-            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodRefilado)} kg</div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(totalRefilado)} kg</div>
             <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Lámina refilada producida</div>
             <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
-            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
-              {prodRefiladoPP > 0 && <>
-                <div style={{fontWeight:700,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{background:'rgba(251,191,36,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>⚙️ PP</span>
-                  <span style={{fontSize:14}}>{fmt(prodRefiladoPP)} kg</span>
-                </div>
-                <div style={{marginLeft:24,fontSize:10.5,opacity:0.9}}>• Lámina doblada/tubular</div>
-              </>}
-              {prodRefiladoPT > 0 && <>
-                <div style={{fontWeight:700,marginTop:10,marginBottom:6,display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{background:'rgba(255,255,255,0.3)',padding:'3px 10px',borderRadius:14,fontSize:10,fontWeight:800,backdropFilter:'blur(4px)'}}>📦 PT</span>
-                  <span style={{fontSize:14}}>{fmt(prodRefiladoPT)} kg</span>
-                </div>
-                <div style={{marginLeft:24,fontSize:10.5,opacity:0.9}}>• Lámina cortada (ref con "lámina")</div>
-              </>}
-            </div>
+            
+            {/* DESGLOSE PT/PP Y SECTOR */}
+            {refiladoItems.length > 0 && (
+              <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',opacity:0.8,marginBottom:8,letterSpacing:0.5}}>📊 Desglose PT/PP:</div>
+                {refiladoItems.map(([tipo,kg])=>{
+                  const icono = tipo.indexOf('PT') === 0 ? '📦' : '⚙️';
+                  return renderFamiliaItem(tipo,kg,totalRefilado,icono);
+                })}
+              </div>
+            )}
           </div>
         </div>
         
-        {/* 4. SELLADO (PT) - MEJORADO */}
+        {/* 4. SELLADO - CON FAMILIAS */}
         <div className="card-hover" style={{background:'linear-gradient(135deg, #10B981 0%, #059669 50%, #047857 100%)',borderRadius:16,padding:24,color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 4px 20px rgba(16,185,129,0.25)'}}>
           <div style={{position:'absolute',top:-30,right:-30,fontSize:120,opacity:0.08,lineHeight:1,transform:'rotate(-10deg)'}}>✅</div>
           <div style={{position:'absolute',top:0,right:0,bottom:0,left:0,background:'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',pointerEvents:'none'}}></div>
@@ -4301,20 +4373,17 @@ function ResumenEjecutivo({datos, reportes, mes, anio}){
               <div style={{fontSize:13,fontWeight:800,textTransform:'uppercase',opacity:0.95,letterSpacing:0.8}}>SELLADO</div>
               <div style={{background:'rgba(255,255,255,0.15)',padding:'4px 10px',borderRadius:20,fontSize:10,fontWeight:700,backdropFilter:'blur(8px)'}}>📦 Área 4</div>
             </div>
-            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(prodSellado)} kg</div>
+            <div style={{fontSize:38,fontWeight:800,fontFamily:'var(--mono)',marginBottom:6,letterSpacing:'-0.02em',textShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>{fmt(totalSellado)} kg</div>
             <div style={{fontSize:13,opacity:0.9,marginBottom:16,fontWeight:500}}>Bolsas selladas y empacadas</div>
             <div style={{height:2,background:'linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%)',marginBottom:16,borderRadius:4}}></div>
-            <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
-              {selladoras.map((m,i)=>(
-                <div key={i} style={{marginBottom:4,display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{fontSize:18}}>•</span>
-                  <span>{m.maquina}: <b>{fmt(m.prodKg)} kg</b></span>
-                </div>
-              ))}
-              <div style={{fontSize:11,opacity:0.85,marginTop:10,padding:'8px 12px',background:'rgba(255,255,255,0.1)',borderRadius:8,backdropFilter:'blur(4px)'}}>
-                <b>{((prodSellado/totalPT)*100).toFixed(1)}%</b> del PT total
+            
+            {/* DESGLOSE POR TIPO DE BOLSA */}
+            {selladoItems.length > 0 && (
+              <div style={{fontSize:11.5,opacity:0.95,lineHeight:1.7}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',opacity:0.8,marginBottom:8,letterSpacing:0.5}}>📊 Desglose por Tipo:</div>
+                {selladoItems.map(([tipo,kg])=>renderFamiliaItem(tipo,kg,totalSellado,'•'))}
               </div>
-            </div>
+            )}
           </div>
         </div>
         
