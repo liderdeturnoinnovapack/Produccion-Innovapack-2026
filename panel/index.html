@@ -1912,7 +1912,7 @@ function DetalleReporteModal({r, lam, onClose}){
   );
   const pesos=loadPesos();
   const prodKg=produccionKg(r);
-  const mKg=mermaKg(r);
+  const mKg=mermaKg(r, pesos);  // Pasar pesos para convertir unidades a kg
   const pu=pesoUnidad(r,pesos);
   // ⏱️ Tiempos por proceso (estimado según metas editables). Base kg = peso estimado + merma.
   const metasT=loadMetas();
@@ -1937,7 +1937,7 @@ function DetalleReporteModal({r, lam, onClose}){
         {[
           {label:"Producción",val:(r.produccion||0).toLocaleString()+" "+(r.unidad||""),color:"var(--good)"},
           {label:String(r.unidad||'').toLowerCase().indexOf('kg')===0?"Producción (kg)":"Peso estimado",val:String(r.unidad||'').toLowerCase().indexOf('kg')===0?Math.round(r.produccion||0).toLocaleString()+" kg":(prodKg>0?"≈ "+Math.round(prodKg).toLocaleString()+" kg":"-"),color:"var(--good)"},
-          {label:"Merma",val:mKg>0?"≈ "+Math.round(mKg).toLocaleString()+" kg":(r.mermasCantidad||"-"),color:"var(--bad)"},
+          {label:"Merma",val:mKg>0?"≈ "+Math.round(mKg).toLocaleString()+" kg":(mKg===0?"0 kg":(r.mermasCantidad||"-")),color:"var(--bad)"},
         ].map(x=>(
           <div key={x.label} style={{background:"var(--panel-2)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
             <div style={{fontSize:10.5,fontWeight:600,color:"var(--text-dim)",textTransform:"uppercase",marginBottom:4}}>{x.label}</div>
