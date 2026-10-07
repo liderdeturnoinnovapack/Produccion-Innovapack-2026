@@ -1913,7 +1913,6 @@ function DetalleReporteModal({r, lam, onClose}){
   const pesos=loadPesos();
   const prodKg=produccionKg(r);
   const mKg=mermaKg(r, pesos);  // Pasar pesos para convertir unidades a kg
-  console.log('🐛 DEBUG Modal SIESA:', {ref:r.referencia, mermasCantidad:r.mermasCantidad, mKg, pesos:Object.keys(pesos).length});
   const pu=pesoUnidad(r,pesos);
   // ⏱️ Tiempos por proceso (estimado según metas editables). Base kg = peso estimado + merma.
   const metasT=loadMetas();
@@ -2122,13 +2121,13 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
     const refBuscar = ref.trim().toUpperCase();
     return refR && refBuscar && (refR === refBuscar || refR.includes(refBuscar) || refBuscar.includes(refR));
   });
-  const totalMermaKg = todosRelacionados.reduce((s,r)=>s+sumNumeros(r.mermasCantidad),0);
+  const totalMermaKg = todosRelacionados.reduce((s,r)=>s+mermaKg(r, pesos),0);
   
   // Desglose de merma por máquina
   const mermaPorMaq = {};
   todosRelacionados.forEach(r=>{
     const maq = r.maquina || 'Sin máquina';
-    const merma = sumNumeros(r.mermasCantidad);
+    const merma = mermaKg(r, pesos);
     if(merma > 0){
       if(!mermaPorMaq[maq]) mermaPorMaq[maq] = 0;
       mermaPorMaq[maq] += merma;
