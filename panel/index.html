@@ -1913,6 +1913,7 @@ function DetalleReporteModal({r, lam, onClose}){
   const pesos=loadPesos();
   const prodKg=produccionKg(r);
   const mKg=mermaKg(r, pesos);  // Pasar pesos para convertir unidades a kg
+  console.log('🐛 DEBUG Modal SIESA:', {ref:r.referencia, mermasCantidad:r.mermasCantidad, mKg, pesos:Object.keys(pesos).length});
   const pu=pesoUnidad(r,pesos);
   // ⏱️ Tiempos por proceso (estimado según metas editables). Base kg = peso estimado + merma.
   const metasT=loadMetas();
