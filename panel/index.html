@@ -2138,7 +2138,7 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   // Acumular tiempos por máquina de todos los reportes
   const tiemposPorMaq = {};
   reportes.forEach(r=>{
-    const kgBase = (produccionKg(r)||0) + (mermaKg(r)||0);
+    const kgBase = (produccionKg(r, pesos)||0) + (mermaKg(r, pesos)||0);
     const unidadRep = String(r.unidad||'').toLowerCase();
     const pu = pesoUnidad(r,pesos);
     const undSell = unidadRep.indexOf('kg')===0 ? (pu>0?(Number(r.produccion)||0)/pu:0) : (Number(r.produccion)||0);
@@ -2645,8 +2645,8 @@ function PendientesProceso({reports, okSet, onToggle, onMarcarTodos, puedeEditar
     const g = grupos[k];
     g.n++;
     g.rollos += obtenerRollos(r);
-    g.kg += Math.round(produccionKg(r));
-    g.merma += Math.round(mermaKg(r));
+    g.kg += Math.round(produccionKg(r, pesos));
+    g.merma += Math.round(mermaKg(r, pesos));
   });
   
   // Extraer máquinas únicas para el select
@@ -2776,8 +2776,8 @@ function PendientesProceso({reports, okSet, onToggle, onMarcarTodos, puedeEditar
                         <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}>{r.maquina}</td>
                         <td style={{padding:"7px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.referencia}</td>
                         <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{obtenerRollos(r)}</td>
-                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{Math.round(produccionKg(r)).toLocaleString()}</td>
-                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{Math.round(mermaKg(r)).toLocaleString()}</td>
+                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{Math.round(produccionKg(r, pesos)).toLocaleString()}</td>
+                        <td style={{padding:"7px 10px",whiteSpace:"nowrap",fontFamily:"var(--mono)"}}>{Math.round(mermaKg(r, pesos)).toLocaleString()}</td>
                       </tr>
                     );
                     
@@ -2833,8 +2833,8 @@ function ResumenRefProcesoModal({grupo, reportes, onClose}){
   if(!grupo || !reportes) return null;
   
   const totRollos = reportes.reduce((s, r) => s + obtenerRollos(r), 0);
-  const totKg = reportes.reduce((s, r) => s + Math.round(produccionKg(r)), 0);
-  const totMerma = reportes.reduce((s, r) => s + Math.round(mermaKg(r)), 0);
+  const totKg = reportes.reduce((s, r) => s + Math.round(produccionKg(r, pesos)), 0);
+  const totMerma = reportes.reduce((s, r) => s + Math.round(mermaKg(r, pesos)), 0);
   const pctMerma = totKg > 0 ? ((totMerma / (totKg + totMerma)) * 100).toFixed(1) : 0;
   
   const porTipo = {};
@@ -5372,8 +5372,8 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   const prodAntKg = ppAnt.reduce((s,r)=>s+produccionKg(r),0);
   
   // Mermas (de TODOS los reportes, incluye PT y PP)
-  const mermaTotal = reportesMes.reduce((s,r)=>s+mermaKg(r),0);
-  const mermaAnt = reportesMesAnt.reduce((s,r)=>s+mermaKg(r),0);
+  const mermaTotal = reportesMes.reduce((s,r)=>s+mermaKg(r, pesos),0);
+  const mermaAnt = reportesMesAnt.reduce((s,r)=>s+mermaKg(r, pesos),0);
   const porcMerma = prodTotalKg > 0 ? (mermaTotal / prodTotalKg) * 100 : 0;
   const porcMermaAnt = prodAntKg > 0 ? (mermaAnt / prodAntKg) * 100 : 0;
   
@@ -5413,7 +5413,7 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
       const u = String(r.unidad||'').toLowerCase();
       return s + (u.indexOf('kg')===0 ? 0 : (Number(r.produccion)||0));
     },0);
-    const merma = reps.reduce((s,r)=>s+mermaKg(r),0);
+    const merma = reps.reduce((s,r)=>s+mermaKg(r, pesos),0);
     
     let horasDisp = 0;
     let horasProd = 0;
@@ -5534,8 +5534,8 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   const turnos = [...new Set(reportesMes.map(r=>r.turno).filter(Boolean))];
   turnos.forEach(t => {
     const reps = reportesMes.filter(r=>r.turno===t);
-    const prodKg = reps.reduce((s,r)=>s+produccionKg(r),0);
-    const merma = reps.reduce((s,r)=>s+mermaKg(r),0);
+    const prodKg = reps.reduce((s,r)=>s+produccionKg(r, pesos),0);
+    const merma = reps.reduce((s,r)=>s+mermaKg(r, pesos),0);
     let horasDisp = 0;
     let horasProd = 0;
     let tm = 0;
