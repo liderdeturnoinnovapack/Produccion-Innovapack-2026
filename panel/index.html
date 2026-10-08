@@ -2113,31 +2113,14 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
     if(li && li.tieneLamina) totalLam += li.consumoKg || 0;
   });
   
-  // MERMA TOTAL: buscar TODOS los reportes relacionados por referencia (incluye procesos intermedios)
-  const ref = r0.referencia || grupo.ref || '';
-  const allReports = window.reportesCache || [];
-  const todosRelacionados = allReports.filter(r => {
-    const refR = (r.referencia||'').trim().toUpperCase();
-    const refBuscar = ref.trim().toUpperCase();
-    return refR && refBuscar && (refR === refBuscar || refR.includes(refBuscar) || refBuscar.includes(refR));
-  });
+  // MERMA TOTAL: sumar de TODOS los reportes del grupo (ya vienen filtrados)
+  const totalMermaKg = reportes.reduce((s,r)=>s+mermaKg(r, pesos),0);
   
-  console.log('🐛 DEBUG ResumenRefModal:', {
-    ref,
-    r0_referencia: r0.referencia,
-    grupo_ref: grupo.ref,
-    todosRelacionados: todosRelacionados.length,
-    primerasMermas: todosRelacionados.slice(0,3).map(r=>({maquina:r.maquina, mermasCantidad:r.mermasCantidad, calculado:mermaKg(r,pesos)})),
-    pesosCargados: Object.keys(pesos).length
-  });
-  
-  const totalMermaKg = todosRelacionados.reduce((s,r)=>s+mermaKg(r, pesos),0);
-  
-  console.log('🐛 totalMermaKg calculado:', totalMermaKg);
+  console.log('🐛 totalMermaKg calculado:', totalMermaKg, 'de', reportes.length, 'reportes');
   
   // Desglose de merma por máquina
   const mermaPorMaq = {};
-  todosRelacionados.forEach(r=>{
+  reportes.forEach(r=>{
     const maq = r.maquina || 'Sin máquina';
     const merma = mermaKg(r, pesos);
     if(merma > 0){
@@ -2215,11 +2198,11 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
         ))}
       </div>
       
-      {totalMermaKg > 0 && todosRelacionados.length > 0 && (
+      {totalMermaKg > 0 && reportes.length > 0 && (
         <div style={{marginBottom:16,padding:"12px 14px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:10}}>
           <div style={{fontSize:12,fontWeight:700,marginBottom:10,fontFamily:"var(--head)"}}>📊 Merma por proceso</div>
           <div style={{fontSize:10.5,color:"var(--text-dim)",marginBottom:10}}>
-            Incluye mermas de <b>todos los procesos</b> relacionados con esta referencia ({todosRelacionados.length} reportes analizados: extrusión, impresión, refilado, sellado).
+            Total de mermas de los <b>{reportes.length} reportes</b> de esta referencia.
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))",gap:10}}>
             {mermaPorMaqArray.map(([maq, merma]) => (
