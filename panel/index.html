@@ -2114,7 +2114,7 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   });
   
   // MERMA TOTAL: buscar TODOS los reportes relacionados por referencia (incluye procesos intermedios)
-  const ref = grupo.ref || r0.referencia || '';
+  const ref = r0.referencia || grupo.ref || '';
   const allReports = window.reportesCache || [];
   const todosRelacionados = allReports.filter(r => {
     const refR = (r.referencia||'').trim().toUpperCase();
@@ -2124,6 +2124,8 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   
   console.log('🐛 DEBUG ResumenRefModal:', {
     ref,
+    r0_referencia: r0.referencia,
+    grupo_ref: grupo.ref,
     todosRelacionados: todosRelacionados.length,
     primerasMermas: todosRelacionados.slice(0,3).map(r=>({maquina:r.maquina, mermasCantidad:r.mermasCantidad, calculado:mermaKg(r,pesos)})),
     pesosCargados: Object.keys(pesos).length
