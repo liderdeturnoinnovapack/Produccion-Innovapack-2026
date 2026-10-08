@@ -1062,6 +1062,12 @@ function produccionKg(report, pesos){
 function mermaKg(report, pesos){
   const src = String(report.mermasCantidad || "");
   if(!src || src === "-") return 0;
+  
+  // DEBUG temporal
+  if(src.includes("15") || src.includes("10")){
+    console.log('🔍 mermaKg() procesando:', {src, siesa: report.siesa, referencia: report.referencia});
+  }
+  
   const pu = pesoUnidad(report, pesos);
   let total = 0, m;
   const re = /([\d.]+)\s*([a-zA-ZáéíóúÁÉÍÓÚ]+)?/g;
@@ -1071,6 +1077,12 @@ function mermaKg(report, pesos){
     if(unit.indexOf("unid") === 0 || unit === "und" || unit === "u") total += pu > 0 ? n * pu : 0;
     else total += n; // Kg o sin unidad → se asume kg
   }
+  
+  // DEBUG temporal
+  if(src.includes("15") || src.includes("10")){
+    console.log('🔍 mermaKg() resultado:', {total, pu});
+  }
+  
   return total;
 }
 
