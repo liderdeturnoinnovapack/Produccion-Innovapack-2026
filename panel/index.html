@@ -2121,7 +2121,17 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
     const refBuscar = ref.trim().toUpperCase();
     return refR && refBuscar && (refR === refBuscar || refR.includes(refBuscar) || refBuscar.includes(refR));
   });
+  
+  console.log('🐛 DEBUG ResumenRefModal:', {
+    ref,
+    todosRelacionados: todosRelacionados.length,
+    primerasMermas: todosRelacionados.slice(0,3).map(r=>({maquina:r.maquina, mermasCantidad:r.mermasCantidad, calculado:mermaKg(r,pesos)})),
+    pesosCargados: Object.keys(pesos).length
+  });
+  
   const totalMermaKg = todosRelacionados.reduce((s,r)=>s+mermaKg(r, pesos),0);
+  
+  console.log('🐛 totalMermaKg calculado:', totalMermaKg);
   
   // Desglose de merma por máquina
   const mermaPorMaq = {};
