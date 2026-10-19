@@ -2116,8 +2116,6 @@ function ResumenRefModal({grupo, reportes, lamInfo, onClose}){
   // MERMA TOTAL: sumar de TODOS los reportes del grupo (ya vienen filtrados)
   const totalMermaKg = reportes.reduce((s,r)=>s+mermaKg(r, pesos),0);
   
-  console.log('🐛 totalMermaKg calculado:', totalMermaKg, 'de', reportes.length, 'reportes');
-  
   // Desglose de merma por máquina
   const mermaPorMaq = {};
   reportes.forEach(r=>{
