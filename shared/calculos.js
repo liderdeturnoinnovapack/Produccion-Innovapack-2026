@@ -978,7 +978,8 @@ async function saveReport(report, url){
 
   const resp = await fetch(url, { method:"POST", body: JSON.stringify(payload) });
   const result = await resp.json();
-  if(result.status !== "ok") throw new Error("Sheets error: " + (result.message||""));
+  // Acepta tanto {status:"ok"} como {ok:true}
+  if(result.status !== "ok" && result.ok !== true) throw new Error("Sheets error: " + (result.message||""));
 }
 
 
