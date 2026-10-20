@@ -87,6 +87,9 @@ const { useState, useEffect } = React;
 const SHEETS_URL_READ = "https://script.google.com/macros/s/AKfycbxAWxEyCh6W8j6iMytZ3-hHgcjrSOEAAREtCJn7BSetzZ0QiiwDzdHvzOhiojkO3iYIeQ/exec";
 window.__CONFIG_URL = SHEETS_URL_READ; // el panel lee reportes y lee/ESCRIBE la config compartida
 
+// Helper: obtener bodega del reporte (prioriza campo guardado, fallback a cálculo)
+function getBodega(r){ return r.bodega || clasificarReporte(r).bodega; }
+
 const inputStyle = {
   width:"100%", padding:"10px 13px", background:"var(--card)", border:"1px solid var(--line)",
   borderRadius:9, color:"var(--text)", fontSize:14, fontFamily:"var(--sans)", outline:"none",
@@ -247,8 +250,8 @@ function ProdCard({reports}){
   const [open,setOpen]=useState(false);
   const ALLM = MAQUINAS_KG.concat(MAQUINAS_UND);
   // Kg por bodega: TODAS las máquinas (las selladoras convierten unidades→kg por peso de referencia).
-  const repsPT = reports.filter(r=>clasificarReporte(r).bodega==="Producto Terminado");
-  const repsPP = reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso");
+  const repsPT = reports.filter(r=>getBodega(r)==="Producto Terminado");
+  const repsPP = reports.filter(r=>getBodega(r)==="Producto en Proceso");
   const repsUnd= reports.filter(r=>MAQUINAS_UND.includes(r.maquina));
   const sumKg = list => Math.round(list.reduce((s,r)=>s+produccionKg(r),0));
   const totalKgPT=sumKg(repsPT), totalKgPP=sumKg(repsPP);
@@ -948,7 +951,7 @@ function BodegaView({reports,titulo,showFiltros}){
 
   const getCategoria=r=>clasificarReporte(r).categoria;
   const getSector=r=>clasificarReporte(r).sector;
-  const rb=reports.filter(r=>clasificarReporte(r).bodega===titulo);
+  const rb=reports.filter(r=>getBodega(r)===titulo);
 
   const tipos=["Todos",...new Set(rb.map(getCategoria).filter(x=>x&&x!=="-"))].sort();
   const sectores=["Todos",...new Set(rb.map(getSector).filter(x=>x&&x!=="-"))].sort();
@@ -1412,8 +1415,8 @@ function TrazabilidadModal({siesa, reports, onClose}){
   const lamInfo=laminaConsumoInfo(reports); // info de consumo de lámina por reporte
   const totalUnd=rows.reduce((s,r)=>{const u=String(r.unidad||"").toLowerCase();return s+(u.indexOf("kg")===0?0:(Number(r.produccion)||0));},0);
   // Peso separado por bodega: NO mezclar producto terminado con producto en proceso.
-  const kgPT=rows.filter(r=>clasificarReporte(r).bodega==="Producto Terminado").reduce((s,r)=>s+produccionKg(r,p),0);
-  const kgPP=rows.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso").reduce((s,r)=>s+produccionKg(r,p),0);
+  const kgPT=rows.filter(r=>getBodega(r)==="Producto Terminado").reduce((s,r)=>s+produccionKg(r,p),0);
+  const kgPP=rows.filter(r=>getBodega(r)==="Producto en Proceso").reduce((s,r)=>s+produccionKg(r,p),0);
   
   // MERMA TOTAL: buscar TODOS los reportes relacionados por referencia (con o sin SIESA)
   // para sumar las mermas de TODOS los procesos (extrusión, impresión, refilado, sellado)
@@ -1637,7 +1640,7 @@ function InventarioRollos({reports, okSet}){
   const tipoColor=t=>TIPO_COLORS[t]||"#64748B";
 
   // Solo reportes cuya bodega es "Producto en Proceso" (excluye la excepción Termo→PT).
-  const base=reports.filter(r=>clasificarReporte(r).bodega==="Producto en Proceso");
+  const base=reports.filter(r=>getBodega(r)==="Producto en Proceso");
   const all=inventarioPP_Agrupado(base, okSet);
 
   // Opciones de filtro derivadas de los datos.
@@ -1850,7 +1853,7 @@ function InventarioFisico({bodega,reports}){
 function InventarioPT({reports}){
   const [buscar,setBuscar]=useState("");
   const [traza,setTraza]=useState(null);
-  const list=reports.filter(r=>clasificarReporte(r).bodega==="Producto Terminado");
+  const list=reports.filter(r=>getBodega(r)==="Producto Terminado");
   let inv=inventarioPT(list);
   if(buscar.trim()) inv=inv.filter(x=>((x.referencia||"")+" "+(x.siesa||"")).toLowerCase().includes(buscar.trim().toLowerCase()));
   const totalUnd=inv.reduce((s,x)=>s+x.unidades,0);
@@ -2592,7 +2595,11 @@ function PendientesProceso({reports, okSet, onToggle, onMarcarTodos, puedeEditar
   const [fReferencia,setFReferencia]=useState("");
   const [fCodigo,setFCodigo]=useState("");
   
-  const pendPP = reports.filter(r => clasificarReporte(r).bodega === "Producto en Proceso" && !okSet.has(reporteId(r)));
+  // Usar la bodega que viene del Sheet (ya clasificada al guardar) en lugar de recalcular
+  const pendPP = reports.filter(r => {
+    const bodega = getBodega(r); // Priorizar bodega del Sheet
+    return bodega === "Producto en Proceso" && !okSet.has(reporteId(r));
+  });
   const totalPend = pendPP.length;
   
   const q = buscar.trim().toLowerCase();
@@ -4102,7 +4109,7 @@ function tiemposMuertosMinutos(reporte){
 // Inventario Bodega PT (simplificado para el informe)
 function inventarioBodegaPT(reportes){
   const invMap = {};
-  reportes.filter(r=>clasificarReporte(r).bodega==='Producto Terminado').forEach(r=>{
+  reportes.filter(r=>getBodega(r)==='Producto Terminado').forEach(r=>{
     const ref = r.referencia || 'Sin referencia';
     if(!invMap[ref]) invMap[ref] = {ref, kg: 0};
     invMap[ref].kg += produccionKg(r);
@@ -4113,7 +4120,7 @@ function inventarioBodegaPT(reportes){
 // Inventario Bodega PP (simplificado para el informe)
 function inventarioBodegaPP(reportes){
   const invMap = {};
-  reportes.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso').forEach(r=>{
+  reportes.filter(r=>getBodega(r)==='Producto en Proceso').forEach(r=>{
     const ref = r.referencia || 'Sin referencia';
     if(!invMap[ref]) invMap[ref] = {ref, kg: 0};
     invMap[ref].kg += produccionKg(r);
@@ -5348,8 +5355,8 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   const pesos = loadPesos();
   
   // Producto Terminado vs En Proceso
-  const pt = reportesMes.filter(r=>clasificarReporte(r).bodega==='Producto Terminado');
-  const pp = reportesMes.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso');
+  const pt = reportesMes.filter(r=>getBodega(r)==='Producto Terminado');
+  const pp = reportesMes.filter(r=>getBodega(r)==='Producto en Proceso');
   const prodPTKg = pt.reduce((s,r)=>s+produccionKg(r),0);
   const prodPPKg = pp.reduce((s,r)=>s+produccionKg(r),0);
   
@@ -5362,7 +5369,7 @@ function calcularDatosInforme(reportesMes, reportesMesAnt){
   },0);
   
   // Mes anterior (misma lógica)
-  const ppAnt = reportesMesAnt.filter(r=>clasificarReporte(r).bodega==='Producto en Proceso');
+  const ppAnt = reportesMesAnt.filter(r=>getBodega(r)==='Producto en Proceso');
   const prodAntKg = ppAnt.reduce((s,r)=>s+produccionKg(r),0);
   
   // Mermas (de TODOS los reportes, incluye PT y PP)
