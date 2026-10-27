@@ -1215,6 +1215,9 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   const [buscarCat,setBuscarCat]=useState(""); // buscador del catálogo
   const [f,setF]=useState({siesa:"",sku:"",referencia:"",bodega:"Producto Terminado",categoria:"Bolsa abierta",sector:"Construcción",peso:"",medida:""});
   const [newMachine,setNewMachine]=useState("");
+  const [newOperarioNombre,setNewOperarioNombre]=useState("");
+  const [newOperarioCargo,setNewOperarioCargo]=useState("");
+  const [operarios,setOperarios]=useState(loadOperarios());
   const [msg,setMsg]=useState("");
   const [editando,setEditando]=useState(null); // producto en edición
 
@@ -1264,6 +1267,22 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   function removeCode(s){ const list=catalog.filter(c=>c.siesa!==s); setCatalog(list); saveCatalog(list); }
   function addMachine(e){ e.preventDefault(); if(!newMachine||machines.includes(newMachine))return; const u=[...machines,newMachine]; setMachines(u); saveMachines(u); setNewMachine(""); }
   function removeMachine(m){ const u=machines.filter(x=>x!==m); setMachines(u); saveMachines(u); }
+  
+  function addOperario(e){ 
+    e.preventDefault(); 
+    if(!newOperarioNombre.trim())return; 
+    const nuevo={nombre:newOperarioNombre.trim(), cargo:newOperarioCargo.trim()||"Sin cargo"}; 
+    const u=[...operarios,nuevo]; 
+    setOperarios(u); 
+    saveOperarios(u); 
+    setNewOperarioNombre(""); 
+    setNewOperarioCargo(""); 
+  }
+  function removeOperario(idx){ 
+    const u=operarios.filter((op,i)=>i!==idx); 
+    setOperarios(u); 
+    saveOperarios(u); 
+  }
 
   const esProceso=f.bodega==="Producto en Proceso";
   const autoPeso=pesoPorTipoDe(f.categoria,f.sector,f.referencia); // peso sugerido por tipo
@@ -1272,7 +1291,7 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
   return(
     <div style={{display:"flex",gap:14,marginBottom:30,flexWrap:"wrap"}}>
       <button onClick={()=>setShowSKU(true)} style={cardBtn}><span style={{fontSize:20}}>🏷️</span><div style={{textAlign:"left"}}><div>Códigos SKU / Siesa</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{catalog.length} referencias</div></div></button>
-      <button onClick={()=>setShowMachines(true)} style={cardBtn}><span style={{fontSize:20}}>⚙️</span><div style={{textAlign:"left"}}><div>Máquinas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{machines.length} registradas</div></div></button>
+      <button onClick={()=>setShowMachines(true)} style={cardBtn}><span style={{fontSize:20}}>⚙️</span><div style={{textAlign:"left"}}><div>Máquinas y Operarios</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{machines.length} máquinas · {operarios.length} operarios</div></div></button>
       {onEditMetas && <button onClick={onEditMetas} style={cardBtn}><span style={{fontSize:20}}>🎯</span><div style={{textAlign:"left"}}><div>Metas</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>Editar metas por máquina</div></div></button>}
       <button onClick={()=>setShowPesos(true)} style={cardBtn}><span style={{fontSize:20}}>⚖️</span><div style={{textAlign:"left"}}><div>Pesos de productos</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>{nPesos} con peso definido</div></div></button>
       <button onClick={()=>setShowPermisos(true)} style={cardBtn}><span style={{fontSize:20}}>👥</span><div style={{textAlign:"left"}}><div>Permisos por usuario</div><div style={{fontWeight:400,fontSize:12,color:"var(--text-dim)",marginTop:2}}>Qué pestañas ve cada quien</div></div></button>
@@ -1379,16 +1398,35 @@ function CatalogEditor({catalog,setCatalog,machines,setMachines,onEditMetas}){
         </Modal>
       )}
       {showMachines && (
-        <Modal title="Máquinas" onClose={()=>setShowMachines(false)}>
-          <form onSubmit={addMachine} style={{display:"flex",gap:8,marginBottom:14}}>
-            <input style={inputStyle} placeholder="Nombre de la máquina" value={newMachine} onChange={e=>setNewMachine(e.target.value)}/>
-            <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"0 16px",fontWeight:700,cursor:"pointer"}}>+</button>
-          </form>
-          {machines.map(m=>(
-            <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13}}>
-              <span>{m}</span><button onClick={()=>removeMachine(m)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+        <Modal title="⚙️ Máquinas y Operarios" onClose={()=>setShowMachines(false)}>
+          <div style={{marginBottom:24}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:10,color:"var(--accent)"}}>🏭 Máquinas</div>
+            <form onSubmit={addMachine} style={{display:"flex",gap:8,marginBottom:14}}>
+              <input style={inputStyle} placeholder="Nombre de la máquina" value={newMachine} onChange={e=>setNewMachine(e.target.value)}/>
+              <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"0 16px",fontWeight:700,cursor:"pointer"}}>+</button>
+            </form>
+            {machines.map(m=>(
+              <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13}}>
+                <span>{m}</span><button onClick={()=>removeMachine(m)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:10,color:"var(--accent)"}}>👷 Operarios</div>
+            <form onSubmit={addOperario} style={{display:"flex",gap:8,marginBottom:14}}>
+              <input style={{...inputStyle,flex:2}} placeholder="Nombre del operario" value={newOperarioNombre} onChange={e=>setNewOperarioNombre(e.target.value)}/>
+              <input style={{...inputStyle,flex:1}} placeholder="Cargo" value={newOperarioCargo} onChange={e=>setNewOperarioCargo(e.target.value)}/>
+              <button type="submit" style={{background:"var(--accent)",color:"#fff",border:"none",borderRadius:8,padding:"0 16px",fontWeight:700,cursor:"pointer"}}>+</button>
+            </form>
+            <div style={{maxHeight:300,overflowY:"auto"}}>
+              {operarios.map((op,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13}}>
+                  <div style={{flex:1}}><span style={{fontWeight:600}}>{op.nombre}</span><span style={{color:"var(--text-dim)",marginLeft:8,fontSize:12}}>({op.cargo})</span></div>
+                  <button onClick={()=>removeOperario(i)} style={{background:"none",border:"none",color:"var(--bad)",cursor:"pointer",fontSize:13}}>quitar</button>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </Modal>
       )}
     </div>

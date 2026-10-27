@@ -213,7 +213,7 @@ function MachineFields({maquina, datosExtra, setDatosExtra}){
   return null;
 }
 
-function FormView({catalog, machines}){
+function FormView({catalog, machines, operarios}){
   const [nombre,setNombre]=useState(""); const [cargo,setCargo]=useState("");
   const [maquina,setMaquina]=useState(""); const [horaInicio,setHoraInicio]=useState("");
   const [horaFinal,setHoraFinal]=useState(""); const [turno,setTurno]=useState("");
@@ -290,12 +290,12 @@ function FormView({catalog, machines}){
           setNombre(selected);
           // Auto-completar cargo según el operario seleccionado
           if(selected){
-            const operario = (window.OPERARIOS||[]).find(op => op.nombre === selected);
+            const operario = (operarios||[]).find(op => op.nombre === selected);
             if(operario) setCargo(operario.cargo);
           }
         }}>
           <option value="">Selecciona tu nombre</option>
-          {(window.OPERARIOS||[]).map(op=><option key={op.nombre} value={op.nombre}>{op.nombre}</option>)}
+          {(operarios||[]).map((op,i)=><option key={i} value={op.nombre}>{op.nombre}</option>)}
         </select>
       </Field>
       <Field label="Cargo">
@@ -401,17 +401,18 @@ function ThemeToggle({theme,setTheme}){
 function App(){
   const [catalog,setCatalog] = useState(loadCatalog());
   const [machines,setMachines] = useState(loadMachines());
+  const [operarios,setOperarios] = useState(loadOperarios());
   const [theme,setTheme]=useState(()=>{try{return localStorage.getItem('tema-reporte')||'light';}catch(e){return 'light';}});
   useEffect(()=>{document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('tema-reporte',theme);}catch(e){}},[theme]);
-  // Trae la config compartida (catálogo/máquinas/clasificación) desde el Sheet.
-  useEffect(()=>{ loadConfigRemoto(SHEETS_URL_WRITE).then(()=>{ setCatalog(loadCatalog()); setMachines(loadMachines()); }); },[]);
+  // Trae la config compartida (catálogo/máquinas/clasificación/operarios) desde el Sheet.
+  useEffect(()=>{ loadConfigRemoto(SHEETS_URL_WRITE).then(()=>{ setCatalog(loadCatalog()); setMachines(loadMachines()); setOperarios(loadOperarios()); }); },[]);
   return (
     <div id="app-root">
       <header style={{background:"var(--header-bg)",borderBottom:"3px solid var(--brand-blue)",boxShadow:"0 3px 0 0 var(--brand-green)",padding:"0 32px",display:"flex",alignItems:"center",justifyContent:"space-between",height:60,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
         <Logo/>
         <ThemeToggle theme={theme} setTheme={setTheme}/>
       </header>
-      <FormView catalog={catalog} machines={machines}/>
+      <FormView catalog={catalog} machines={machines} operarios={operarios}/>
     </div>
   );
 }

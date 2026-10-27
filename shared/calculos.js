@@ -192,6 +192,12 @@ function loadMachines(){
 }
 function saveMachines(list){ try{ localStorage.setItem('catalogo-maquinas', JSON.stringify(list)); }catch(e){} postConfig_('maquinas', list); }
 
+function loadOperarios(){
+  try{ const r = localStorage.getItem('catalogo-operarios'); return r ? JSON.parse(r) : window.OPERARIOS.slice(); }
+  catch(e){ return window.OPERARIOS.slice(); }
+}
+function saveOperarios(list){ try{ localStorage.setItem('catalogo-operarios', JSON.stringify(list)); }catch(e){} postConfig_('operarios', list); }
+
 function loadMetas(){
   try{ const r = localStorage.getItem('metas-produccion'); return r ? JSON.parse(r) : window.DEFAULT_METAS; }
   catch(e){ return window.DEFAULT_METAS; }
@@ -202,7 +208,7 @@ function saveMetas(m){ try{ localStorage.setItem('metas-produccion', JSON.string
    metas, pesos, catálogo, máquinas y clasificación se sincronizan con una hoja
    "Config" del Sheet vía Apps Script, además de quedar en localStorage (caché
    offline). Cada app define window.__CONFIG_URL con su endpoint. */
-var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override', corte_override_pp:'corte-override-pp', calidad_verif:'calidad-verif' };
+var _CFG_KEYS = { catalogo_extra:'catalogo-extra', maquinas:'catalogo-maquinas', operarios:'catalogo-operarios', metas:'metas-produccion', pesos:'pesos-siesa', clasificacion:'clasificacion-siesa', siesa_ok:'siesa-ok', reportes_siesa:'reportes-siesa-ok', pedidos_extra:'pedidos-extra', despachos:'despachos', ajustes_inventario:'ajustes-inventario', permisos_usuario:'permisos-usuario', corte_override:'corte-override', corte_override_pp:'corte-override-pp', calidad_verif:'calidad-verif' };
 
 async function postConfig_(clave, valor){
   if(!window.__CONFIG_URL) return;
