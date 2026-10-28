@@ -70,9 +70,11 @@ function normalizarReporte(r){
      si trae keys legibles ("Fecha", "Nombre") lo mapeamos. */
   var out = r;
   if(r['Nombre'] !== undefined || r['Maquina'] !== undefined){
-    // Derivar timestamp de Fecha ISO
-    var tsVal = 0;
-    try{ tsVal = new Date(r['Fecha']).getTime(); }catch(e){}
+    // Usar timestamp del servidor si existe, sino derivarlo de Fecha ISO
+    var tsVal = r['ts'] || 0;
+    if(!tsVal){
+      try{ tsVal = new Date(r['Fecha']).getTime(); }catch(e){}
+    }
     // Formatear fecha a DD/MM/AAAA HH:MM en hora de Bogotá
     var fechaStr = '';
     try{
