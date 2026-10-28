@@ -184,9 +184,21 @@ function leerReportesMaquina(maquina) {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       
+      // Parsear fecha para generar timestamp
+      const fechaStr = parseFecha(row[0]);
+      let ts = 0;
+      if (fechaStr) {
+        try {
+          ts = new Date(fechaStr + 'T00:00:00').getTime();
+        } catch (e) {
+          ts = Date.now();
+        }
+      }
+      
       // Construir objeto reporte con las 43 columnas (nombres legibles para el frontend)
       const reporte = {
-        'Fecha': parseFecha(row[0]),
+        'ts': ts,  // Agregar timestamp para ordenamiento
+        'Fecha': fechaStr,
         'Nombre': String(row[1] || '').trim(),
         'Cargo': String(row[2] || '').trim(),
         'Maquina': String(row[3] || '').trim(),
@@ -253,7 +265,7 @@ function leerReportesMaquina(maquina) {
 function leerTodosReportes() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const maquinas = ['Extrusora 1', 'Extrusora 2', 'Extrusora 3', 'Refiladora', 'Impresora', 'Selladora 1', 'Selladora 2'];
+    const maquinas = ['Extrusora 1', 'Extrusora 2', 'Extrusora 3', 'Refiladora', 'Impresora', 'Selladora 1', 'Selladora 2', 'Selladora Manual'];
     const todosReportes = [];
     
     maquinas.forEach(maquina => {
@@ -265,9 +277,21 @@ function leerTodosReportes() {
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
           
+          // Parsear fecha para generar timestamp
+          const fechaStr = parseFecha(row[0]);
+          let ts = 0;
+          if (fechaStr) {
+            try {
+              ts = new Date(fechaStr + 'T00:00:00').getTime();
+            } catch (e) {
+              ts = Date.now();
+            }
+          }
+          
           // Construir objeto reporte con las 43 columnas (nombres legibles)
           const reporte = {
-            'Fecha': parseFecha(row[0]),
+            'ts': ts,  // Agregar timestamp para ordenamiento
+            'Fecha': fechaStr,
             'Nombre': String(row[1] || '').trim(),
             'Cargo': String(row[2] || '').trim(),
             'Maquina': String(row[3] || '').trim(),
