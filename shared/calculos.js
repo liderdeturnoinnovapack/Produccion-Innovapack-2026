@@ -730,8 +730,8 @@ function getNextConsecutivo(maquina){
    Excepciones que van directo a PRODUCTO TERMINADO (aunque sean de máquina
    de proceso):
      · Extrusora 2 + Lámina Termoencogible
-     · Refiladora + referencia de "lámina" (las que dicen "bolsa" siguen en
-       proceso como Lámina Doblada). */
+     · Refiladora + referencia de "lámina" o "SIKA" (las que dicen "bolsa" 
+       siguen en proceso como Lámina Doblada). */
 function clasificarReporte(r){
   const cls = loadClasificacion();
   const c = cls[r.siesa] || cls[r.sku] || {};
@@ -739,6 +739,7 @@ function clasificarReporte(r){
   const esTermo = c.categoria === "Lámina Termoencogible";
   const ref = String(r.referencia || "").toLowerCase();
   const refLamina = ref.indexOf("lamina") !== -1 || ref.indexOf("lámina") !== -1;
+  const refSika = ref.indexOf("sika") !== -1;
 
   let categoria = c.categoria || "-";
   if(r.maquina === "Impresora") categoria = "Lámina Impresa";
@@ -747,7 +748,7 @@ function clasificarReporte(r){
   if(esProceso){
     const vaATerminado =
       (r.maquina === "Extrusora 2" && esTermo) ||   // termoencogible de Extrusora 2
-      (r.maquina === "Refiladora" && refLamina);    // lámina refilada
+      (r.maquina === "Refiladora" && (refLamina || refSika));    // lámina refilada o SIKA
     if(vaATerminado){
       bodega = "Producto Terminado";
       sector = c.sector || "-";
