@@ -390,10 +390,9 @@ function leerConfig() {
       }
     }
     
-    return ContentService.createTextOutput(JSON.stringify({
-      ok: true,
-      config: config
-    })).setMimeType(ContentService.MimeType.JSON);
+    // Retornar las claves directamente en el nivel superior (no dentro de "config")
+    // para que el frontend pueda leerlas con: cfg.operarios, cfg.maquinas, etc.
+    return ContentService.createTextOutput(JSON.stringify(config)).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({
